@@ -19,7 +19,7 @@
  */
 
 /*
-**  $Id: msg.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
+**  $Id: msg.h,v 1.2 1997/07/24 05:16:29 cbehrens Exp $
 */
 
 #ifndef	__msg_include__
@@ -143,8 +143,10 @@ extern int m_service(), m_servset(), m_servlist(), m_squery();
 #ifdef TSDEBUG
 extern int m_ts();
 #endif
+#ifndef PUT_KLINES_IN_IRCD_CONF
 #ifdef SEPARATE_QUOTE_KLINES_BY_DATE 
 extern  int	m_addklines();
+#endif
 #endif
 #if defined(OPER_REHASH) || defined(LOCOP_REHASH)
 extern	int	m_rehash();
@@ -235,12 +237,16 @@ struct Message msgtab[] = {
 	{ MSG_DNS,	m_dns,		0, MAXPARA, 1, 0L },
 #if defined(OPER_REHASH) || defined(LOCOP_REHASH)
 	{ MSG_REHASH,	m_rehash,	0, MAXPARA, 1, 0L },
+#ifndef PUT_KLINES_IN_IRCD_CONF
 #ifdef SEPARATE_QUOTE_KLINES_BY_DATE
 	{ MSG_REHASHADD,m_rehashadd,	0, MAXPARA,1,0L},
 #endif
 #endif
+#endif
+#ifndef PUT_KLINES_IN_IRCD_CONF
 #ifdef SEPARATE_QUOTE_KLINES_BY_DATE 
 	{ MSG_ADDKLINES,m_addklines,	0, MAXPARA, 1, 0L },
+#endif
 #endif
 #if defined(OPER_RESTART) || defined(LOCOP_RESTART)
 	{ MSG_RESTART,	m_restart,	0, MAXPARA, 1, 0L },

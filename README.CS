@@ -1,8 +1,8 @@
 ---
-$Id: README.CS,v 1.1.1.1 1997/07/23 18:02:01 cbehrens Exp $
+$Id: README.CS,v 1.2 1997/07/24 05:13:29 cbehrens Exp $
 ---
 
-This is the README for irc2.8.21+CSr30.  Basically, this is just a list
+This is the README for irc2.8.21+CSr30.5.  Basically, this is just a list
 of changes...more information can be found in include/comstud.h.
 
 Any questions or comments can be directed to cbehrens@concentric.net
@@ -15,6 +15,14 @@ The newest versions of +CS ircds can be found at:
 
 NOTE: Please change values in comstud.h to your liking...
       The default values are probably less than ideal for you! 
+
+New in CSr30.5:
+
+1) Bug fix for those who use select() instead of poll().  highfd in
+    s_bsd.c not being set correctly.
+2) Typo in CSr30 for BSD/OS 3.0 fixed, plus other code removed
+3) SHOW_NICKNAMES wasn't completed...fixed.
+
 
 New in CSr30:
 

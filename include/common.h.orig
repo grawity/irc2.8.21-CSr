@@ -18,7 +18,7 @@
  */
 
 /*
-**  $Id: common.h,v 1.2 1997/07/24 05:13:33 cbehrens Exp $
+**  $Id: common.h,v 1.1.1.1 1997/07/23 18:02:01 cbehrens Exp $
 */
 
 #ifndef	__common_include__
@@ -58,13 +58,11 @@
 #define FALSE (0)
 #define TRUE  (!FALSE)
 
-#if 0
 #ifndef	MALLOCH
 char	*malloc(), *calloc();
 void	free();
 #else
 #include MALLOCH
-#endif
 #endif
 
 extern	int	irc_sprintf();

@@ -35,7 +35,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: s_bsd.c,v 1.2 1997/07/24 05:13:39 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: s_bsd.c,v 1.1.1.1 1997/07/23 18:02:04 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -62,8 +62,8 @@ static  char rcsid[] = "@(#)$Id: s_bsd.c,v 1.2 1997/07/24 05:13:39 cbehrens Exp 
 #endif
 
 int rcvbufmax = 0, sndbufmax = 0;
-#if !defined(USE_POLL) && defined(FD_ALLOC)
-fd_set *read_set, *write_set;
+#if !defined(USE_POLL) && defined(HAVE_FD_ALLOC)
+read_set *read_set, *write_set;
 #endif
 
 aClient	*local[MAXCONNECTIONS];
@@ -545,7 +545,7 @@ void	init_sys()
 	}
 init_dgram:
 	resfd = init_resolver(0x1f);
-#if !defined(USE_POLL) && defined(FD_ALLOC)
+#if !defined(USE_POLL) && defined(HAVE_FD_ALLOC)
 	read_set = FD_ALLOC(MAXCONNECTIONS+50);
 	write_set = FD_ALLOC(MAXCONNECTIONS+50);
 #endif
@@ -1525,7 +1525,7 @@ fdlist	*listp;
 	u_long	us;
 	time_t	now;
 #endif
-#ifndef FD_ALLOC
+#ifndef HAVE_FD_ALLOC
 	fd_set	readset, writeset;
 	fd_set	*read_set = &readset, *write_set = &writeset;
 #endif
@@ -1572,8 +1572,8 @@ fdlist	*listp;
 				FD_SET(cptr->authfd, read_set);
 				if (cptr->flags & FLAGS_WRAUTH)
 					FD_SET(cptr->authfd, write_set);
-				if (cptr->authfd > highfd)
-					highfd = cptr->authfd;
+				if (cptr->fd > highfd)
+					highfd = cptr->fd;
 			}
 			if (DoingDNS(cptr) || DoingAuth(cptr))
 				continue;

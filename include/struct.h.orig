@@ -19,7 +19,7 @@
  */
 
 /*
-**  $Id: struct.h,v 1.2 1997/07/24 05:13:34 cbehrens Exp $
+**  $Id: struct.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
 */
 
 #ifndef	__struct_include__
@@ -235,7 +235,6 @@ typedef struct commandlog
 #define FLAGS_LMODE		0x0800 /* +l usermode */
 #define FLAGS_ZMODE		0x1000 /* +z usermode */
 #define FLAGS_GMODE		0x2000 /* +g usermode */
-#define FLAGS_NMODE		0x4000 /* +n usermode */
 
 #define	SEND_UMODES	(FLAGS_INVISIBLE|FLAGS_OPER|FLAGS_WALLOP)
 
@@ -273,7 +272,6 @@ typedef struct commandlog
 #define IsBMode(x)		((x)->extraflags & FLAGS_BMODE)
 #define IsDMode(x)		((x)->extraflags & FLAGS_DMODE)
 #define IsGMode(x)		((x)->extraflags & FLAGS_GMODE)
-#define IsNMode(x)		((x)->extraflags & FLAGS_NMODE)
 #define IsZMode(x)		((x)->extraflags & FLAGS_ZMODE)
 
 #define	SendWallops(x)		((x)->extraflags & FLAGS_WALLOP)
