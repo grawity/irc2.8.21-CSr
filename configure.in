@@ -36,7 +36,7 @@ AC_CHECK_LIB(socket, socket)
 AC_CHECK_LIB(nsl, socket)
 AC_CHECK_LIB(resolv, res_init)
 
-AC_CHECK_HEADERS(sys/cdefs.h sys/syslog.h stdlib.h stddef.h sys/malloc.h unistd.h string.h strings.h arpa/inet.h arpa/nameser.h resolv.h sys/bitypes.h netdb.h errno.h sys/errno.h net/errno.h sys/select.h time.h sys/time.h sys/filio.h sys/un.h sys/rusage.h sys/times.h sys/syscall.h stropts.h)
+AC_CHECK_HEADERS(sys/cdefs.h sys/syslog.h stdlib.h stddef.h sys/malloc.h unistd.h string.h strings.h arpa/inet.h arpa/nameser.h resolv.h sys/bitypes.h netdb.h errno.h sys/errno.h net/errno.h sys/select.h time.h sys/time.h sys/filio.h sys/un.h sys/rusage.h sys/times.h sys/syscall.h poll.h stropts.h)
 
 AC_CHECK_TYPE(int16_t, , AC_DEFINE(NEED_BITYPES_H))
 AC_CHECK_FUNC(linebuffer, AC_DEFINE(HAVE_LINEBUFFER))

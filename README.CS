@@ -1,5 +1,5 @@
 ---
-$Id: README.CS,v 1.5 1998/01/05 05:55:47 cbehrens Exp $
+$Id: README.CS,v 1.7 1998/02/21 02:50:07 cbehrens Exp $
 ---
 
 This is the README for irc2.8.21+CSr30.5.  Basically, this is just a list
@@ -13,6 +13,14 @@ The newest versions of +CS ircds can be found at:
 
 NOTE: Please change values in comstud.h to your liking...
       The default values are probably less than ideal for you! 
+
+New in CSr31pl1:
+
+1) Small linux fix for those version that have poll() where there is
+    no poll.h, but there is sys/poll.h
+2) ->ipstring not being \0 terminated.
+3) m_kline() fix to check for ->user != NULL
+
 
 New in CSr31:
 

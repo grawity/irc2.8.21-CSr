@@ -22,7 +22,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: s_serv.c,v 1.4 1997/10/16 22:10:07 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: s_serv.c,v 1.5 1998/02/21 02:50:11 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -2159,6 +2159,11 @@ char    *parv[];
 	{
 		if (!(acptr = find_chasing(sptr, parv[1], NULL)))
 			return 0;
+		if (!acptr->user)
+		{
+			sendto_one(sptr, ":%s NOTICE %s :Can't KLINE an unregistered connection", me.name, parv[0]);
+			return 0;
+		}
 		if (IsServer(acptr))
 		{
 			sendto_one(sptr, ":%s NOTICE %s :Can't KLINE a server, use @'s where appropriate",

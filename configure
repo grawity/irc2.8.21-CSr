@@ -1097,7 +1097,7 @@ else
 fi
 
 
-for ac_hdr in sys/cdefs.h sys/syslog.h stdlib.h stddef.h sys/malloc.h unistd.h string.h strings.h arpa/inet.h arpa/nameser.h resolv.h sys/bitypes.h netdb.h errno.h sys/errno.h net/errno.h sys/select.h time.h sys/time.h sys/filio.h sys/un.h sys/rusage.h sys/times.h sys/syscall.h stropts.h
+for ac_hdr in sys/cdefs.h sys/syslog.h stdlib.h stddef.h sys/malloc.h unistd.h string.h strings.h arpa/inet.h arpa/nameser.h resolv.h sys/bitypes.h netdb.h errno.h sys/errno.h net/errno.h sys/select.h time.h sys/time.h sys/filio.h sys/un.h sys/rusage.h sys/times.h sys/syscall.h poll.h stropts.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6

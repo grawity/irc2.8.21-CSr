@@ -18,7 +18,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: support.c,v 1.2 1997/10/01 17:55:11 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: support.c,v 1.3 1998/02/21 02:50:12 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -100,7 +100,7 @@ char *token_sep;
 **			of separators
 **			argv 9/90
 **
-**	$Id: support.c,v 1.2 1997/10/01 17:55:11 cbehrens Exp $
+**	$Id: support.c,v 1.3 1998/02/21 02:50:12 cbehrens Exp $
 */
 
 char *strtoken(save, str, fs)
@@ -139,7 +139,7 @@ char *str, *fs;
 **	strerror - return an appropriate system error string to a given errno
 **
 **		   argv 11/90
-**	$Id: support.c,v 1.2 1997/10/01 17:55:11 cbehrens Exp $
+**	$Id: support.c,v 1.3 1998/02/21 02:50:12 cbehrens Exp $
 */
 
 char *strerror(err_no)
@@ -226,6 +226,7 @@ char	*in;
 	n = IpQuadTab[ *a ];
 	while ( *n )
 		*bufptr++ = *n++;
+	*bufptr = '\0';
 	return buf;
 }
 
@@ -233,7 +234,7 @@ char	*in;
 /*
 **	inet_netof --	return the net portion of an internet number
 **			argv 11/90
-**	$Id: support.c,v 1.2 1997/10/01 17:55:11 cbehrens Exp $
+**	$Id: support.c,v 1.3 1998/02/21 02:50:12 cbehrens Exp $
 **
 */
 
