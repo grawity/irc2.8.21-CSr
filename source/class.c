@@ -64,7 +64,7 @@ aClient	*acptr;
 {
 	Reg1	Link	*tmp;
 	Reg2	aClass	*cl;
-	int	i = 0, retc = BAD_CLIENT_CLASS;
+	int	retc = BAD_CLIENT_CLASS;
 
 	if (acptr && !IsMe(acptr)  && (acptr->confs))
 		for (tmp = acptr->confs; tmp; tmp = tmp->next)
@@ -98,7 +98,8 @@ aClient	*acptr;
 		    {
 			aconf = link->value.aconf;
 			if (aconf->status & (CONF_CLIENT|CONF_CONNECT_SERVER|
-					     CONF_NOCONNECT_SERVER))
+					     CONF_NOCONNECT_SERVER|
+					     CONF_NZCONNECT_SERVER))
 			    {
 				ping2 = get_conf_ping(aconf);
 				if ((ping2 != BAD_PING) && ((ping > ping2) ||

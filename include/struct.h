@@ -56,6 +56,8 @@
 #include "hash.h"
 #include "fdlist.h"
 
+#include "zlib.h"
+
 typedef	struct	ConfItem aConfItem;
 typedef	struct 	Client	aClient;
 typedef	struct	Channel	aChannel;
@@ -63,6 +65,15 @@ typedef	struct	User	anUser;
 typedef	struct	Server	aServer;
 typedef	struct	SLink	Link;
 typedef	struct	SMode	Mode;
+typedef	struct	CPass	ClearPass;
+#ifdef KEEP_OPS
+typedef	struct	kept_ops	KeptOps;
+typedef	struct	id_kept_ops	IdKeptOps;
+#endif
+#ifdef ZIP_LINKS
+typedef	struct	Zdata	aZdata;
+#endif
+
 typedef	long	ts_val;
 
 typedef struct	IdleItem anIdle;
@@ -116,14 +127,22 @@ typedef struct commandlog
 #define	REALLEN	 	50
 #define	TOPICLEN	80
 #define	CHANNELLEN	200
-#define	PASSWDLEN 	20
+#define	PASSWDLEN 	20	/* connection password, not channel */
 #define	KEYLEN		23
+#define	CHPASSLEN	23
+#define IDLEN		12	/* this is the maximum length, not the actual
+				   generated length; DO NOT CHANGE! */
+#define	CHPASSHASHLEN	12	/* same comment...  DO NOT CHANGE! */
+
+#define COOKIELEN	IDLEN
 #define	BUFSIZE		512		/* WARNING: *DONT* CHANGE THIS!!!! */
 #define	MAXRECIPIENTS 	20
-#define	MAXBANS		20
+#define	MAXBANS		20	/* bans + exceptions together */
 #define	MAXBANLENGTH	1024
 
 #define	USERHOST_REPLYLEN	(NICKLEN+HOSTLEN+USERLEN+5)
+
+#define	READBUF_SIZE	16384	/* used in s_bsd *AND* s_zip.c ! */
 
 #ifdef USE_SERVICES
 #include "service.h"
@@ -183,6 +202,8 @@ typedef struct commandlog
 #define	IsLog(x)		((x)->status == STAT_LOG)
 #define	IsService(x)		((x)->status == STAT_SERVICE)
 
+#define UserHasID(x)		((x)->user && (x)->user->id[0] == '.')
+
 #define	SetMaster(x)		((x)->status = STAT_MASTER)
 #define	SetConnecting(x)	((x)->status = STAT_CONNECTING)
 #define	SetHandshake(x)		((x)->status = STAT_HANDSHAKE)
@@ -218,6 +239,13 @@ typedef struct commandlog
 #define	FLAGS_LOCAL	 0x1000 /* set for local clients */
 #define	FLAGS_GOTID	 0x2000	/* successful ident lookup achieved */
 #define	FLAGS_NONL	 0x4000 /* No \n in buffer */
+#define FLAGS_NKILLED  0x100000 /* killed by a server;  never set on a client
+                                   that isn't mine */
+#define FLAGS_ZIP      0x200000 /* link is zipped */
+#define FLAGS_ZIPFIRST 0x400000 /* start of zip (ignore any CRLF) */
+#define FLAGS_CBURST   0x800000 /* set to mark connection burst being sent */
+#define FLAGS_NKILL   0x1000000 /* do recover this client's kill even
+                                   if exit_client fired from &me */
 
 /* aClient->extraflags */
 
@@ -300,6 +328,7 @@ typedef struct commandlog
 #define	DoAccess(x)		((x)->flags & FLAGS_CHKACCESS)
 #define	IsLocal(x)		((x)->flags & FLAGS_LOCAL)
 #define	IsDead(x)		((x)->flags & FLAGS_DEADSOCKET)
+#define	CBurst(x)		((x)->flags & FLAGS_CBURST)
 
 #define	SetUnixSock(x)		((x)->flags |= FLAGS_UNIX)
 #define	SetDNS(x)		((x)->flags |= FLAGS_DOINGDNS)
@@ -421,35 +450,57 @@ struct	ConfItem	{
 
 #define	CONF_ILLEGAL		0x80000000
 #define	CONF_MATCH		0x40000000
-#define	CONF_QUARANTINED_SERVER	0x00001
-#define	CONF_CLIENT		0x00002
-#define	CONF_CONNECT_SERVER	0x00004
-#define	CONF_NOCONNECT_SERVER	0x00008
-#define	CONF_LOCOP		0x00010
-#define	CONF_OPERATOR		0x00020
-#define	CONF_ME			0x00040
-#define	CONF_KILL		0x00080
-#define	CONF_ADMIN		0x00100
+#define	CONF_QUARANTINED_SERVER	0x000001
+#define	CONF_CLIENT		0x000002
+#define	CONF_CONNECT_SERVER	0x000004
+#define	CONF_NOCONNECT_SERVER	0x000008
+#define	CONF_NZCONNECT_SERVER	0x000010
+#define	CONF_LOCOP		0x000020
+#define	CONF_OPERATOR		0x000040
+#define	CONF_ME			0x000080
+#define	CONF_KILL		0x000100
+#define	CONF_ADMIN		0x000200
 #ifdef 	R_LINES
-#define	CONF_RESTRICT		0x00200
+#define	CONF_RESTRICT		0x000400
 #endif
-#define	CONF_CLASS		0x00400
-#define	CONF_SERVICE		0x00800
-#define	CONF_LEAF		0x01000
-#define	CONF_LISTEN_PORT	0x02000
-#define	CONF_HUB		0x04000
-#define CONF_BOT_IGNORE		0x08000
-#define CONF_ELINE		0x10000
-#define CONF_DLINE		0x20000
-#define CONF_JLINE		0x40000
-#define CONF_GLINE		0x80000
+#define	CONF_CLASS		0x000800
+#define	CONF_SERVICE		0x001000
+#define	CONF_LEAF		0x002000
+#define	CONF_LISTEN_PORT	0x004000
+#define	CONF_HUB		0x008000
+#define CONF_BOT_IGNORE		0x010000
+#define CONF_ELINE		0x020000
+#define CONF_DLINE		0x040000
+#define CONF_JLINE		0x080000
+#define CONF_GLINE		0x100000
 
 #define	CONF_OPS		(CONF_OPERATOR | CONF_LOCOP)
-#define	CONF_SERVER_MASK	(CONF_CONNECT_SERVER | CONF_NOCONNECT_SERVER)
+#define	CONF_SERVER_MASK	(CONF_CONNECT_SERVER | CONF_NOCONNECT_SERVER |\
+				 CONF_NZCONNECT_SERVER)
 #define	CONF_CLIENT_MASK	(CONF_CLIENT | CONF_SERVICE | CONF_OPS | \
 				 CONF_SERVER_MASK)
 
 #define	IsIllegal(x)	((x)->status & CONF_ILLEGAL)
+
+#ifdef  ZIP_LINKS
+
+/* the minimum amount of data needed to trigger compression */
+#define ZIP_MINIMUM     4096
+
+/* the maximum amount of data to be compressed (can actually be a bit more) */
+#define ZIP_MAXIMUM     8192    /* WARNING: *DON'T* CHANGE THIS!!!! */
+
+struct Zdata {
+        z_stream        *in;            /* input zip stream data */
+        z_stream        *out;           /* output zip stream data */
+        char            inbuf[ZIP_MAXIMUM]; /* incoming zipped buffer */
+        char            outbuf[ZIP_MAXIMUM]; /* outgoing (unzipped) buffer */
+        int             incount;        /* size of inbuf content */
+        int             outcount;       /* size of outbuf content */
+};
+
+#endif /* ZIP_LINKS */
+
 
 /*
  * Client structures
@@ -465,6 +516,7 @@ struct	User	{
 	int	joined;		/* number of channels joined */
 	char	username[USERLEN+1];
 	char	host[HOSTLEN+1];
+	char	id[IDLEN+1];	/* ID if available, nick otherwise */
         char	server[HOSTLEN+1];
 				/*
 				** In a perfect world the 'server' name
@@ -497,6 +549,7 @@ struct Client
 	struct	Client *next;	/* Next client */
 	struct	Client *prev;	/* Previous client */
 	struct	Client *hnext;	/* Next client in this hash bucket */
+	struct	Client *idhnext;/* Next client in this id hash bucket */
 	struct	Client *lnext;	/* Used for Server->servers/users */
 	struct	Client *lprev;	/* Used for Server->servers/users */
 
@@ -533,6 +586,9 @@ struct Client
 	int	count;		/* Amount of data in buffer */
 	fdlist	*fdlist;
 	char	buffer[BUFSIZE]; /* Incoming message buffer */
+#ifdef	ZIP_LINKS
+	aZdata	*zip;		/* zip data */
+#endif
 	short	lastsq;		/* # of 2k blocks when sendqueued called last*/
 	dbuf	sendQ;		/* Outgoing message queue--if socket full */
 	dbuf	recvQ;		/* Hold for data incoming yet to be parsed */
@@ -565,10 +621,35 @@ struct Client
 				  */
 	char	ipstr[HOSTLEN+1];
 	char	passwd[PASSWDLEN+1];
+        char    oldnick[NICKLEN+1];  /* This is for local NKILLed clients */
+	int	caps;		/* capabilities bit-field */
+#ifdef KEEP_OPS
+        KeptOps *ko;            /* list of kept ops */
+        char    cookie[COOKIELEN+1];
+#endif
 };
 
 #define	CLIENT_LOCAL_SIZE sizeof(aClient)
 #define	CLIENT_REMOTE_SIZE offsetof(aClient,count)
+
+#ifdef KEEP_OPS
+struct  kept_ops {
+        struct  kept_ops *next, *prev;
+        char    *chname;
+        ts_val  ts;
+        ts_val  expires;
+	int	flags;
+};
+
+struct  id_kept_ops {
+        char    cookie[COOKIELEN+1];
+        ts_val  expires;
+        struct  id_kept_ops *next, *prev;
+        struct  kept_ops *first;
+};
+
+#define MAXKEPTCHANS    10
+#endif /* KEEP_OPS */
 
 /*
  * statistics structures
@@ -607,7 +688,17 @@ struct	stats {
 struct	SMode	{
 	unsigned int	mode;
 	int	limit;
+
 	char	key[KEYLEN+1];
+	char	pass[CHPASSHASHLEN+1];
+	ClearPass	*clear;
+};
+
+/* Clear passwords for channels */
+
+struct	CPass	{
+	ts_val	expires;
+	char	pass[1];		/* variable size */
 };
 
 /* Message table structure */
@@ -643,6 +734,13 @@ struct	SLink	{
 	int	flags;
 };
 
+/* this should eliminate a lot of ifdef's in the main code... -orabidoo */
+#ifdef BAN_INFO
+#  define BANSTR(l)  ((l)->value.ban.banstr)
+#else
+#  define BANSTR(l)  ((l)->value.cp)
+#endif
+
 /* channel structure */
 
 struct Channel	{
@@ -658,52 +756,151 @@ struct Channel	{
 	Link	*members;
 	Link	*invites;
 	Link	*banlist;
+	Link	*exceptlist;
 	ts_val	channelts;
+	ts_val	passwd_ts;
+	ts_val	opless_ts;
 	char	chname[1];
 };
 
-#define	TS_CURRENT	3	/* current TS protocol version */
-#define	TS_MIN		1	/* minimum supported TS protocol version */
-#define	TS_DOESTS	0x20000000
-#define	DoesTS(x)	((x)->tsinfo == TS_DOESTS)
+#define TS_CURRENT      4       /* current TS protocol version */
+
+#ifdef TS4_ONLY
+#define TS_MIN          4       /* minimum supported TS protocol version */
+#else
+#define TS_MIN          3
+#endif
+
+#define CAP_TS          0x00000001
+#define CAP_TS4         0x00000002
+#define CAP_ZIP         0x00000004
+
+#define DoesTS(x)       ((x)->caps & (CAP_TS|CAP_TS4))
+/* we can't #define DoesTS to 1, it's used to check that the server sent
+** the "TS" extra arg to "PASS" (or "CAPAB TS4" or both).
+*/
+
+#ifdef TS4_ONLY
+#define DoesTS4(x)      1
+#else
+#define DoesTS4(x)      ((x)->caps & CAP_TS4)
+#endif
+
+typedef int (*testcap_t)(aClient *, int);
+#define SEND_DEFAULT    (testcap_t)0
+
+struct  Capability      {
+        char    *name;
+        int     cap;
+        int     wehaveit;
+        int     required;
+        testcap_t  sendit;      /* SEND_DEFAULT means: send it if we have it */
+};
+
+/*
+ * Capability macros.
+ */
+#define IsCapable(x, cap)       ((x)->caps & (cap))
+#define SetCapable(x, cap)      ((x)->caps |= (cap))
+#define ClearCap(x, cap)        ((x)->caps &= ~(cap))
+
+extern  int     test_send_zipcap PROTO((aClient *, int));
+
+/*
+** list of recognized server capabilities.  "TS" is not on the list
+** because all servers that we talk to already do TS, and the kludged
+** extra argument to "PASS" takes care of checking that.  -orabidoo
+*/
+
+#ifdef CAPTAB
+struct Capability captab[] = {
+/*  name        cap           have   required  send function */
+#ifdef  TS4_ONLY
+  { "TS4",      CAP_TS4,        1,      1,      SEND_DEFAULT },
+#else
+  { "TS4",      CAP_TS4,        1,      0,      SEND_DEFAULT },
+#endif
+#ifdef  ZIP_LINKS
+  { "ZIP",      CAP_ZIP,        1,      0,      test_send_zipcap },
+#else
+  { "ZIP",      CAP_ZIP,        0,      0,      SEND_DEFAULT },
+#endif
+  { (char*)0,   0,              0,      0,      SEND_DEFAULT }
+};
+#else
+extern  struct Capability captab[];
+#endif
+
+#define MIN_NOW         (880000000)     /* minimal acceptable time() value */
+#define MAX_NOW         (2147000000)    /* max acceptable time() value */
 
 /*
 ** Channel Related macros follow
 */
 
+#undef DEBUGGING_TIMES
+#ifdef DEBUGGING_TIMES
+
+#define	CHPASS_MIN_TS (300)
+#define	CHPASS_EXPIRE (300)
+#define	CLEANUP_DELAY (60)
+#define	CLEARPASS_EXPIRE (300)
+#define	CLEARCHAN_EXPIRE (120)
+#define	TS_WARN_OVERRIDE (600)
+#define KEPT_OPS_EXPIRE 900
+#define KEEP_OPS_MIN_TS 10
+
+#else
+#define	CHPASS_MIN_TS	(48*3600)    /* no +c on channels less than 48h old */
+#define	CHPASS_EXPIRE	(48*3600)    /* expire +c after 48 hours opless */
+#define	CLEANUP_DELAY	(5*60)	     /* check expired +c's every 5 mins */
+#define	CLEARPASS_EXPIRE (15*60)     /* forget clear password after 15 mins */
+#define	CLEARCHAN_EXPIRE (15*60)     /* expire +z after 15 mins */
+#define	TS_WARN_OVERRIDE (4*24*3600) /* warn of a possible hack when a TS 
+				      * older than 4 days gets overriden */
+#define KEPT_OPS_EXPIRE 900          /* kept ops lists expire after 15 mins */
+#define KEEP_OPS_MIN_TS 3600         /* no keptops on chans less than 1h old */
+
+#endif
+
 /* Channel related flags */
 
 #define	CHFL_CHANOP     0x0001 /* Channel operator */
 #define	CHFL_VOICE      0x0002 /* the power to speak */
-#define	CHFL_DEOPPED	0x0004 /* deopped by us, modes need to be bounced */
-#define	CHFL_BAN	0x0008 /* ban channel flag */
+#define	CHFL_DEOPPED	0x0004 /* deopped by us, modes need to be ignored */
+#define	CHFL_HALFOP	0x0008 /* channel half-operator */
+#define	CHFL_BAN	0x0010 /* ban channel flag */
+#define	CHFL_EXCEPTION	0x0020 /* exception to ban channel flag */
 
 /* Channel Visibility macros */
 
 #define	MODE_CHANOP	CHFL_CHANOP
 #define	MODE_VOICE	CHFL_VOICE
 #define	MODE_DEOPPED	CHFL_DEOPPED
-#define	MODE_PRIVATE	0x0008
-#define	MODE_SECRET	0x0010
-#define	MODE_MODERATED  0x0020
-#define	MODE_TOPICLIMIT 0x0040
-#define	MODE_INVITEONLY 0x0080
-#define	MODE_NOPRIVMSGS 0x0100
-#define	MODE_KEY	0x0200
-#define	MODE_BAN	0x0400
-#define	MODE_LIMIT	0x0800
-#define	MODE_FLAGS	0x0fff
-/*
- * mode flags which take another parameter (With PARAmeterS)
- */
+#define	MODE_HALFOP	CHFL_HALFOP
+#define	MODE_PRIVATE	0x00010
+#define	MODE_SECRET	0x00020
+#define	MODE_MODERATED  0x00040
+#define	MODE_TOPICLIMIT 0x00080
+#define	MODE_INVITEONLY 0x00100
+#define	MODE_NOPRIVMSGS 0x00200
+#define MODE_CHPASSWD   0x00400 /* not actually used !*/
+#define	MODE_KEY	0x00800
+#define	MODE_BAN	0x01000
+#define MODE_EXCEPTION  0x02000 /* not actually used !*/
+#define	MODE_LIMIT	0x04000
+#define	MODE_NOPLUSC	0x08000
+#define	MODE_ZAP	0x10000
+#define	MODE_FLAGS	0x1ffff
+
 #define	MODE_WPARAS	(MODE_CHANOP|MODE_VOICE|MODE_BAN|MODE_KEY|MODE_LIMIT)
 /*
  * Undefined here, these are used in conjunction with the above modes in
  * the source.
-#define	MODE_DEL       0x40000000
-#define	MODE_ADD       0x80000000
+#define MODE_QUERY      0x10000000
+#define MODE_ADD        0x40000000
+#define MODE_DEL        0x20000000
  */
-
 
 #define IsLimitIp(x)		((x)->flags & FLAGS_LIMIT_IP)
 #define IsNoTilde(x)		((x)->flags & FLAGS_NO_TILDE)
@@ -712,21 +909,39 @@ struct Channel	{
 #define IsNoMatchIp(x)		((x)->flags & FLAGS_NOMATCH_IP)
 
 #define	HoldChannel(x)		(!(x))
+/* zapped channels are automatically invisible */
+#define SecretMask      (MODE_SECRET|MODE_ZAP)
 /* name invisible */
-#define	SecretChannel(x)	((x) && ((x)->mode.mode & MODE_SECRET))
+#define	SecretChannel(x)	((x) && ((x)->mode.mode & SecretMask))
 /* channel not shown but names are */
 #define	HiddenChannel(x)	((x) && ((x)->mode.mode & MODE_PRIVATE))
 /* channel visible */
 #define	ShowChannel(v,c)	(PubChannel(c) || IsMember((v),(c)))
 #define	PubChannel(x)		((!x) || ((x)->mode.mode &\
-				 (MODE_PRIVATE | MODE_SECRET)) == 0)
+				 (MODE_PRIVATE | SecretMask)) == 0)
+
+/* channel cleared by opers, joinable by opers only */
+#ifdef CLEAR_CHAN
+#define ZappedChannel(x)        ((x) && ((x)->mode.mode & MODE_ZAP))
+#else
+#define ZappedChannel(x)        0
+#endif
+
+/* either of +o or +h resets the opless counter */
+#define OpsMask (CHFL_CHANOP|CHFL_HALFOP)
+
 #ifdef THIS_ONE_IS_MUCH_BETTER
 #define	IsMember(user,chan) (find_user_link((chan)->members,user) ? 1 : 0)
 #endif
 #define	IsMember(blah,chan) ((blah && blah->user && \
 		find_channel_link((blah->user)->channel, chan)) ? 1 : 0)
 
-#define	IsChannelName(name) ((name) && (*(name) == '#' || *(name) == '&'))
+#ifdef PLUS_CHANNELS
+#define	IsChannelName(name) ((name) && (*(name) == '#' || *(name) == '&' || \
+							 *(name) == '+' ))
+#else
+#define IsChannelName(name) ((name) && (*(name) == '#' || *(name) == '&'))
+#endif
 
 /* Misc macros */
 
@@ -738,6 +953,15 @@ struct Channel	{
 #define	MyClient(x)			(MyConnect(x) && IsClient(x))
 #define	MyOper(x)			(MyConnect(x) && IsOper(x))
 
+#ifdef TS4_ONLY
+#define ID(x)			(((x)->user && *(x)->user->id == '.') ? \
+				    (x)->user->id : (x)->name)
+#define IDORNICK(x)		(MyConnect((x)) ? (x)->name : ID(x))
+#else
+#define ID(x)			((x)->name)
+#define IDORNICK(x)		((x)->name)
+#endif
+
 /* String manipulation macros */
 
 /* strncopynt --> strncpyzt to avoid confusion, sematics changed
@@ -747,9 +971,10 @@ struct Channel	{
 
 /* used in SetMode() in channel.c and m_umode() in s_msg.c */
 
-#define	MODE_NULL      0
-#define	MODE_ADD       0x40000000
-#define	MODE_DEL       0x20000000
+#define	MODE_NULL	0
+#define	MODE_QUERY	0x10000000
+#define	MODE_ADD	0x40000000
+#define	MODE_DEL	0x20000000
 
 /* return values for hunt_server() */
 
@@ -775,9 +1000,16 @@ struct Channel	{
 extern	char	*version, *infotext[];
 extern	char	*generation, *creation;
 
+#ifdef RELIABLE_TIME
+#define	timedelta	0
+#else
+extern	ts_val	timedelta;
+#endif
+
 /* misc defines */
 
 #define	FLUSH_BUFFER	-2
+#define GO_ON		-3	/* for m_nick/m_client's benefit */
 #define	UTMP		"/etc/utmp"
 #define	COMMA		","
 
@@ -816,6 +1048,10 @@ typedef	struct	Ignore {
 
 #define	HEADERLEN	200
 
+#endif
+
+#ifndef IRC_CSR31PL1_TS4_BETA_2_2
+#error "Please use (and edit) the config.h that came with this server."
 #endif
 
 #endif /* __struct_include__ */

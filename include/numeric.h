@@ -131,10 +131,14 @@
  * is local to the server. If any server is passed a numeric in this range
  * from another server then it is remapped to 100-199. -avalon
  */
-#define	RPL_WELCOME          001
-#define	RPL_YOURHOST         002
-#define	RPL_CREATED          003
-#define	RPL_MYINFO           004
+/* 
+ * Avoid 0's in front of the numbers, unless they're octal.  -orabidoo
+ */
+#define	RPL_WELCOME          1
+#define	RPL_YOURHOST         2
+#define	RPL_CREATED          3
+#define	RPL_MYINFO           4
+#define	RPL_YOURCOOKIE       14
 
 /*
  * Errors are in the range from 400-599 currently and are grouped by what
@@ -176,6 +180,8 @@
 #define ERR_USERSDISABLED    446
 
 #define ERR_NOTREGISTERED    451
+#define	ERR_IDCOLLISION      452
+#define ERR_NICKLOST         453
 
 #define ERR_NEEDMOREPARAMS   461
 #define ERR_ALREADYREGISTRED 462
@@ -195,6 +201,8 @@
 #define ERR_NOPRIVILEGES     481
 #define ERR_CHANOPRIVSNEEDED 482
 #define	ERR_CANTKILLSERVER   483
+#define ERR_CHANTOORECENT    487
+#define ERR_TSLESSCHAN	     488
 
 #define ERR_NOOPERHOST       491
 #define ERR_NOSERVICEHOST    492
@@ -234,14 +242,23 @@
 #define RPL_LIST             322
 #define RPL_LISTEND          323
 #define RPL_CHANNELMODEIS    324
+#define RPL_CHANNELPASSIS    325
+#define RPL_NOCHANPASS       326
+#define RPL_CHPASSUNKNOWN    327
 
 #define RPL_CREATIONTIME     329
 
 #define RPL_NOTOPIC          331
 #define RPL_TOPIC            332
 
+#define	RPL_CHANPASSOK       338
+#define	RPL_BADCHANPASS      339
+
 #define RPL_INVITING         341
 #define	RPL_SUMMONING        342
+
+#define RPL_EXCEPTLIST	     348
+#define RPL_ENDOFEXCEPTLIST  349
 
 #define RPL_VERSION          351
 
@@ -330,5 +347,7 @@
 #define	RPL_ADMINEMAIL       259
 
 #define	RPL_TRACELOG         261
+#define RPL_STATSDELTA       274
+
 #define RPL_ENDOFTRACE       262
 

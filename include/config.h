@@ -20,6 +20,10 @@
 #ifndef	__config_include__
 #define	__config_include__
 
+#undef V28PlusOnly	/* we don't want this!@ */
+
+#undef TSDEBUG
+
 #include "setup.h"
 #include "comstud.h"
 
@@ -27,6 +31,7 @@
 
 #define FDLISTCHKFREQ 10
 
+/* leave POLL off on Linux, at least with glibc!! */
 #ifdef HAVE_POLL
 
 #define USE_POLL                /* Define this if you want to use poll() */
@@ -85,6 +90,7 @@
 #define	MPATH	"ircd.motd"	/* server MOTD file */
 #define	LPATH	"ircd.log" /* Where the debug file lives, if DEBUGMODE */
 #define	PPATH	"ircd.pid"	/* file for server pid */
+#define RPATH	"ircd.rnd"	/* file for random seed (for id generation) */
 
 /*
  * Define this filename to maintain a list of persons who log
@@ -124,24 +130,78 @@
  */
 #define	NO_DEFAULT_INVISIBLE
 
-/* TS_ONLY
- *
- * When defined, the server will refuse to directly link to non-TS servers.
- * Remote servers can still be non-TS, although that basically keeps channel
- * TS's to 0 so it's not a good idea.  Defining TS_ONLY speeds the server
- * up by removing some compatibility code.
+/* TS4_ONLY
+ * When defined, the server will only be able to directly connect to
+ * other TS4 servers, which also understand modes +c, +h and +e, IDs and
+ * other goodies. Define this when all your up/downlinks have switched 
+ * to TS4, it will speed the server up slightly and activate some of
+ * the new features.
  */
-#define TS_ONLY
+#undef TS4_ONLY
 
-/* TS_WARNINGS
- *
- * When defined, +s users are warned of some things that should never
- * happen on an all-TS net.  Currently these are: server-generated MODE +o,
- * new nicks without a TS, and remote JOINs for non-existing channels.
- * This is useful to track down anomalies;  undefine it on a mixed TS/nonTS
- * net or you'll get a lot of warnings!
+/* TS4_GLOBAL_ONLY
+ * When defined, the server will not be compatible with pre-TS4 servers
+ * anywhere on the network.  When every server has gone TS4, defining
+ * this will enable mixing modes +e and +h with others.  Define it when 
+ * the WHOLE NETWORK has switched to TS4.
  */
-#define TS_WARNINGS
+#undef TS4_GLOBAL_ONLY
+
+/* RELIABLE_TIME
+ * Define this if your server has a reliable clock, updated via NTP or
+ * similar.  This disables ircd's own time adjustments;  it's strongly
+ * recommended to use NTP and define this.
+ */
+#undef RELIABLE_TIME
+
+/* TS_MAX_DELTA & TS_WARN_DELTA - allowed TS delta ranges for direct 
+ * server connections.
+ *
+ * A server connecting with a clock difference greater than TS_WARN_DELTA
+ * generates a warning.  One greater than TS_MAX_DELTA gets the link 
+ * dropped.
+ */
+#define TS_MAX_DELTA	1800
+#define TS_WARN_DELTA   120
+
+/* PLUS_C_START
+ * In order to phase in channel passwords and avoid the creation of
+ * +channel and +c zones, servers will not allow local users to join 
+ * +channels or set MODE +c until a certain time.  Set this to the time, 
+ * in Unix format (number of seconds after 1 Jan 1970).
+ */
+#define PLUS_C_START 894799872
+
+/* SHOW_EMPTY_CHANS
+ * If this is defined, empty channels will appear in LIST.
+ */
+#define SHOW_EMPTY_CHANS
+
+/* NO_HALFOP_FLAGS_IN_NAMES
+ * If this is defined, /names replies (including the one you get 
+ * automatically when joining a channel) will not have multiple
+ * user-on-channel flags, and will show halfops as '+' instead of '%'.
+ * This keeps non-TS4-aware clients that parse that list from getting
+ * confused.
+ * 
+ * /who and /whois replies still use '%' for halfops, and show all
+ * user flags rather than just the strongest.
+ */
+#define NO_HALFOP_FLAGS_IN_NAMES
+
+/*
+ * The compression level used for zipped links. (Suggested values: 1 to 5)
+ * Above 4 will only give a rather marginal increase in compression for a
+ * large increase in CPU usage.
+ */ 
+#define ZIP_LEVEL       2
+
+/*
+ * Should your opers be allowed to use the /clearchan command?  DO
+ * NOT DEFINIE THIS until the WHOLE NET IS TS4, as this badly desyncs
+ * any connected TS3 servers.
+ */
+#undef	OPER_CLEARCHAN
 
 /* OPER_KILL
  *
@@ -161,7 +221,7 @@
 #define	OPER_KILL
 #define	OPER_REHASH
 #undef	OPER_RESTART
-#define OPER_DIE
+#undef	OPER_DIE
 #define	OPER_REMOTE
 #undef	LOCOP_REHASH
 #undef	LOCOP_RESTART
@@ -459,6 +519,14 @@
 #define	IRCD_PIDFILE PPATH
 #define KLINEFILE KPATH
 
+#if defined(TS4_GLOBAL_ONLY) && !defined(TS4_ONLY)
+#error "TS4_GLOBAL_ONLY without TS4_ONLY doesn't make sense to me"
+#endif
+
+#if defined(OPER_CLEARCHAN) && !defined(TS4_GLOBAL_ONLY)
+#error "OPER_CLEARCHAN needs TS4_GLOBAL_ONLY, which needs a TS4-only net"
+#endif
+
 #ifdef	__osf__
 #define	OSF
 /* OSF defines BSD to be its version of BSD */
@@ -542,6 +610,18 @@ error You stuffed up config.h signals #defines use only one.
 #undef	SENDQ_ALWAYS
 #endif
 
+/* These are all standard with TS4, leave them alone unless the whole
+** net decides to change 
+*/
+#define	MODE_PLUS_C		/* have +c */
+#undef	PLUS_CHANNELS		/* have +channels */
+#undef	MODE_C_PLUS_CHANS_ONLY	/* mode +c in +channels only */
+#define	RECOVER_NICK_KILLS	/* set nickkilled people as unregistered */
+#define	KEEP_OPS		/* do cookies to hold ops for DoS-ed people */
+#define	ZIP_LINKS		/* compress server-to-server links */
+#define	PLUS_C_OPT_OUT		/* net-wide support for "/join #chan none" */
+#define	CLEAR_CHAN              /* mode +z zaps channel, only opers can join */
+
 /*
  * safety margin so we can always have one spare fd, for motd/authd or
  * whatever else.  -4 allows "safety" margin of 1 and space reserved.
@@ -573,6 +653,14 @@ error CLIENT_FLOOD undefined
 #endif
 
 /*
+** you wouldn't want to compress messages one by one.. would you?
+** (it's not implemented anyways)
+*/
+#if defined(ZIP_LINKS) && !defined(SENDQ_ALWAYS)
+# define SENDQ_ALWAYS
+#endif
+
+/*
  * Some ugliness for AIX platforms.
  */
 #ifdef AIX
@@ -589,6 +677,7 @@ error CLIENT_FLOOD undefined
 # define BSD_INCLUDES
 #endif
 
+#define Reg  register
 #define Reg1 register
 #define Reg2 register
 #define Reg3 register
@@ -599,5 +688,7 @@ error CLIENT_FLOOD undefined
 #define Reg8 register
 #define Reg9 register
 #define Reg10 register
+
+#define IRC_CSR31PL1_TS4_BETA_2_2
 
 #endif /* __config_include__ */

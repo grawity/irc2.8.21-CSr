@@ -100,8 +100,11 @@ char	serveropts[] = {
 #ifdef	USE_SYSLOG
 'Y',
 #endif
+#ifdef  ZIP_LINKS
+'Z',
+#endif
 #ifdef	V28PlusOnly
-'8',
+#error "V28PlusOnly shoulnd't be defined"
 #endif
 ' ',
 'C',
@@ -217,11 +220,35 @@ char	serveropts[] = {
 #ifdef	TSDEBUG
 'd',
 #endif
-#ifdef TS_ONLY
+#ifdef TS4_ONLY
 'o',
 #endif
-#ifdef TS_WARNINGS
-'w',
+#ifdef TS4_GLOBAL_ONLY
+'g',
+#endif
+#ifdef PLUS_CHANNELS
+'p',
+#endif
+#ifdef RELIABLE_TIME
+'r',
+#endif
+#ifndef RECOVER_NICK_KILLS
+'N',
+#endif
+#ifndef KEEP_OPS
+'K',
+#endif
+#ifndef MODE_PLUS_C
+'C',
+#endif
+#ifndef PLUS_C_OPT_OUT
+'O',
+#endif
+#ifndef CLEAR_CHAN
+'Z',
+#endif
+#ifdef OPER_CLEARCHAN
+'z',
 #endif
 '\0'};
 

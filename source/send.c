@@ -123,7 +123,7 @@ int	fd;
 				continue;
 			if (IsDead(cptr))
 			{
-				(void)exit_client(cptr, cptr, &me,
+				(void)exit_client(cptr, cptr, cptr,
 					strerror(get_sockerr(cptr)));
 				continue;
 			}
@@ -148,7 +148,7 @@ int	fd;
 					(connected % 3600) / 60,
 					connected % 60);
 			}
-			(void)exit_client(cptr, cptr, &me, length >= 0 ?
+			(void)exit_client(cptr, cptr, cptr, length >= 0 ?
 				"EOF From client" :
 					strerror(get_sockerr(cptr)));
 		}
@@ -163,6 +163,9 @@ int	fd;
 **	Internal utility which delivers one message buffer to the
 **	socket. Takes care of the error handling and buffering, if
 **	needed.
+**	if SENDQ_ALWAYS is defined, the message will be queued.
+**      if ZIP_LINKS is defined, the message will eventually be compressed,
+**      anything stored in the sendQ is compressed.
 */
 static	int	send_message(to, msg, len)
 aClient	*to;
@@ -170,6 +173,14 @@ char	*msg;	/* if msg is a null pointer, we are flushing connection */
 int	len;
 #ifdef SENDQ_ALWAYS
 {
+	if (to->from)
+		to = to->from;
+	if (IsMe(to))
+	    {
+		sendto_ops("Trying to send to myself! [%s]", msg);
+		return 0;
+	    }
+
 	if (IsDead(to))
 		return 0; /* This socket has already been marked as dead */
 	if (DBufLength(&to->sendQ) > get_sendq(to))
@@ -180,8 +191,24 @@ int	len;
 				DBufLength(&to->sendQ), get_sendq(to));
 		return dead_link(to, "Max Sendq exceeded");
 	    }
-	else if (dbuf_put(&to->sendQ, msg, len) < 0)
-		return dead_link(to, "Buffer allocation error for %s");
+	else
+	    {
+#ifdef ZIP_LINKS
+		/*
+		** data is first stored in to->zip->outbuf until
+		** it's big enough to be compressed and stored in the sendq.
+		** send_queued is then responsible to never let the sendQ
+		** be empty and to->zip->outbuf not empty.
+		*/
+		if (to->flags & FLAGS_ZIP)
+			msg = zip_buffer(to, msg, &len, 0);
+
+		if (len && dbuf_put(&to->sendQ, msg, len) < 0)
+#else /* ZIP_LINKS */
+		if (dbuf_put(&to->sendQ, msg, len) < 0)
+#endif /* ZIP_LINKS */
+			return dead_link(to, "Buffer allocation error for %s");
+	    }
 	/*
 	** Update statistics. The following is slightly incorrect
 	** because it counts messages even if queued, but bytes
@@ -207,6 +234,13 @@ int	len;
 {
 	int	rlen = 0;
 
+	if (to->from)
+		to = to->from;
+	if (IsMe(to))
+	    {
+		sendto_ops("Trying to send to myself! [%s]", msg);
+		return 0;
+	    }
 	if (IsDead(to))
 		return 0; /* This socket has already been marked as dead */
 
@@ -229,8 +263,25 @@ int	len;
 				   DBufLength(&to->sendQ), get_sendq(to));
 			return dead_link(to, "Max Sendq exceeded");
 		    }
-		else if (dbuf_put(&to->sendQ,msg+rlen,len-rlen) < 0)
-			return dead_link(to,"Buffer allocation error for %s");
+		else 
+		    {
+#ifdef ZIP_LINKS
+		/*
+		** data is first stored in to->zip->outbuf until
+		** it's big enough to be compressed and stored in the sendq.
+		** send_queued is then responsible to never let the sendQ
+		** be empty and to->zip->outbuf not empty.
+		*/
+			if (to->flags & FLAGS_ZIP)
+				msg = zip_buffer(to, msg, &len, 0);
+
+			if (len && dbuf_put(&to->sendQ,msg+rlen,len-rlen) < 0)
+#else /* ZIP_LINKS */
+			if (dbuf_put(&to->sendQ,msg+rlen,len-rlen) < 0)
+#endif /* ZIP_LINKS */
+				return dead_link(to,
+					     "Buffer allocation error for %s");
+		    }
 	    }
 	/*
 	** Update statistics. The following is slightly incorrect
@@ -255,7 +306,7 @@ int	send_queued(to)
 aClient *to;
 {
 	char	*msg;
-	int	len, rlen;
+	int	len, rlen, more = 0;
 
 	/*
 	** Once socket is marked dead, we cannot start writing to it,
@@ -274,7 +325,33 @@ aClient *to;
 		return -1;
 #endif
 	    }
-	while (DBufLength(&to->sendQ) > 0)
+#ifdef	ZIP_LINKS
+	/*
+	** Here, we must make sure than nothing will be left in to->zip->outbuf
+	** This buffer needs to be compressed and sent if all the sendQ is sent
+	*/
+	if ((to->flags & FLAGS_ZIP) && to->zip->outcount)
+	    {
+		if (DBufLength(&to->sendQ) > 0)
+			more = 1;
+		else
+		    {
+			msg = zip_buffer(to, NULL, &len, 1);
+			
+			if (len == -1)
+			       return dead_link(to,
+						"fatal error in zip_buffer()");
+
+			if (dbuf_put(&to->sendQ, msg, len) < 0)
+			    {
+				return dead_link(to,
+					 "Buffer allocation error for %s");
+			    }
+		    }
+	    }
+#endif  /* ZIP_LINKS */
+
+	while (DBufLength(&to->sendQ) > 0 || more)
 	    {
 		msg = dbuf_map(&to->sendQ, &len);
 					/* Returns always len > 0 */
@@ -284,6 +361,28 @@ aClient *to;
 		to->lastsq = DBufLength(&to->sendQ)/1024;
 		if (rlen < len) /* ..or should I continue until rlen==0? */
 			break;
+
+#ifdef	ZIP_LINKS
+		if (DBufLength(&to->sendQ) == 0 && more)
+		    {
+			/*
+			** The sendQ is now empty, compress what's left
+			** uncompressed and try to send it too
+			*/
+			more = 0;
+			msg = zip_buffer(to, NULL, &len, 1);
+
+			if (len == -1)
+			       return dead_link(to,
+						"fatal error in zip_buffer()");
+
+			if (dbuf_put(&to->sendQ, msg, len) < 0)
+			    {
+				return dead_link(to,
+					 "Buffer allocation error for %s");
+			    }
+		    }
+#endif /* ZIP_LINKS */
 	    }
 
 	return (IsDead(to)) ? -1 : 0;
@@ -306,6 +405,7 @@ va_dcl
 {
 	va_list	vl;
 #endif
+	Reg1	char *par1, *par2;
 	char	sendbuf[2048];
 
 #ifdef VMS
@@ -317,6 +417,25 @@ va_dcl
 
 #ifdef	USE_VARARGS
 	va_start(vl);
+	par1 = va_arg(vl, char *);
+	par2 = va_arg(vl, char *);
+#else
+	par1 = p1;
+	par2 = p2;
+#endif
+
+	/* ID-ize remote numerics on the fly.  this is ugly, but it works
+	 * and it's fast enough  -orabidoo
+	 */
+	if (!MyConnect(to) && 
+	    isdigit(pattern[3]) && isdigit(pattern[4]) && 
+	    isdigit(pattern[5]) && *pattern==':' && DoesTS4(to->from) &&
+	    UserHasID(to) && !mycmp(par2, to->name))
+	    {
+	    	par2 = to->user->id;
+	    }
+
+#ifdef USE_VARARGS
 	(void)vsprintf(sendbuf, pattern, vl);
 	va_end(vl);
 #else
@@ -349,16 +468,18 @@ va_dcl
 
 # ifndef	USE_VARARGS
 /*VARARGS*/
-void	sendto_channel_butone(one, from, chptr, pattern,
+void	sendto_channel_butone(one, from, chptr, flag, pattern,
 			      p1, p2, p3, p4, p5, p6, p7, p8)
 aClient *one, *from;
 aChannel *chptr;
+int	flag;
 char	*pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8;
 {
 # else
-void	sendto_channel_butone(one, from, chptr, pattern, va_alist)
+void	sendto_channel_butone(one, from, chptr, flag, pattern, va_alist)
 aClient	*one, *from;
 aChannel *chptr;
+int	flag;
 char	*pattern;
 va_dcl
 {
@@ -375,6 +496,8 @@ va_dcl
         bzero((char *)sentalong,sizeof(sentalong));
 	for (lp = chptr->members; lp; lp = lp->next)
 	    {
+	    	if (flag && !(lp->flags & flag))
+			continue;
 		acptr = lp->value.cptr;
 		if (acptr->from == one)
 			continue;	/* ...was the one I should skip */
@@ -397,6 +520,11 @@ va_dcl
 		 * remote link already */
 			if (sentalong[i] == 0)
 			    {
+#ifndef TS4_ONLY
+			    	if (flag && !DoesTS4(acptr->from))
+					continue;
+#endif
+				sentalong[i] = 1;
 # ifdef	USE_VARARGS
 	  			sendto_prefix_one(acptr, from, pattern, vl);
 # else
@@ -404,7 +532,6 @@ va_dcl
 						  p1, p2, p3, p4,
 						  p5, p6, p7, p8);
 # endif
-				sentalong[i] = 1;
 			    }
 		    }
 	    }
@@ -421,9 +548,9 @@ va_dcl
  */
 # ifndef	USE_VARARGS
 /*VARARGS*/
-void	sendto_serv_butone(one, pattern, p1, p2, p3, p4, p5, p6, p7, p8)
+void	sendto_serv_butone(one, pattern, p1, p2, p3, p4, p5, p6, p7, p8, p9)
 aClient *one;
-char	*pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8;
+char	*pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9;
 {
 # else
 void	sendto_serv_butone(one, pattern, va_alist)
@@ -456,29 +583,29 @@ va_dcl
 	}
 	send_fdlist.last_entry = k;
 	if (k)
-		sendto_fdlist(&send_fdlist,pattern,p1,p2,p3,p4,p5,p6,p7,p8);
+		sendto_fdlist(&send_fdlist,pattern,p1,p2,p3,p4,p5,p6,p7,p8,p9);
 #endif
 	return;
 }
 
 
-#ifndef TS_ONLY
+#ifndef TS4_ONLY
 
 /*
- * sendto_TS_server_butone
+ * sendto_TS4_server_butone
  *
- * Send a message to all connected TS servers except the 'one', if ts==1,
- * and to all connected non-TS servers except the 'one', if ts==0.
+ * Send a message to all connected TS4 servers except the 'one', if ts==1,
+ * and to all connected non-TS4 servers except the 'one', if ts==0.
  */
 # ifndef	USE_VARARGS
 /*VARARGS*/
-void	sendto_TS_serv_butone(ts, one, pattern, p1, p2, p3, p4, p5, p6, p7, p8)
+void	sendto_TS4_serv_butone(ts, one, pattern, p1,p2,p3,p4,p5,p6,p7,p8,p9)
 int	ts;
 aClient *one;
-char	*pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8;
+char	*pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9;
 {
 # else
-void	sendto_TS_serv_butone(ts, one, pattern, va_alist)
+void	sendto_TS4_serv_butone(ts, one, pattern, va_alist)
 int	ts;
 aClient	*one;
 char	*pattern;
@@ -500,7 +627,7 @@ va_dcl
 	{
 		if (!(cptr = local[i]) || (one && cptr == one->from))
 			continue;
-		if ((DoesTS(cptr) != 0) == (ts != 0))
+		if ((DoesTS4(cptr) != 0) == (ts != 0))
 #ifdef USE_VARARGS
 			sendto_one(cptr, pattern, vl);
 	}
@@ -510,17 +637,17 @@ va_dcl
 	}
 	send_fdlist.last_entry = k;
 	if (k)
-		sendto_fdlist(&send_fdlist,pattern,p1,p2,p3,p4,p5,p6,p7,p8);
+		sendto_fdlist(&send_fdlist,pattern,p1,p2,p3,p4,p5,p6,p7,p8,p9);
 #endif
 	return;
 }
 
-#endif /* TS_ONLY */
+#endif /* TS4_ONLY */
 
 /*
  * sendto_common_channels()
  *
- * Sends a message to all people (inclusing user) on local server who are
+ * Sends a message to all people (but NOT the user) on local server who are
  * in same channel with user.
  */
 # ifndef	USE_VARARGS
@@ -565,17 +692,6 @@ va_dcl
 # endif
 		}
 
-/* maybe (cptr == user) could be taken out above and this
-   part of code removed?  -- CS */
-
-	if (MyConnect(user))
-# ifdef	USE_VARARGS
-		sendto_prefix_one(user, user, pattern, vl);
-	va_end(vl);
-# else
-		sendto_prefix_one(user, user, pattern, p1, p2, p3, p4,
-					p5, p6, p7, p8);
-# endif
 	return;
 }
 
@@ -588,10 +704,10 @@ va_dcl
 #ifndef	USE_VARARGS
 /*VARARGS*/
 void	sendto_channel_butserv(chptr, from, pattern, p1, p2, p3,
-			       p4, p5, p6, p7, p8)
+			       p4, p5, p6, p7, p8, p9)
 aChannel *chptr;
 aClient *from;
-char	*pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8;
+char	*pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9;
 {
 #else
 void	sendto_channel_butserv(chptr, from, pattern, va_alist)
@@ -615,7 +731,7 @@ va_dcl
 		if (MyConnect(acptr = lp->value.cptr))
 			sendto_prefix_one(acptr, from, pattern,
 					  p1, p2, p3, p4,
-					  p5, p6, p7, p8);
+					  p5, p6, p7, p8, p9);
 #endif
 
 	return;
@@ -679,7 +795,7 @@ va_dcl
 	{
 		if (*chptr->chname == '&')
 			return;
-		if (mask = (char *)rindex(chptr->chname, ':'))
+		if ((mask = (char *)rindex(chptr->chname, ':')))
 			mask++;
 	}
 	else
@@ -691,6 +807,8 @@ va_dcl
 		if (!(cptr = local[i]))
 			continue;
 		if (cptr == from)
+			continue;
+		if (chptr && *chptr->chname == '+' && !DoesTS4(cptr))
 			continue;
 		if (!BadPtr(mask) &&
 			match(mask, cptr->name))
@@ -708,18 +826,17 @@ va_dcl
 #endif
 }
 
-#ifndef TS_ONLY
-
+#ifndef TS4_ONLY
 /*
- * sendto_match_TS_servs
+ * sendto_match_TS4_servs
  *
- * if ts==0, send to all non-TS servers matching the mask
- * if ts==1, send to all TS servers matching the mask
+ * if ts==0, send to all non-TS4 servers matching the mask
+ * if ts==1, send to all TS4 servers matching the mask
  * (or to all if no mask)
  */
 #ifndef	USE_VARARGS
 /*VARARGS*/
-void	sendto_match_TS_servs(ts, chptr, from, format, 
+void	sendto_match_TS4_servs(ts, chptr, from, format, 
 				p1,p2,p3,p4,p5,p6,p7,p8,p9)
 int	ts;
 aChannel *chptr;
@@ -727,7 +844,7 @@ aClient	*from;
 char	*format, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9;
 {
 #else
-void	sendto_match_TS_servs(ts, chptr, from, format, va_alist)
+void	sendto_match_TS4_servs(ts, chptr, from, format, va_alist)
 int	ts;
 aChannel *chptr;
 aClient	*from;
@@ -750,6 +867,8 @@ va_dcl
 	{
 		if (*chptr->chname == '&')
 			return;
+		if (*chptr->chname == '+' && !ts)
+			return;
 		if (mask = (char *)rindex(chptr->chname, ':'))
 			mask++;
 	}
@@ -761,7 +880,7 @@ va_dcl
 	{
 		if (!(cptr = local[i]))
 			continue;
-		if ((cptr == from) || (DoesTS(cptr) != 0) != (ts != 0))
+		if ((cptr == from) || (DoesTS4(cptr) != 0) != (ts != 0))
 			continue;
 		if (!BadPtr(mask) &&
 			match(mask, cptr->name))
@@ -779,7 +898,7 @@ va_dcl
 #endif
 }
 
-#endif  /* TS_ONLY */
+#endif  /* TS4_ONLY */
 
 
 /*
@@ -1068,10 +1187,9 @@ va_dcl
 #endif
 
 	/*
-	** if we're runnign with TS_WARNINGS enabled and someone does
-	** something silly like (remotely) connecting a nonTS server,
-	** we'll get a ton of warnings, so we make sure we don't send
-	** more than 5 every 5 seconds.  -orabidoo
+	** if someone does something silly like remotely connecting a 
+	** TS3 server when we're TS4_GLOBAL_ONLY, we'll get a ton of warnings, 
+	** so we make sure we don't send more than 5 in 5 seconds.  -orabidoo
 	*/
 	now = time(NULL);
 	if (now - last < 5)
@@ -1342,14 +1460,18 @@ va_dcl
 			else
 				(void)strcat(sender, from->sockhost);
 		    }
-#ifdef	USE_VARARGS
 		par = sender;
 	    }
+	else if (to && from && DoesTS4(to->from) && 
+		 (!MyConnect(to) || IsServer(to)) && 
+		 UserHasID(from) && !mycmp(par, from->name))
+	    {
+		par = from->user->id;
+	    }
+#ifdef	USE_VARARGS
 	sendto_one(to, pattern, par, vl);
 	va_end(vl);
 #else
-		par = sender;
-	    }
 	sendto_one(to, pattern, par, p2, p3, p4, p5, p6, p7, p8);
 #endif
 }

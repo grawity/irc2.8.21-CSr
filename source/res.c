@@ -237,7 +237,7 @@ time_t	now;
 			{
 				case ASYNC_CLIENT :
 #ifdef SHOW_HEADERS
-					write(cptr->fd, REPORT_FAIL_DNS2,
+					sendheader(cptr, REPORT_FAIL_DNS2,
 						R_fail_dns);
 #endif
 					ClearDNS(cptr);

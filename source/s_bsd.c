@@ -80,14 +80,7 @@ static	void	add_unixconnection PROTO((aClient *, int));
 static	char	unixpath[256];
 #endif
 
-static	char	*readbuf;
-
-#ifndef READBUFSIZE
-#define READBUFSIZE 8192
-#endif
-
-
-extern	ts_val	timedelta;
+static	char	readbuf[READBUF_SIZE+1];
 
 /*
  * Try and find the correct name to use with getrlimit() for setting the max.
@@ -232,7 +225,7 @@ int	port;
 
 	if (cptr != &me)
 	{
-		(void)irc_sprintf(cptr->sockhost, "%-.42s.%.u",
+		(void)irc_sprintf(cptr->sockhost, "%-.42s.%u",
 			ipname, (unsigned int)port);
 		(void)strcpy(cptr->name, me.name);
 	}
@@ -683,7 +676,7 @@ char	*username;
 	return 0;
 }
 
-#define	CFLAG	CONF_CONNECT_SERVER
+#define	CFLAG	(CONF_CONNECT_SERVER|CONF_NZCONNECT_SERVER)
 #define	NFLAG	CONF_NOCONNECT_SERVER
 /*
  * check_server_init(), check_server()
@@ -944,6 +937,7 @@ aClient	*cptr;
 		sendto_ops("Lost N-Line for %s", get_client_name(cptr,FALSE));
 		return -1;
 	}
+	send_capabilities(cptr);
 	sendto_one(cptr, "SERVER %s 1 :%s",
 		   my_name_for_link(me.name, aconf), me.info);
 	if (!IsDead(cptr))
@@ -1036,6 +1030,14 @@ aClient *cptr;
 	{
 		flush_connections(cptr->fd);
 		local[cptr->fd] = NULL;
+#ifdef ZIP_LINKS
+		/*
+		** the connection might have zip data (even if
+		** FLAGS_ZIP is not set)
+		*/
+		if (IsServer(cptr) || IsListening(cptr))
+			zip_free(cptr);
+#endif
 		if (cptr->fdlist)
 			del_from_fdlist(cptr->fd, cptr->fdlist);
 		del_from_fdlist(cptr->fd, &new_servfdlist);
@@ -1109,9 +1111,13 @@ int fd;
 {
 	int optlen;
 
+	/* the read buffer is now of fixed size, for s_zip's benefit;
+	** we still tell the kernel to use a big read buffer if it's
+	** willing to listen  -orabidoo
+	*/
+
 #ifdef _SEQUENT_
 	rcvbufmax = sndbufmax = 8192;
-	readbuf = (char *)MyMalloc((rcvbufmax+1) * sizeof(char));
 	return;
 #endif
 
@@ -1123,7 +1129,6 @@ int fd;
 			(char *)&rcvbufmax, optlen) >= 0))
 		rcvbufmax += 1024;
 	getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char *)&rcvbufmax, &optlen);
-	readbuf = (char *)MyMalloc((rcvbufmax+1) * sizeof(char));
 	sndbufmax = rcvbufmax;
 	if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF,
 		(char *)&rcvbufmax, optlen) != 0)
@@ -1131,9 +1136,8 @@ int fd;
 	return;
 #endif
 
-	rcvbufmax = READBUFSIZE;
+	rcvbufmax = READBUF_SIZE;
 	sndbufmax = rcvbufmax > 8192 ? 8192 : rcvbufmax;
-	readbuf = (char *)MyMalloc((rcvbufmax+1) * sizeof(char)); 
 }
 
 /*
@@ -1179,7 +1183,7 @@ aClient	*cptr;
 	else if (opt > 0)
 	{
 		for (*readbuf = '\0'; opt > 0; opt--, s+= 3)
-			(void)irc_sprintf(s, "%02.2x:", *t++);
+			(void)irc_sprintf(s, "%2.2x:", *t++);
 		*s = '\0';
 		sendto_ops("Connection %s using IP opts: (%s)",
 			get_client_name(cptr, TRUE), readbuf);
@@ -1299,6 +1303,7 @@ add_con_refuse:
 		bcopy ((char *)&addr.sin_addr, (char *)&acptr->ip,
 			sizeof(struct in_addr));
 		acptr->port = ntohs(addr.sin_port);
+		acptr->fd = fd;
 
 		/*
 		 * Check that this socket (client) is allowed to accept
@@ -1317,7 +1322,7 @@ add_con_refuse:
 		if (len)
 			goto add_con_refuse;
 #ifdef SHOW_HEADERS
-		write(fd, REPORT_DO_DNS, R_do_dns);
+		write(acptr, REPORT_DO_DNS, R_do_dns);
 #endif
 
 		lin.flags = ASYNC_CLIENT;
@@ -1329,7 +1334,7 @@ add_con_refuse:
 			SetDNS(acptr);
 #ifdef SHOW_HEADERS
 		else
-			write(fd, REPORT_FIN_DNSC, R_fin_dnsc);
+			sendheader(acptr, REPORT_FIN_DNSC, R_fin_dnsc);
 #endif
 		nextdnscheck = 1;
 	}
@@ -1413,7 +1418,7 @@ int	msg_ready;
 	    !(IsPerson(cptr) && DBufLength(&cptr->recvQ) > 6090))
 	{
 		errno = 0;
-		length = recv(cptr->fd, readbuf, rcvbufmax*sizeof(char), 0);
+		length = recv(cptr->fd, readbuf, READBUF_SIZE, 0);
 
 		cptr->lasttime = NOW;
 		if (cptr->lasttime > cptr->since)
@@ -1462,10 +1467,15 @@ int	msg_ready;
 			** If it has become registered as a Service or Server
 			** then skip the per-message parsing below.
 			*/
+
+                        /* This is actually useful, but it needs the ZIP_FIRST
+                        ** kludge or it will break zipped links  -orabidoo
+                        */
+
 			if (IsService(cptr) || IsServer(cptr))
 			{
 				dolen = dbuf_get(&cptr->recvQ, readbuf,
-						rcvbufmax*sizeof(char));
+						READBUF_SIZE);
 				if (dolen <= 0)
 					break;
 				if ((done = dopacket(cptr, readbuf, dolen)))
@@ -1473,7 +1483,7 @@ int	msg_ready;
 				break;
 			}
 			dolen = dbuf_getmsg(&cptr->recvQ, readbuf,
-					rcvbufmax*sizeof(char));
+					    READBUF_SIZE);
 			/*
 			** Devious looking...whats it do ? well..if a client
 			** sends a *long* message without any CR or LF, then
@@ -1520,16 +1530,15 @@ fdlist	*listp;
 	Reg1	aClient	*cptr;
 	Reg2	int	nfds;
 	struct	timeval	wait;
-#ifdef	pyr
 	struct	timeval	nowt;
+#ifdef	pyr
 	u_long	us;
-	time_t	now;
 #endif
 #ifndef FD_ALLOC
 	fd_set	readset, writeset;
 	fd_set	*read_set = &readset, *write_set = &writeset;
 #endif
-	time_t	delay2 = delay;
+	time_t	delay2 = delay, now;
 	u_long	usec = 0;
 	int	res, length, fd;
 	int	auth;
@@ -1548,10 +1557,8 @@ fdlist	*listp;
 	if (delay2 > 1)
 		delay2 = 1;
 
-#ifdef  pyr
         (void) gettimeofday(&nowt, NULL);
         now = nowt.tv_sec;
-#endif
  
 	for (res = 0;;)
 	{
@@ -1593,7 +1600,12 @@ fdlist	*listp;
 				}
 			}
 
-			if (DBufLength(&cptr->sendQ) || IsConnecting(cptr))
+			if (DBufLength(&cptr->sendQ) || IsConnecting(cptr)
+#ifdef ZIP_LINKS
+                                || ((cptr->flags & FLAGS_ZIP) &&
+                                   (cptr->zip->outcount > 0))
+#endif
+                           )
 #ifndef	pyr
 			{
 				FD_SET(i, write_set);
@@ -1696,6 +1708,7 @@ fdlist	*listp;
 			aConfItem *d = NULL;
 #endif
 
+			id_reseed((char *)&nowt, sizeof(nowt));
 			FD_CLR(i, read_set);
 			cptr->lasttime = NOW;
 			/*
@@ -1844,7 +1857,7 @@ deadsocket:
 				(connected % 3600) / 60,
 				connected % 60);
 		}
-		(void)exit_client(cptr, cptr, &me, length >= 0 ?
+		(void)exit_client(cptr, cptr, cptr, length >= 0 ?
 			  "EOF From client" : strerror(get_sockerr(cptr)));
 	}
 	return 0;
@@ -2182,7 +2195,7 @@ fdlist  *listp;
 			if (IsDead(cptr) || write_err)
 			{
 deadsocket:
-				(void)exit_client(cptr, cptr, &me,
+				(void)exit_client(cptr, cptr, cptr,
 					     strerror(get_sockerr(cptr)));
 				continue;
 			 }
@@ -2228,7 +2241,7 @@ deadsocket:
 				(connected % 3600) / 60,
 				connected % 60);
 		}
-		(void)exit_client(cptr, cptr, &me, length >= 0 ?
+		(void)exit_client(cptr, cptr, cptr, length >= 0 ?
 					  "EOF From client" :
 					  strerror(get_sockerr(cptr)));
 	    }
@@ -2263,7 +2276,7 @@ struct	hostent	*hp;
 		if (by && IsPerson(by) && !MyClient(by))
 			sendto_one(by,
 			":%s NOTICE %s :Server %s already present from %s",
-				me.name, by->name, aconf->name,
+				me.name, IDORNICK(by), aconf->name,
 				get_client_name(c2ptr, TRUE));
 		return -1;
 	}
@@ -2338,7 +2351,7 @@ struct	hostent	*hp;
                 if (by && IsPerson(by) && !MyClient(by))
                   sendto_one(by,
                              ":%s NOTICE %s :Connect to host %s failed.",
-			     me.name, by->name, cptr);
+			     me.name, IDORNICK(by), cptr);
 		(void)close(cptr->fd);
 		cptr->fd = -2;
 		free_client(cptr);
@@ -2366,7 +2379,7 @@ struct	hostent	*hp;
                 if (by && IsPerson(by) && !MyClient(by))
                   sendto_one(by,
                              ":%s NOTICE %s :Connect to host %s failed.",
-			     me.name, by->name, cptr);
+			     me.name, IDORNICK(by), cptr);
 		det_confs_butmask(cptr, 0);
 		(void)close(cptr->fd);
 		cptr->fd = -2;
@@ -2390,6 +2403,11 @@ struct	hostent	*hp;
 		highest_fd = cptr->fd;
 	local[cptr->fd] = cptr;
 	cptr->acpt = &me;
+	cptr->servptr = &me;
+        /*
+        ** Will be added to the llist's in m_server() -> m_server_estab()
+        ** -orabidoo
+        */
 	SetConnecting(cptr);
 	cptr->fdlist = &new_fdlists[0];
 	add_to_fdlist(cptr->fd, cptr->fdlist);
@@ -2641,7 +2659,7 @@ static	void	polludp()
 	 */
 	if (!mlen)
 	{
-		mlen = rcvbufmax*sizeof(char) - strlen(me.name) - strlen(PATCHLEVEL);
+		mlen = READBUF_SIZE*sizeof(char) - strlen(me.name) - strlen(PATCHLEVEL);
 		mlen -= 6;
 		if (mlen < 0)
 			mlen = 0;
@@ -2713,7 +2731,7 @@ static	void	do_dns_async()
 		{
 			del_queries((char *)cptr);
 #ifdef SHOW_HEADERS
-			write(cptr->fd, REPORT_FIN_DNS, R_fin_dns);
+			sendheader(cptr, REPORT_FIN_DNS, R_fin_dns);
 #endif
 			ClearDNS(cptr);
 			if (!DoingAuth(cptr))

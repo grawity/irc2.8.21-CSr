@@ -130,7 +130,7 @@ main()
 postcode='))) {
 		signal(SIGALRM, alarmed);
 		alarm(3);
-		recvfrom(f, b, 12, 0, x, &l);
+		recvfrom(f, b, 12, 0, (struct sockaddr *)x, &l);
 		alarm(0);
 		exit(0);
 	}

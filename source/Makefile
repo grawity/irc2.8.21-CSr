@@ -33,6 +33,7 @@ INSTALL=/usr/bin/install
 
 IRCDMODE=771
 INCLUDEDIR=../include
+ZLIBDIR=../zlib
 
 # RES - if you are missing the resolv library (man 5 resolv.conf), or you
 # experience probems with ip# to hostname lookups for local machines or
@@ -48,9 +49,11 @@ OBJS= bsd.o dbuf.o packet.o send.o match.o parse.o support.o \
 	channel.o class.o hash.o ircd.o list.o \
 	res.o s_auth.o s_bsd.o s_conf.o s_debug.o s_err.o s_misc.o \
 	s_numeric.o s_serv.o s_user.o whowas.o clone.o fdlist.o \
-	dich_conf.o dog3.o gline.o $(RES)
+	dich_conf.o dog3.o gline.o md5.o s_zip.o $(RES)
 
 SRC=$(OBJS:%.o=%.c)
+
+ALLLIBS = $(ZLIBDIR)/libz.a $(IRCDLIBS) 
 
 MAKE = make 'CFLAGS=${CFLAGS}' 'CC=${CC}' 'IRCDLIBS=${IRCDLIBS}' \
 	    'LDFLAGS=${LDFLAGS}' 'IRCDMODE=${IRCDMODE}'
@@ -61,7 +64,7 @@ all: ircd
 ircd: $(OBJS) ../include/patchlevel.h
 	$(SHELL) version.c.SH
 	$(CC) $(CFLAGS) -c version.c
-	$(CC) $(CFLAGS) $(OBJS) version.o $(LDFLAGS) $(IRCDLIBS) -o ircd
+	$(CC) $(CFLAGS) $(OBJS) version.o $(LDFLAGS) $(ALLLIBS) -o ircd
 	chmod $(IRCDMODE) ircd
 
 lint:
@@ -122,12 +125,12 @@ inet_addr.o: inet_addr.c ../include/comstud.h ../include/sys.h\
 	../include/common.h
 	$(CC) $(CFLAGS) -c inet_addr.c
 
-channel.o: ../include/struct.h ../include/config.h ../include/dbuf.h \
+channel.o: channel.c ../include/struct.h ../include/config.h ../include/dbuf.h \
 	   ../include/numeric.h ../include/channel.h ../include/sys.h \
 	   ../include/common.h ../include/comstud.h
 	$(CC) $(CFLAGS) -c channel.c
 
-class.o: ../include/struct.h ../include/class.h ../include/numeric.h \
+class.o: class.c ../include/struct.h ../include/class.h ../include/numeric.h \
 	 ../include/common.h ../include/config.h ../include/sys.h \
 	../include/comstud.h
 	$(CC) $(CFLAGS) -c class.c

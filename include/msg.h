@@ -33,6 +33,7 @@
 #define MSG_WHOWAS   "WHOWAS"	/* WHOW */
 #define MSG_USER     "USER"	/* USER */
 #define MSG_NICK     "NICK"	/* NICK */
+#define MSG_CLIENT   "CLIENT"	/* CLIENT */
 #define MSG_SERVER   "SERVER"	/* SERV */
 #define MSG_LIST     "LIST"	/* LIST */
 #define MSG_TOPIC    "TOPIC"	/* TOPI */
@@ -76,6 +77,13 @@
 #define	MSG_CLOSE    "CLOSE"	/* CLOS */
 #define	MSG_SVINFO   "SVINFO"	/* SVINFO */
 #define	MSG_SJOIN    "SJOIN"	/* SJOIN */
+#define MSG_CAPAB    "CAPAB"	/* CAPAB */
+#ifdef KEEP_OPS
+#define MSG_COOKIE   "COOKIE"	/* COOKIE */
+#endif
+#ifdef CLEAR_CHAN
+#define MSG_CLEARCHAN "CLEARCHAN" /* CLEARCHAN */
+#endif
 #ifdef	TSDEBUG
 #define	MSG_TS	     "TS"	/* TS */
 #endif
@@ -127,7 +135,7 @@ extern int m_idle();
 extern int m_gline(), m_operwall(), m_ext();
 extern int m_private(), m_topic(), m_join(), m_part(), m_mode();
 extern int m_ping(), m_pong(), m_wallops(), m_kick();
-extern int m_nick(), m_error(), m_notice();
+extern int m_nick(), m_client(), m_error(), m_notice();
 extern int m_invite(), m_quit(), m_kill();
 #ifndef CLIENT_COMPILE
 extern int m_motd(), m_who(), m_whois(), m_user(), m_list();
@@ -138,8 +146,14 @@ extern int m_oper(), m_pass(), m_trace();
 extern int m_time(), m_names(), m_admin();
 extern int m_lusers(), m_umode(), m_note(), m_close();
 extern int m_motd(), m_whowas();
+#ifdef KEEP_OPS
+extern int m_cookie();
+#endif
+#ifdef CLEAR_CHAN
+extern int m_clearchan();
+#endif
 extern int m_service(), m_userhost(), m_ison(), m_svinfo(), m_sjoin();
-extern int m_service(), m_servset(), m_servlist(), m_squery();
+extern int m_service(), m_servset(), m_servlist(), m_squery(), m_capab();
 #ifdef TSDEBUG
 extern int m_ts();
 #endif
@@ -182,6 +196,7 @@ struct Message msgtab[] = {
 	{ MSG_AWAY,	m_away,		0, MAXPARA, 1, 0L },
 	{ MSG_ISON,	m_ison,		0, 1,       1, 0L },
 	{ MSG_SERVER,	m_server,	0, MAXPARA, 1, 0L },
+	{ MSG_CLIENT,	m_client,	0, MAXPARA, 1, 0L },
 	{ MSG_SQUIT,	m_squit,	0, MAXPARA, 1, 0L },
 	{ MSG_WHOIS,	m_whois,	0, MAXPARA, 1, 0L },
 	{ MSG_WHO,	m_who,		0, MAXPARA, 1, 0L },
@@ -205,6 +220,13 @@ struct Message msgtab[] = {
 	{ MSG_CLOSE,	m_close,	0, MAXPARA, 1, 0L },
 	{ MSG_SVINFO,	m_svinfo,	0, MAXPARA, 1, 0L },
 	{ MSG_SJOIN,	m_sjoin,	0, MAXPARA, 1, 0L },
+	{ MSG_CAPAB,	m_capab,	0, MAXPARA, 1, 0L },
+#ifdef KEEP_OPS
+	{ MSG_COOKIE,	m_cookie,	0, MAXPARA, 1, 0L },
+#endif
+#ifdef CLEAR_CHAN
+	{ MSG_CLEARCHAN,  m_clearchan,	0, MAXPARA, 1, 0L },
+#endif
 #ifdef DOG3
 	{ MSG_HTM,	m_htm,		0, MAXPARA, 1, 0L },
 	{ MSG_DOG3LOAD,	m_dog3load,	0, MAXPARA, 1, 0L },

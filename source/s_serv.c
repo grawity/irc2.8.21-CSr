@@ -25,7 +25,9 @@
 static  char rcsid[] = "@(#)$Id: s_serv.c,v 1.5 1998/02/21 02:50:11 cbehrens Exp $";
 #endif
 
+#define CAPTAB
 #include "struct.h"
+#undef CAPTAB
 #include "common.h"
 #include "sys.h"
 #include "numeric.h"
@@ -35,8 +37,6 @@ static  char rcsid[] = "@(#)$Id: s_serv.c,v 1.5 1998/02/21 02:50:11 cbehrens Exp
 #include "dich_conf.h"
 
 extern time_t check_fdlists();
-
-static	char	buf[BUFSIZE];
 
 #ifdef HIGHEST_CONNECTION
 int     max_connection_count = 1, max_client_count = 1;
@@ -111,8 +111,6 @@ char *mask;
 		}
 	}
 }
-
-extern 	ts_val	timedelta;
 
 /*
 ** m_functions execute protocol messages on this server:
@@ -322,8 +320,9 @@ char	*parv[];
 	*/
 	if (!acptr)
 	    {
-		sendto_one(sptr, err_str(ERR_NOSUCHSERVER),
-			   me.name, parv[0], server);
+	    	if (IsPerson(sptr))
+			sendto_one(sptr, err_str(ERR_NOSUCHSERVER),
+				   me.name, parv[0], server);
 		return 0;
 	    }
 	if (IsLocOp(sptr) && !MyConnect(acptr))
@@ -348,12 +347,19 @@ char	*parv[];
 		sendto_ops("Received SQUIT %s from %s (%s)",
 			   acptr->name, get_client_name(sptr,FALSE), comment);
 
+	/*
+	** Very important and tricky: because we use exit_client here, we
+	** will only ever send out a SQUIT for another server by the name 
+	** we know it (which can be a hostmask, in which case we'll never
+	** send out "SQUIT full.server.name").  auto-quitting of dependent
+	** clients relies on this in rather obscure ways.   -orabidoo
+	*/
 	return exit_client(cptr, acptr, sptr, comment);
     }
 
 /*
 ** ts_servcount
-**	returns the number of TS servers that are connected to us
+**	returns the number of (TS) servers that are connected to us
 */
 int	ts_servcount()
 {
@@ -362,7 +368,7 @@ int	ts_servcount()
 	Reg3	int	r = 0;
 
 	for (i = 0; i <= highest_fd; i++)
-	    	if ((acptr = local[i]) && IsServer(acptr) && DoesTS(acptr))
+	    	if ((acptr = local[i]) && IsServer(acptr) && !IsMe(acptr))
 			r++;
 	return r;
 }
@@ -380,36 +386,149 @@ aClient *cptr, *sptr;
 int	parc;
 char	*parv[];
 {
-	Reg1	ts_val	v;
+	Reg1	ts_val	t, now;
+	Reg2	long	v;	/* v must always be signed */
 
         if (!IsServer(sptr) || !MyConnect(sptr) || !DoesTS(sptr) || parc < 5)
 	                return 0;
 
+        /*
+        ** TS4 does this check on the CAPAB line, but SVINFO stays for
+        ** compatibility and for the clock synchronization thing -orabidoo
+        */
+
         if (TS_CURRENT < atoi(parv[2]) || atoi(parv[1]) < TS_MIN)
 	{
-#ifdef TS_ONLY
                 /*
                 ** a server with the wrong TS version connected; since we're
-                ** TS_ONLY we can't fall back to the non-TS protocol so
+                ** TS-only we can't fall back to the non-TS protocol so
                 ** we drop the link  -orabidoo
                 */
                 sendto_ops("Link %s dropped, wrong TS protocol version (%s,%s)",
                            get_client_name(sptr, TRUE), parv[1], parv[2]);
                 return exit_client(sptr, sptr, sptr, "Incompatible TS version");
-#else
-                sptr->tsinfo = 0;
-                return 0;
-#endif
 	}
 
-	if (atoi(parv[3]))
-	    	v = (atol(parv[4]) - (ts_val)NOW - timedelta) / 2;
-	else
-	    	v = atol(parv[4]) - (ts_val)NOW - timedelta;
+        if (atoi(parv[1]) >= 4)
+                SetCapable(sptr, CAP_TS4);
 
+        t = (ts_val)atol(parv[4]);
+        now = make_ts();
+        v = ((atoi(parv[3])) ? (t - now) / 2 : t - now);
+
+	if (abs(t - now) > TS_MAX_DELTA)
+	    {
+		sendto_ops("Link %s dropped, excessive TS delta (my TS=%ld, their TS=%ld, delta=%ld)", 
+			   get_client_name(sptr, TRUE), (long)now, (long)t, 
+			   (long)(t - now));
+		return exit_client(sptr, sptr, sptr, "Excessive TS delta");
+	    }
+	else if (abs(t - now) > TS_WARN_DELTA)
+	    {
+	    	ts_warn("Links %s notable TS delta (my TS=%ld, their TS=%ld, delta=%ld)", 
+			   get_client_name(sptr, TRUE), (long)now, (long)t, 
+			   (long)(t - now));
+	    }
+
+#ifndef RELIABLE_TIME
 	if (ts_servcount() == 1)
 		timedelta += v;
+#endif
+
 	return 0;
+}
+
+/*
+** m_capab
+**	parv[0] = sender prefix
+**	parv[1] = comma-separated list of capabilities
+*/
+int	m_capab(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int	parc;
+char	*parv[];
+{
+	Reg1	struct Capability *cap;
+	char	*p;
+	Reg1	char *s;
+
+	if ((!IsUnknown(cptr) && !IsHandshake(cptr)) || parc < 2)
+		return 0;
+
+	for (s=strtoken(&p, parv[1], " "); s; s=strtoken(&p, NULL, " "))
+	    {
+	    	for (cap=captab; cap->name; cap++)
+		    {
+		    	if (!strcmp(cap->name, s))
+			    {
+			    	cptr->caps |= cap->cap;
+				break;
+			    }
+		     }
+	    }
+	
+	return 0;
+}
+
+/*
+** check that a server's capabilities are compatible with our requirements
+** (called from m_server; doing it from m_capab would skip it on servers
+** that don't send a CAPAB line	 -orabidoo
+*/
+int check_capabilities(cptr)
+aClient	*cptr;
+{
+	Reg1	struct Capability *cap;
+	char	msgbuf[BUFSIZE];
+
+	for (cap = captab; cap->name; cap++)
+	    {
+	    	if (cap->required && !(cptr->caps & cap->cap))
+		    {
+		    	sprintf(msgbuf, "missing capability: %s", cap->name);
+			sendto_ops("Link %s cancelled, %s",
+			   	get_client_name(cptr, TRUE), msgbuf);
+			return exit_client(cptr, cptr, cptr, msgbuf);
+		     }
+	    }
+	return GO_ON;
+}
+
+int
+test_send_zipcap(cptr, cap)
+aClient	*cptr;
+int	cap;
+{
+	aConfItem	*aconf;
+
+	aconf = find_conf(cptr->confs, cptr->name, 
+			  CONF_CONNECT_SERVER|CONF_NZCONNECT_SERVER);
+	if (!aconf || aconf->status == CONF_NZCONNECT_SERVER)
+		return 0;
+	return 1;
+}
+
+/*
+** send the CAPAB line to a server  -orabidoo
+*/
+void send_capabilities(cptr)
+aClient	*cptr;
+{
+	Reg1	struct Capability *cap;
+	char	msgbuf[BUFSIZE];
+
+	msgbuf[0] = '\0';
+	for (cap = captab; cap->name; cap++)
+	    {
+	    	if (cap->wehaveit && (cap->sendit == SEND_DEFAULT || 
+		     (cap->sendit(cptr, cap->cap))))
+		    {
+			if (msgbuf[0])
+				strcat(msgbuf, " ");
+			strcat(msgbuf, cap->name);
+		    }
+	    }
+	sendto_one(cptr, "CAPAB :%s", msgbuf);
 }
 
 /*
@@ -709,9 +828,8 @@ char	*parv[];
 	** status accordingly...
 	*/
 
-#ifdef TS_ONLY
         /* 
-        ** Reject a direct nonTS server connection if we're TS_ONLY -orabidoo
+        ** Reject a direct nonTS server connection -orabidoo
         */
         if (!DoesTS(cptr))
 	{
@@ -719,7 +837,9 @@ char	*parv[];
                            get_client_name(cptr, TRUE));
                 return exit_client(cptr, cptr, cptr, "Non-TS server");
 	}
-#endif
+
+        if ((i = check_capabilities(cptr)) != GO_ON)
+                return i;
 
 	strncpyzt(cptr->name, host, sizeof(cptr->name));
 	strncpyzt(cptr->info, info[0] ? info:me.name, sizeof(cptr->info));
@@ -745,18 +865,24 @@ char	*parv[];
 static void	sendnick_TS(cptr, acptr)
 aClient	*cptr, *acptr;
 {
+	Reg1	anUser *user = acptr->user;
 	static	char ubuf[12];
 
 	if (IsPerson(acptr))
 	{
-		send_umode(NULL, acptr, 0, SEND_UMODES,
-			   ubuf);
+		send_umode(NULL, acptr, 0, SEND_UMODES, ubuf);
 		if (!*ubuf)
 			strcpy(ubuf, "+");
-		sendto_one(cptr, "NICK %s %d %ld %s %s %s %s :%s", acptr->name, 
-			   acptr->hopcount + 1, acptr->tsinfo, ubuf,
-			   acptr->user->username, acptr->user->host,
-			   acptr->user->server, acptr->info);
+                if (UserHasID(acptr) && DoesTS4(cptr))
+                        sendto_one(cptr, ":%s CLIENT %s %ld %s %d %s %s %s :%s",
+                                user->server, user->id, acptr->tsinfo,
+                                acptr->name, acptr->hopcount + 1, ubuf,
+                                user->username, user->host, acptr->info);
+                else
+                        sendto_one(cptr, "NICK %s %d %ld %s %s %s %s :%s",
+                                acptr->name, acptr->hopcount + 1,
+                                acptr->tsinfo, ubuf, user->username,
+                                user->host, user->server, acptr->info);
 	}
 	else if (IsService(acptr))
 	{
@@ -776,6 +902,8 @@ Reg1	aClient	*cptr;
 	Reg3	aConfItem	*aconf, *bconf;
 	char	*inpath, *host, *s, *encr;
 	int	split, i;
+	Link	*l;
+	static	char nickissent = 1;
 
 	inpath = get_client_name(cptr,TRUE); /* "refresh" inpath with host */
 	split = mycmp(cptr->name, cptr->sockhost);
@@ -792,7 +920,8 @@ Reg1	aClient	*cptr;
 		sendto_ops("Access denied. No N line for server %s", inpath);
 		return exit_client(cptr, cptr, cptr, "No N line for server");
 	}
-	if (!(bconf = find_conf(cptr->confs, host, CONF_CONNECT_SERVER)))
+	if (!(bconf = find_conf(cptr->confs, host, (CONF_CONNECT_SERVER|
+				CONF_NZCONNECT_SERVER))))
 	{
 		ircstp->is_ref++;
 		sendto_one(cptr, "ERROR :Only N (no C) field for server %s",
@@ -846,6 +975,7 @@ Reg1	aClient	*cptr;
 		/*
 		** Pass my info to the new server
 		*/
+		send_capabilities(cptr);
 		sendto_one(cptr, "SERVER %s 1 :%s",
 			   my_name_for_link(me.name, aconf), 
 			   (me.info[0]) ? (me.info) : "IRCers United");
@@ -869,11 +999,32 @@ Reg1	aClient	*cptr;
 		*s = '@';
 	}
 
-	if (DoesTS(cptr))
-		sendto_one(cptr, "SVINFO %d %d %d :%ld", TS_CURRENT, TS_MIN,
-			(ts_servcount() == 0 ? 1 : 0),
-			(ts_val)NOW + timedelta);
- 
+#ifdef ZIP_LINKS
+	if (IsCapable(cptr, CAP_ZIP) && 
+	    (bconf->status != CONF_NZCONNECT_SERVER))
+	    {
+		if (zip_init(cptr) == -1)
+		    {
+			zip_free(cptr);
+			sendto_ops("Unable to setup compressed link for %s",
+				    get_client_name(cptr, TRUE));
+			return exit_client(cptr, cptr, &me,
+					   "zip_init() failed");
+		    }
+		cptr->flags |= (FLAGS_ZIP|FLAGS_ZIPFIRST);
+	    }
+	else
+		ClearCap(cptr, CAP_ZIP);
+#endif /* ZIP_LINKS */
+
+	sendto_one(cptr, "SVINFO %d %d %c :%ld", TS_CURRENT, TS_MIN,
+#ifdef RELIABLE_TIME
+		   '0',
+#else
+		   (ts_servcount() == 0 ? '1' : '0'),
+#endif
+		   make_ts());
+
 	det_confs_butmask(cptr, CONF_LEAF|CONF_HUB|CONF_NOCONNECT_SERVER);
 	/*
 	** *WARNING*
@@ -901,12 +1052,15 @@ Reg1	aClient	*cptr;
 	add_to_fdlist(cptr->fd, cptr->fdlist);
 #endif
 	nextping = NOW;
-	sendto_ops("Link with %s (%s) established.", inpath, DoesTS(cptr) ? "TS" : "NoTS");
+	sendto_ops("Link with %s established (%s%s).", inpath, 
+		   (DoesTS4(cptr) ? "TS4" : "TS3"),
+                   (IsCapable(cptr, CAP_ZIP) ? ", zipped" : ""));
 	(void)add_to_client_hash_table(cptr->name, cptr);
 	/* doesnt duplicate cptr->serv if allocted this struct already */
 	(void)make_server(cptr);
 	(void)strcpy(cptr->serv->up, me.name);
 	cptr->serv->nline = aconf;
+	cptr->flags |= FLAGS_CBURST;
 #ifdef	USE_SERVICES
 	check_services_butone(SERVICE_WANT_SERVER, sptr,
 				":%s SERVER %s %d :%s", parv[0],
@@ -979,93 +1133,62 @@ Reg1	aClient	*cptr;
 		}
 	}
 
-	if (DoesTS(cptr))
+	/*
+	** Send it in the shortened format with the TS, if
+	** it's a TS server; walk the list of channels, sending
+	** all the nicks that haven't been sent yet for each
+	** channel, then send the channel itself -- it's less
+	** obvious than sending all nicks first, but on the
+	** receiving side memory will be allocated more nicely
+	** saving a few seconds in the handling of a split
+	** -orabidoo
+	*/
+
+	nickissent = 3 - nickissent;
+	/* flag used for each nick to check if we've sent it
+	   yet - must be different each time and !=0, so we
+	   alternate between 1 and 2 -orabidoo
+	*/
+	for (chptr = channel; chptr; chptr = chptr->nextch)
 	{
-	    	Link	*l;
-		static	char nickissent = 1;
-
-		/*
-		** Send it in the shortened format with the TS, if
-		** it's a TS server; walk the list of channels, sending
-		** all the nicks that haven't been sent yet for each
-		** channel, then send the channel itself -- it's less
-		** obvious than sending all nicks first, but on the
-		** receiving side memory will be allocated more nicely
-		** saving a few seconds in the handling of a split
-		** -orabidoo
-		*/
-
-		nickissent = 3 - nickissent;
-		/* flag used for each nick to check if we've sent it
-		   yet - must be different each time and !=0, so we
-		   alternate between 1 and 2 -orabidoo
-	        */
-		for (chptr = channel; chptr; chptr = chptr->nextch)
+		if (!chptr->members && !!ZappedChannel(chptr))
+			continue;
+		for (l = chptr->members; l; l = l->next)
 		{
-			for (l = chptr->members; l; l = l->next)
-			{
-				acptr = l->value.cptr;
-				if (acptr->nicksent != nickissent)
-				{
-					acptr->nicksent = nickissent;
-					if (acptr->from != cptr)
-						sendnick_TS(cptr, acptr);
-				}
-			}
-			send_channel_modes(cptr, chptr);
-		}
-		/*
-		** also send out those that are not on any channel
-		*/
-		for (acptr = &me; acptr; acptr = acptr->prev)
+			acptr = l->value.cptr;
 			if (acptr->nicksent != nickissent)
 			{
 				acptr->nicksent = nickissent;
 				if (acptr->from != cptr)
 					sendnick_TS(cptr, acptr);
 			}
-			
-	}
-	else
-	{
-	    	/*
-		** do it the usual way, for non-TS servers  -orabidoo
-		*/
-		for (acptr = &me; acptr; acptr = acptr->prev)
-		{
-			/* acptr->from == acptr for acptr == cptr */
-			if (acptr->from == cptr)
-				continue;
-			if (IsPerson(acptr))
-			{
-			/*
-			** IsPerson(x) is true only when IsClient(x) is true.
-			** These are only true when *BOTH* NICK and USER have
-			** been received. -avalon
-			*/
-				sendto_one(cptr,"NICK %s :%d",acptr->name,
-					   acptr->hopcount + 1);
-				sendto_one(cptr,
-					":%s USER %s %s %s :%s", acptr->name,
-				       acptr->user->username, acptr->user->host,
-				       acptr->user->server, acptr->info);
-				send_umode(cptr, acptr, 0, SEND_UMODES, buf);
-				send_user_joins(cptr, acptr);
-			}
-			else if (IsService(acptr))
-			{
-				sendto_one(cptr,"NICK %s :%d",
-					   acptr->name, acptr->hopcount + 1);
-				sendto_one(cptr,":%s SERVICE * * :%s",
-					   acptr->name, acptr->info);
-			}
 		}
-		/*
-		** Last, pass all channels plus statuses
-		*/
-		for (chptr = channel; chptr; chptr = chptr->nextch)
-			send_channel_modes(cptr, chptr);
+		send_channel_modes(cptr, chptr);
 	}
+	/*
+	** also send out those that are not on any channel
+	*/
+	for (acptr = &me; acptr; acptr = acptr->prev)
+		if (acptr->nicksent != nickissent)
+		{
+			acptr->nicksent = nickissent;
+			if (acptr->from != cptr)
+				sendnick_TS(cptr, acptr);
+		}
+		
+	cptr->flags &= ~FLAGS_CBURST;
+#ifdef	ZIP_LINKS
+ 	/*
+ 	** some stats about the connect burst,
+ 	** they are slightly incorrect because of cptr->zip->outbuf.
+ 	*/
+ 	if ((cptr->flags & FLAGS_ZIP) && cptr->zip->out->total_in)
+	  sendto_ops("Connect burst to %s: %lu, compressed: %lu (%3.1f%%)",
+		      get_client_name(cptr, TRUE),
+		      cptr->zip->out->total_in,cptr->zip->out->total_out,
+ 	              (100.0*(float)cptr->zip->out->total_out) /
+		      (float)cptr->zip->out->total_in);
+#endif /* ZIP_LINKS */
 	return 0;
 }
 
@@ -1172,8 +1295,9 @@ char	*parv[];
 **            it--not reversed as in ircd.conf!
 */
 
-static	int report_array[11][3] = {
+static	int report_array[12][3] = {
 		{ CONF_CONNECT_SERVER,    RPL_STATSCLINE, 'C'},
+		{ CONF_NZCONNECT_SERVER,  RPL_STATSNLINE, 'c'},
 		{ CONF_NOCONNECT_SERVER,  RPL_STATSNLINE, 'N'},
 		{ CONF_CLIENT,            RPL_STATSILINE, 'I'},
 		{ CONF_KILL,              RPL_STATSKLINE, 'K'},
@@ -1183,8 +1307,8 @@ static	int report_array[11][3] = {
 		{ CONF_HUB,		  RPL_STATSHLINE, 'H'},
 		{ CONF_LOCOP,		  RPL_STATSOLINE, 'o'},
 		{ CONF_SERVICE,		  RPL_STATSSLINE, 'S'},
-		{ 0, 0}
-				};
+		{ 0, 0, 0 }
+};
 
 static	void	report_configured_links(sptr, mask)
 aClient *sptr;
@@ -1440,7 +1564,8 @@ gohere:
 #endif
 	case 'C' : case 'c' :
                 report_configured_links(sptr, CONF_CONNECT_SERVER|
-					CONF_NOCONNECT_SERVER);
+					CONF_NOCONNECT_SERVER|
+					CONF_NZCONNECT_SERVER);
 		break;
 #ifdef D_LINES
 	case 'D' : case 'd' :
@@ -1537,6 +1662,10 @@ gohere:
 					   me.name, parv[0], mptr->cmd,
 					   mptr->count, mptr->bytes);
 		break;
+        case 'N' : case 'n' :
+                sendto_one(sptr, rpl_str(RPL_STATSDELTA), me.name, parv[0],
+                                        (long)timedelta);
+                break;
 	case 'o' : case 'O' :
 		report_configured_links(sptr, CONF_OPS);
 		break;
@@ -1795,13 +1924,14 @@ char	*parv[];
 	if ((acptr = find_server(parv[1], NULL)))
 	{
 		sendto_one(sptr, ":%s NOTICE %s :Connect: Server %s %s %s.",
-			   me.name, parv[0], parv[1], "already exists from",
-			   acptr->from->name);
+			   me.name, IDORNICK(sptr), parv[1], 
+			   "already exists from", acptr->from->name);
 		return 0;
 	}
 
 	for (aconf = conf; aconf; aconf = aconf->next)
-		if (aconf->status == CONF_CONNECT_SERVER &&
+		if ((aconf->status == CONF_CONNECT_SERVER ||
+		     aconf->status == CONF_NZCONNECT_SERVER) &&
 		    match(parv[1], aconf->name) == 0)
 		  break;
 	/* Checked first servernames, then try hostnames. */
@@ -1815,8 +1945,8 @@ char	*parv[];
 	if (!aconf)
 	{
 	      sendto_one(sptr,
-			 "NOTICE %s :Connect: Host %s not listed in irc.conf",
-			 parv[0], parv[1]);
+			 "NOTICE %s :Connect: Host %s not listed in ircd.conf",
+			 IDORNICK(sptr), parv[1]);
 	      return 0;
 	}
 	/*
@@ -1831,14 +1961,14 @@ char	*parv[];
 		{
 			sendto_one(sptr,
 				   "NOTICE %s :Connect: Illegal port number",
-				   parv[0]);
+				   IDORNICK(sptr));
 			return 0;
 		}
 	}
 	else if (port <= 0 && (port = PORTNUM) <= 0)
 	{
 		sendto_one(sptr, ":%s NOTICE %s :Connect: missing port number",
-			   me.name, parv[0]);
+			   me.name, IDORNICK(sptr));
 		return 0;
 	}
 	/*
@@ -1860,20 +1990,21 @@ char	*parv[];
 	case 0:
 		sendto_one(sptr,
 			   ":%s NOTICE %s :*** Connecting to %s[%s].",
-			   me.name, parv[0], aconf->host, aconf->name);
+			   me.name, IDORNICK(sptr), aconf->host, aconf->name);
 		break;
 	case -1:
 		sendto_one(sptr, ":%s NOTICE %s :*** Couldn't connect to %s.",
-			   me.name, parv[0], aconf->host);
+			   me.name, IDORNICK(sptr), aconf->host);
 		break;
 	case -2:
 		sendto_one(sptr, ":%s NOTICE %s :*** Host %s is unknown.",
-			   me.name, parv[0], aconf->host);
+			   me.name, IDORNICK(sptr), aconf->host);
 		break;
 	default:
 		sendto_one(sptr,
 			   ":%s NOTICE %s :*** Connection to %s failed: %s",
-			   me.name, parv[0], aconf->host, strerror(retval));
+			   me.name, IDORNICK(sptr), aconf->host, 
+			   strerror(retval));
 	}
 	aconf->port = tmpport;
 	return 0;
@@ -2475,7 +2606,12 @@ char	*parv[];
 		ac2ptr = next_client(client, tname);
 #endif
 		sendto_one(sptr, rpl_str(RPL_TRACELINK), me.name, parv[0],
-			   version, debugmode, tname, ac2ptr->from->name);
+			   version, debugmode, tname, ac2ptr->from->name,
+                           (DoesTS4(ac2ptr) ? "TS4" : "TS3"),
+                           (IsCapable(ac2ptr, CAP_ZIP) ? "z" : ""),
+                           time(NULL) - ac2ptr->from->firsttime,
+                           (int)DBufLength(&ac2ptr->from->sendQ),
+                           (int)DBufLength(&sptr->from->sendQ));
 		return 0;
 	    }
 	case HUNTED_ISME:
@@ -2547,8 +2683,8 @@ char	*parv[];
 			/* Only opers see users if there is a wildcard
 			 * but anyone can see all the opers.
 			 */
-			if (IsAnOper(sptr)  &&
-			    (MyClient(sptr) || !(dow && IsInvisible(acptr)))
+			if ((IsAnOper(sptr)  &&
+			    (MyClient(sptr) || !(dow && IsInvisible(acptr))))
 			    || !dow || IsAnOper(acptr))
 			    {
 				if (IsAnOper(acptr))
@@ -2570,12 +2706,16 @@ char	*parv[];
 					   me.name, parv[0], class, link_s[i],
 					   link_u[i], name, acptr->serv->by,
 					   acptr->serv->user->username,
-					   acptr->serv->user->host);
+					   acptr->serv->user->host,
+                                           (DoesTS4(acptr) ? "TS4" : "TS3"),
+                                           (IsCapable(acptr, CAP_ZIP)?"z":""));
 			else
 				sendto_one(sptr, rpl_str(RPL_TRACESERVER),
 					   me.name, parv[0], class, link_s[i],
 					   link_u[i], name, *(acptr->serv->by) ?
-					   acptr->serv->by : "*", "*", me.name);
+					   acptr->serv->by : "*", "*", me.name,
+                                           (DoesTS4(acptr) ? "TS4" : "TS3"),
+                                           (IsCapable(acptr, CAP_ZIP)?"z":""));
 			cnt++;
 			break;
 		case STAT_SERVICE:
@@ -2612,7 +2752,8 @@ char	*parv[];
 		 */
 		sendto_one(sptr, rpl_str(RPL_TRACESERVER),
 			   me.name, parv[0], 0, link_s[me.fd],
-			   link_u[me.fd], me.name, "*", "*", me.name);
+			   link_u[me.fd], me.name, "*", "*", me.name, "*",
+			   "", "");
 		sendto_one(sptr, rpl_str(RPL_ENDOFTRACE), me.name, parv[0],
 			tname);
 		return 0;

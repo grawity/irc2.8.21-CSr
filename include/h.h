@@ -54,6 +54,9 @@ extern        void    check_max_count();
 #define REPORT_FIN_ID   "NOTICE AUTH :*** Got Ident response\n"
 #define REPORT_FAIL_ID  "NOTICE AUTH :*** No Ident response\n"
 
+#define sendheader(cptr, msg, len) do \
+   { if (IsUnknown(cptr)) send((cptr)->fd, (msg), (len), 0); } while(0)
+
 extern int R_do_dns, R_fin_dns, R_fin_dnsc, R_fail_dns,
 	R_do_id, R_fin_id, R_fail_id;
 
@@ -145,10 +148,14 @@ extern	void	remove_user_from_channel PROTO((aClient *, aChannel *));
 extern	void	del_invite PROTO((aClient *, aChannel *));
 extern	void	send_user_joins PROTO((aClient *, aClient *));
 extern	void	clean_channelname PROTO((char *));
-extern	int	can_send PROTO((aClient *, aChannel *));
+extern	int	can_send PROTO((aClient *, aChannel *, int));
 extern	int	is_chan_op PROTO((aClient *, aChannel *));
+extern	int	is_deopped PROTO((aClient *, aChannel *));
 extern	int	has_voice PROTO((aClient *, aChannel *));
 extern	int	count_channels PROTO(());
+
+extern  void    send_capabilities PROTO((aClient *));
+extern  int     check_capabilities PROTO((aClient *));
 
 extern	aClient	*find_chasing PROTO((aClient *, char *, int *));
 extern	aClient	*find_client PROTO((char *, aClient *));
@@ -235,20 +242,20 @@ extern	void	sendto_one();
 extern	void	sendto_channel_butone();
 /*VARARGS2*/
 extern	void	sendto_serv_butone();
-
-#ifndef TS_ONLY
-/*VARARGS2*/
-extern	void	sendto_TS_serv_butone();
+#ifndef TS4_ONLY
 /*VARARGS3*/
-extern	void	sendto_match_TS_servs();
+extern	void	sendto_TS4_serv_butone();
 #endif
-
 /*VARARGS2*/
 extern	void	sendto_common_channels();
 /*VARARGS3*/
 extern	void	sendto_channel_butserv();
 /*VARARGS3*/
 extern	void	sendto_match_servs();
+#ifndef TS4_ONLY
+/*VARARGS4*/
+extern	void	sendto_match_TS4_servs();
+#endif
 /*VARARGS5*/
 extern	void	sendto_match_butone();
 /*VARARGS3*/
@@ -280,6 +287,10 @@ extern	char	*myctime PROTO((time_t)), *date PROTO((time_t));
 extern	int	exit_client PROTO((aClient *, aClient *, aClient *, char *));
 extern	void	initstats PROTO(()), tstats PROTO((aClient *, char *));
 
+extern	char	*collapse PROTO((char *));
+extern	int	matches PROTO((char *, char *));
+extern	int	match PROTO((char *, char *));
+
 extern	int	parse PROTO((aClient *, char *, char *, struct Message *));
 extern	int	do_numeric PROTO((int, aClient *, aClient *, int, char **));
 extern	int hunt_server PROTO((aClient *,aClient *,char *,int,int,char **));
@@ -292,7 +303,8 @@ extern	int	m_umode PROTO((aClient *, aClient *, int, char **));
 extern	int	m_names PROTO((aClient *, aClient *, int, char **));
 extern	int	m_server_estab PROTO((aClient *));
 extern	void	send_umode PROTO((aClient *, aClient *, int, int, char *));
-extern	void	send_umode_out PROTO((aClient*, aClient *, int, int));
+extern	void	send_umode_out PROTO((aClient*, aClient *, int));
+extern	ts_val	make_ts PROTO((void));
 #endif
 
 extern	void	free_client PROTO((aClient *));
@@ -315,6 +327,8 @@ extern  void    add_client_to_llist PROTO((aClient **, aClient *));
 extern  void    del_client_from_llist PROTO((aClient **, aClient *));
 extern  void    del_stuff PROTO((aClient *));
 extern	void	initlists PROTO(());
+extern  void    add_client_to_llist PROTO((aClient **, aClient *));
+extern  void    del_client_from_llist PROTO((aClient **, aClient *));
 
 extern	void	add_class PROTO((int, int, int, int, long));
 extern	void	fix_class PROTO((aConfItem *, aConfItem *));
@@ -325,6 +339,8 @@ extern	int	get_client_class PROTO((aClient *));
 extern	int	get_conf_class PROTO((aConfItem *));
 extern	void	report_classes PROTO((aClient *));
 
+extern	void	count_memory PROTO((aClient *, char *));
+extern	u_long	cres_mem PROTO((aClient *));
 extern	struct	hostent	*get_res PROTO((char *));
 extern	struct	hostent	*gethost_byaddr PROTO((char *, Link *));
 extern	struct	hostent	*gethost_byname PROTO((char *, Link *));
@@ -333,6 +349,26 @@ extern	int	init_resolver PROTO((int));
 extern	time_t	timeout_query_list PROTO((time_t));
 extern	time_t	expire_cache PROTO((time_t));
 extern	void    del_queries PROTO((char *));
+extern	void	expire_channel_passwords PROTO(());
+
+extern	void    id_init PROTO((void));
+extern	void    id_reseed PROTO((char *, int));
+extern	char    *id_get PROTO((void));
+extern	int	*match_pw PROTO((char *, aChannel *));
+extern	char	*hash_pw PROTO((char *, char *));
+#ifdef KEEP_OPS
+extern	char    *cookie_get PROTO((void));
+extern	void	save_client_ops PROTO((aClient *));
+extern	IdKeptOps	*find_cookie PROTO((char *));
+extern	void	free_ko_chain PROTO((KeptOps *));
+#endif
+extern	void	save_random PROTO((void));
+#ifdef ZIP_LINKS
+extern	int	zip_init PROTO((aClient *));
+extern	void	zip_free PROTO((aClient *));
+extern	char	*unzip_packet PROTO((aClient *, char *, int *));
+extern	char	*zip_buffer PROTO((aClient *, char *, int *, int));
+#endif
 
 extern	void	clear_channel_hash_table PROTO(());
 extern	void	clear_client_hash_table PROTO(());
@@ -340,9 +376,11 @@ extern	int	add_to_client_hash_table PROTO((char *, aClient *));
 extern	int	del_from_client_hash_table PROTO((char *, aClient *));
 extern	int	add_to_channel_hash_table PROTO((char *, aChannel *));
 extern	int	del_from_channel_hash_table PROTO((char *, aChannel *));
+extern	int	add_to_id_hash_table PROTO((char *, aClient *));
+extern	int	del_from_id_hash_table PROTO((char *, aClient *));
 extern	aChannel *hash_find_channel PROTO((char *, aChannel *));
 extern	aClient	*hash_find_client PROTO((char *, aClient *));
-extern	aClient	*hash_find_nickserver PROTO((char *, aClient *));
+extern	aClient	*hash_find_id PROTO((char *, aClient *));
 extern	aClient	*hash_find_server PROTO((char *, aClient *));
 
 extern	void	add_history PROTO((aClient *, int));

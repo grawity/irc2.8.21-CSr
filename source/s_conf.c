@@ -224,7 +224,8 @@ Reg1	Link	*lp;
 		aconf = lp->value.aconf;
 		if (!(aconf->status & CONF_SERVER_MASK))
 			continue;
-		if (aconf->status == CONF_CONNECT_SERVER && !cline)
+		if ((aconf->status == CONF_CONNECT_SERVER ||
+		     aconf->status == CONF_NZCONNECT_SERVER) && !cline)
 			cline = aconf;
 		else if (aconf->status == CONF_NOCONNECT_SERVER && !nline)
 			nline = aconf;
@@ -940,9 +941,13 @@ char *filename;
 				break;
 #endif /* B_LINES */
 			case 'C': /* Server where I should try to connect */
-			case 'c': /* in case of lp failures             */
+			          /* in case of lp failures             */
 				ccount++;
 				aconf->status = CONF_CONNECT_SERVER;
+				break;
+			case 'c':
+				ccount++;
+				aconf->status = CONF_NZCONNECT_SERVER;
 				break;
 #ifdef D_LINES
 			case 'D':
@@ -1188,7 +1193,7 @@ char *filename;
 			}
 			else
 #endif /* I_LINES */
-			if (bconf = find_conf_entry(aconf, aconf->status))
+			if ((bconf = find_conf_entry(aconf, aconf->status)))
 			{
 				delist_conf(bconf);
 				bconf->status &= ~CONF_ILLEGAL;

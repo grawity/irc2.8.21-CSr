@@ -122,6 +122,7 @@ aClient	*from;
 	cptr->next = NULL; /* For machines with NON-ZERO NULL pointers >;) */
 	cptr->prev = NULL;
 	cptr->hnext = NULL;
+	cptr->idhnext = NULL;
 	cptr->user = NULL;
 	cptr->serv = NULL;
 	cptr->lnext = NULL;
@@ -144,6 +145,13 @@ aClient	*from;
 		cptr->ipstr[0] = '\0';
 		cptr->buffer[0] = '\0';
 		cptr->authfd = -1;
+#ifdef KEEP_OPS
+                cptr->ko = NULL;
+                *cptr->cookie = '\0';
+#endif
+#ifdef ZIP_LINKS
+                cptr->zip = NULL;
+#endif
 	    }
 	return (cptr);
 }
@@ -175,6 +183,7 @@ aClient *cptr;
 		user->joined = 0;
 		user->channel = NULL;
 		user->invited = NULL;
+		*user->id = '\0';
 		user->last = NOW;
 		user->last2 = NOW;
 		cptr->user = user;
@@ -526,14 +535,19 @@ aWhowas *whowas;
 		whowas->next->prev = whowas->prev;
 }
 
+/* addded some extra paranoia around here -orabidoo */
+
 void add_client_to_llist(bucket, client)
 aClient **bucket;
 aClient *client;
 {
-	client->lprev = NULL;
-	if ((client->lnext = *bucket) != NULL)
-		client->lnext->lprev = client;
-	*bucket = client;
+	if (!client->lprev && !client->lnext)
+	{
+		client->lprev = NULL;
+		if ((client->lnext = *bucket) != NULL)
+			client->lnext->lprev = client;
+		*bucket = client;
+	}
 }
 
 void    del_client_from_llist(bucket, client)
@@ -542,39 +556,10 @@ aClient *client;
 {
 	if (client->lprev)
 		client->lprev->lnext = client->lnext;
-	else
+	else if (*bucket == client)
 		*bucket = client->lnext;
 	if (client->lnext)
 		client->lnext->lprev = client->lprev;
-}
-
-void del_stuff(cptr)
-aClient *cptr;
-{
-	aClient **userbucket, **servbucket;
-	aClient *tempuser, *tempserv;
-	aClient *nextuser, *nextserv;
-
-	servbucket = &(cptr->serv->servers);
-	userbucket = &(cptr->serv->users);
-	tempserv = *servbucket;
-	while(tempserv)
-	{
-		nextserv = tempserv->lnext;
-		del_stuff(tempserv);
-		del_client_from_llist(servbucket, tempserv);
-		tempserv->servptr = NULL;
-		tempserv = nextserv;
-	}
-	tempuser = *userbucket;
-	while(tempuser)
-	{
-		nextuser = tempuser->lnext;
-		del_client_from_llist(userbucket, tempuser);
-		tempuser->servptr = NULL;
-		tempuser = nextuser;
-	}
-	*servbucket = NULL;
-	*userbucket = NULL;
+	client->lnext = client->lprev = NULL;
 }
 

@@ -1,0 +1,17 @@
+
+zlib integrated into EFnet's ircd by orabidoo (Roger Espel Llima,
+espel@llaic.u-clermont1.fr, espel@pobox.com).
+
+This is a copy of zlib 1.1.2 as found at ftp.cdrom.com/pub/infozip/zlib,
+with the following changes made:
+
+	. subdirectories "nt", "msdos", and "contrib" deleted
+	. a few other files for compilation on non-Unix systems deleted
+	. Makefile tweaked to work with ircd's own; original saved in
+	  the file Makefile.org.
+
+None of the actual *.c or *.h files in zlib were changed.
+
+Feel free to update with more recent versions of zlib (just make sure
+to merge the Makefile changes).
+

@@ -31,8 +31,9 @@ CC = @CC@
 DEFS = @DEFS@
 LIBS = @LIBS@
 
-INCLUDEDIR = -I. -I../include
+INCLUDEDIR = -I. -I../include -I../zlib
 CFLAGS = @CFLAGS@ $(DEFS) $(INCLUDEDIR) @CPPFLAGS@
+ZCFLAGS = -O3
 LDFLAGS = @LDFLAGS@
 
 IRCDLIBS = $(LIBS)
@@ -103,9 +104,15 @@ MAKE=make 'CFLAGS=${CFLAGS}' 'CC=${CC}' 'IRCDLIBS=${IRCDLIBS}' \
 	'INSTALL=${INSTALL}' 'IRCLIBS=${IRCLIBS}' 'INCLUDEDIR=${INCLUDEDIR}' \
 	'IRCDDIR=${IRCDDIR}' 'SHELL=${SHELL}' 'RM=${RM}'
 
+ZMAKE=make 'CFLAGS=${ZCFLAGS}'
+
 all:	ircd
 
+
 ircd:
+	@echo "Building zlib"
+	cd zlib; \
+	${ZMAKE} build
 	@echo "Building ircd"
 	@cd source;\
 	${MAKE} ircd
@@ -127,12 +134,16 @@ clean:
 	${RM} -f *.o *~ #* core *.bak
 	@cd source;\
 	${MAKE} clean
+	@cd zlib;\
+	${MAKE} clean
 
 cleanall:
 	${RM} -f *.o *~ #* core *.bak
 	@cd source;\
 	${MAKE} clean
 	@cd util;\
+	${MAKE} clean
+	@cd zlib;\
 	${MAKE} clean
 
 

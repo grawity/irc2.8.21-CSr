@@ -84,6 +84,14 @@ char	*parv[];
 	    {
 		if ((acptr = find_client(nick, (aClient *)NULL)))
 		    {
+#ifdef RECOVER_NICK_KILLS
+                        /* Catch collision messages from remote servers
+                        ** if we'll be recovering them  -orabidoo
+                        */
+                        if ((numeric == ERR_NICKCOLLISION ||
+                             numeric == ERR_IDCOLLISION) && MyClient(acptr))
+                                continue;
+#endif
 			/*
 			** Drop to bit bucket if for me...
 			** ...one might consider sendto_ops
@@ -109,7 +117,7 @@ char	*parv[];
 					parv[0], numeric, nick, buffer);
 		    }
 		else if ((chptr = find_channel(nick, (aChannel *)NULL)))
-			sendto_channel_butone(cptr,sptr,chptr,":%s %d %s%s",
+			sendto_channel_butone(cptr,sptr,chptr,0,":%s %d %s%s",
 					      parv[0],
 					      numeric, chptr->chname, buffer);
 	    }

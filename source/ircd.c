@@ -116,7 +116,16 @@ static	char	*dpath = DPATH;
 time_t	nextconnect = 1;	/* time for next try_connections call */
 time_t	nextping = 1;		/* same as above for check_pings() */
 time_t	nextdnscheck = 0;	/* next time to poll dns to force timeouts */
+time_t  nextpasscleanup = 0;    /* next time to cleanup passwds on empty #'s */
 time_t	nextexpire = 1;	/* next expire run on the dns cache */
+
+#ifndef RELIABLE_TIME
+/*
+** number of seconds to add to all readings of time() when making TS's
+** -orabidoo
+*/
+ts_val  timedelta = 0;
+#endif
 
 #ifdef	PROFIL
 extern	etext();
@@ -254,7 +263,9 @@ time_t	currenttime;
 	for (aconf = conf; aconf; aconf = aconf->next )
 	    {
 		/* Also when already connecting! (update holdtimes) --SRB */
-		if (!(aconf->status & CONF_CONNECT_SERVER) || aconf->port <= 0)
+		if (!(aconf->status & 
+			(CONF_CONNECT_SERVER|CONF_NZCONNECT_SERVER)) || 
+		    aconf->port <= 0)
 			continue;
 		cltmp = Class(aconf);
 		/*
@@ -388,7 +399,7 @@ time_t	currenttime;
 		*/
 		if (cptr->flags & FLAGS_DEADSOCKET)
 		{
-			(void)exit_client(cptr, cptr, &me, "Dead socket");
+			(void)exit_client(cptr, cptr, cptr, "Dead socket");
 			i=0;
 			continue;
 		}
@@ -422,7 +433,7 @@ time_t	currenttime;
 			}
 			sendto_ops("Idle time limit exceeded for %s",
 				get_client_name(cptr, FALSE));
-			(void)exit_client(cptr, cptr, &me,
+			(void)exit_client(cptr, cptr, cptr,
 				"Idle time limit exceeded");
 			i=0;
 			continue;
@@ -491,10 +502,10 @@ time_t	currenttime;
 					}
 #ifdef SHOW_HEADERS
 					if (DoingDNS(cptr))
-						write(cptr->fd, REPORT_FAIL_DNS1,
+						sendheader(cptr, REPORT_FAIL_DNS1,
 							R_fail_dns);
 					else
-						write(cptr->fd, REPORT_FAIL_ID,
+						sendheader(cptr, REPORT_FAIL_ID,
 							R_fail_id);
 #endif
 					Debug((DEBUG_NOTICE,
@@ -517,7 +528,7 @@ time_t	currenttime;
 
 			sprintf(buffer, "Ping timeout: %i seconds",
 				currenttime - cptr->lasttime);
-			(void)exit_client(cptr, cptr, &me, buffer);
+			(void)exit_client(cptr, cptr, cptr, buffer);
 }
 			i = 0;
 			continue;
@@ -699,6 +710,23 @@ char	*argv[];
 	}
 #endif /*CHROOTDIR*/
 
+#ifdef	ZIP_LINKS
+	if (zlib_version[0] == '0')
+	    {
+		fprintf(stderr, "zlib version 1.0 or higher required\n");
+		exit(1);
+	    }
+	if (zlib_version[0] != ZLIB_VERSION[0])
+	    {
+        	fprintf(stderr, "incompatible zlib version\n");
+		exit(1);
+	    }
+	if (strcmp(zlib_version, ZLIB_VERSION) != 0)
+	    {
+		fprintf(stderr, "warning: different zlib version\n");
+	    }
+#endif
+
 	myargv = argv;
 	(void)umask(077);                /* better safe than sorry --SRB */
 	bzero((char *)&me, sizeof(me));
@@ -765,7 +793,14 @@ char	*argv[];
 			bootopt |= BOOT_TTY;
 			break;
 		    case 'v':
-			(void)printf("ircd %s\n", version);
+			(void)printf("ircd %s\n\tzlib %s\n\tircd_dir: %s\n", 
+				     version, 
+#ifndef ZIP_LINKS
+				     "not used",
+#else
+				     zlib_version,
+#endif
+				     dpath);
 			exit(0);
 		    case 'x':
 #ifdef	DEBUGMODE
@@ -850,6 +885,7 @@ char	*argv[];
 	initclass();
 	initwhowas();
 	initstats();
+	id_init(); /* before init_sys! */
 	NOW = time(NULL);
 	open_debugfile();
 	NOW = time(NULL);
@@ -916,10 +952,12 @@ char	*argv[];
 	me.next = NULL;
 	me.user = NULL;
 	me.from = &me;
+	me.servptr = &me;
 	SetMe(&me);
 	make_server(&me);
 	(void)strcpy(me.serv->up, me.name);
 
+	id_reseed(me.name, HOSTLEN);
 	me.lasttime = me.since = me.firsttime = NOW;
 	(void)add_to_client_hash_table(me.name, &me);
 
@@ -1011,6 +1049,7 @@ done_check:
 			delay = nextping;
 		delay = MIN(nextdnscheck, delay);
 		delay = MIN(nextexpire, delay);
+		delay = MIN(nextpasscleanup, delay);
 		delay -= NOW;
 		/*
 		** Adjust delay to something reasonable [ad hoc values]
@@ -1113,6 +1152,14 @@ done_check:
 #endif
 			dorehash = 0;
 		}
+
+		if (NOW >= nextpasscleanup)
+		    {
+		    	nextpasscleanup = NOW + CLEANUP_DELAY;
+			expire_channel_passwords();
+			save_random();
+		    }
+
 		/*
 		** Flush output buffers on all connections now if they
 		** have data in them (or at least try to flush)

@@ -70,7 +70,7 @@ Reg1	aClient	*cptr;
 		return;
 	}
 #ifdef SHOW_HEADERS
-	write(cptr->fd, REPORT_DO_ID, R_do_id);
+	sendheader(cptr, REPORT_DO_ID, R_do_id);
 #endif
 	set_non_blocking(cptr->authfd, cptr);
 
@@ -110,7 +110,7 @@ Reg1	aClient	*cptr;
 		if (!DoingDNS(cptr))
 			SetAccess(cptr);
 #ifdef SHOW_HEADERS
-		write(cptr->fd, REPORT_FAIL_ID, R_fail_id);
+		sendheader(cptr, REPORT_FAIL_ID, R_fail_id);
 #endif
 		return;
 	}
@@ -167,7 +167,7 @@ authsenderr:
 		cptr->authfd = -1;
 		cptr->flags &= ~FLAGS_AUTH;
 #ifdef SHOW_HEADERS
-		write(cptr->fd, REPORT_FAIL_ID, R_fail_id);
+		sendheader(cptr, REPORT_FAIL_ID, R_fail_id);
 #endif
 		if (!DoingDNS(cptr))
 			SetAccess(cptr);
@@ -245,7 +245,7 @@ Reg1	aClient	*cptr;
 	if (len > 0)
 		Debug((DEBUG_INFO,"ident reply: [%s]", cptr->buffer));
 #ifdef SHOW_HEADERS
-	write(cptr->fd, REPORT_FIN_ID, R_fin_id);
+	sendheader(cptr, REPORT_FIN_ID, R_fin_id);
 #endif
 	if (!locp || !remp || !*ruser)
 	{

@@ -13,7 +13,7 @@
                      OSes...but here is the define.
 */
 
-#undef NO_PRIORITY
+#define NO_PRIORITY
 
 
 
@@ -216,13 +216,10 @@ they are increased!
 
 #define MAXBUFFERS
 
-#ifndef MAXBUFFERS
-
-/* This is the receive buffer size to use if MAXBUFFER isn't used: */
-
-#define READBUFSIZE 32767
-
-#endif
+/* readbufsize now defined in include/struct.h to 16k ; I'm not sure
+   it can be changed w/o breaking the zip stuff locally or remotely
+   -orabidoo
+*/
 
 /* DBUF_INIT        - define this if you want to pre-allocate
                       4 megs of dbufs...this should help in
@@ -416,6 +413,10 @@ they are increased!
 #define CLIENT_NOTICES
 
 
+/* the new one-pass set_mode doesn't even have the code to generate fakes,
+   so this is obsolete  -orabidoo 
+ */
+
 /* DONT_SEND_FAKES - define this if you don't want Fake: notices
                      sent to users...there are tons of fakes all
                      the time and it takes a lot of CPU to send
@@ -423,7 +424,6 @@ they are increased!
 */
 
 #define DONT_SEND_FAKES
-
 
 /* FK_USERMODES  - define this if you want +f and +k usermodes
                    +f would then show fakes and serverkills

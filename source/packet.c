@@ -27,13 +27,19 @@ static  char rcsid[] = "@(#)$Id: packet.c,v 1.1.1.1 1997/07/23 18:02:05 cbehrens
 #include "sys.h"
 #include "msg.h"
 #include "h.h"
- 
+
 /*
 ** dopacket
 **	cptr - pointer to client structure for which the buffer data
 **	       applies.
 **	buffer - pointr to the buffer containing the newly read data
 **	length - number of valid bytes of data in the buffer
+**
+**      The buffer might be partially or totally zipped.
+**      At the beginning of the compressed flow, it is possible that
+**      an uncompressed ERROR message will be found.  This occurs when
+**      the connection fails on the other server before switching
+**      to compressed mode.
 **
 ** Note:
 **	It is implicitly assumed that dopacket is called only
@@ -49,6 +55,9 @@ Reg4	int	length;
 	Reg2	char	*ch2;
 	aClient	*acpt = cptr->acpt;
 	register char *cptrbuf = cptr->buffer;
+#ifdef ZIP_LINKS
+	int	zipped = 0;
+#endif
  
 	me.receiveB += length; /* Update bytes received */
 	cptr->receiveB += length;
@@ -73,7 +82,31 @@ Reg4	int	length;
 	}
 	ch1 = cptrbuf + cptr->count;
 	ch2 = buffer;
-	while (--length >= 0)
+
+#ifdef	ZIP_LINKS
+	if (cptr->flags & FLAGS_ZIPFIRST)
+	    {
+	    	if (*ch2 == '\n' || *ch2 == '\r')
+		    {
+		    	ch2++;
+			length--;
+		    }
+		cptr->flags &= ~FLAGS_ZIPFIRST;
+	    }
+
+	if (length && (cptr->flags & FLAGS_ZIP))
+	    {
+		/* uncompressed buffer first */
+		zipped = length;
+		ch2 = unzip_packet(cptr, ch2, &zipped);
+		length = zipped;
+		zipped = 1;
+		if (length == -1)
+			return exit_client(cptr, cptr, &me,
+					   "fatal error in unzip_packet(1)");
+	    }
+#endif /* ZIP_LINKS */
+	while (--length >= 0 && ch2)
 	{
 		register char g;
 
@@ -98,7 +131,7 @@ Reg4	int	length;
 					 ** FLUSH_BUFFER without removing the
 					 ** structure pointed by cptr... --msa
 					 */
-			if (parse(cptr, cptr->buffer, ch1, msgtab) ==
+			if (parse(cptr, cptrbuf, ch1, msgtab) ==
 			    FLUSH_BUFFER)
 				/*
 				** FLUSH_BUFFER means actually that cptr
@@ -110,8 +143,38 @@ Reg4	int	length;
 			** FLUSH_BUFFER here).  - avalon
 			*/
 			if (cptr->flags & FLAGS_DEADSOCKET)
-				return exit_client(cptr, cptr, &me,
+				return exit_client(cptr, cptr, cptr,
 						   "Dead Socket");
+#ifdef	ZIP_LINKS
+			if ((cptr->flags & FLAGS_ZIP) && (zipped == 0) &&
+			    (length > 0))
+			    {
+				/*
+				** beginning of server connection, the buffer
+				** contained PASS/CAPAB/SERVER and is now 
+				** zipped!
+				** Ignore the '\n' that should be here.
+				*/
+				/* Checked RFC1950: \r or \n can't start a
+				** zlib stream  -orabidoo
+				*/
+
+				zipped = length;
+				if (zipped > 0 && 
+					(*ch2 == '\n' || *ch2 == '\r'))
+				    {
+					ch2++;
+					zipped--;
+				    }
+				cptr->flags &= ~FLAGS_ZIPFIRST;
+				ch2 = unzip_packet(cptr, ch2, &zipped);
+				length = zipped;
+				zipped = 1;
+				if (length == -1)
+					return exit_client(cptr, cptr, &me,
+					   "fatal error in unzip_packet(2)");
+			    }
+#endif
 			ch1 = cptrbuf;
 		}
 		else if (ch1 < cptrbuf + (sizeof(cptr->buffer)-1))

@@ -41,10 +41,20 @@ static	Numeric	local_replies[] = {
 /* 002 */	RPL_YOURHOST, ":Your host is %s, running version %s",
 /* 003 */	RPL_CREATED, ":This server was created %s",
 #ifdef FK_USERMODES
-/* 004 */	RPL_MYINFO, "%s %s oiwsfcukbdl biklmnopstv",
+/* 004 */	RPL_MYINFO, "%s %s oiwsfcukbdl biklmnopstvchez",
 #else
-/* 004 */       RPL_MYINFO, "%s %s oiwsucbdl biklmnopstv",
+/* 004 */       RPL_MYINFO, "%s %s oiwsucbdl biklmnopstvchez",
 #endif
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+/* 014 */       RPL_YOURCOOKIE, "%s :is your reconnection cookie",
 		0, (char *)NULL
 };
 
@@ -85,17 +95,22 @@ static	Numeric	numeric_errors[] = {
 		0, (char *)NULL,
 #endif
 		0, (char *)NULL,
-		0, (char *)NULL, 0, (char *)NULL,
-		ERR_USERNOTINCHANNEL, "%s %s :They aren't on that channel",
-		ERR_NOTONCHANNEL, "%s :You're not on that channel",
+		0, (char *)NULL, 
+		0, (char *)NULL,
+/* 441 */	ERR_USERNOTINCHANNEL, "%s %s :They aren't on that channel",
+/* 442 */	ERR_NOTONCHANNEL, "%s :You're not on that channel",
 /* 443 */	ERR_USERONCHANNEL, "%s %s :is already on channel",
 /* 444 */	ERR_NOLOGIN, "%s :User not logged in",
 /* 445 */	ERR_SUMMONDISABLED, ":SUMMON has been disabled",
 /* 446 */	ERR_USERSDISABLED, ":USERS has been disabled",
-		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
+		0, (char *)NULL,
+		0, (char *)NULL,
+		0, (char *)NULL,
 		0, (char *)NULL,
 /* 451 */	ERR_NOTREGISTERED, ":You have not registered",
-		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
+/* 452 */       ERR_IDCOLLISION, ":ID collision KILL",
+/* 453 */       ERR_NICKLOST,"%s :Nickname collision; please enter a new nick.",
+		0, (char *)NULL,
 		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
 		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
 /* 461 */	ERR_NEEDMOREPARAMS, "%s :Not enough parameters",
@@ -118,9 +133,13 @@ static	Numeric	numeric_errors[] = {
 		":Permission Denied- You're not an IRC operator",
 /* 482 */	ERR_CHANOPRIVSNEEDED, "%s :You're not channel operator",
 /* 483 */	ERR_CANTKILLSERVER, ":You cant kill a server!",
-		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
-		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
-		0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+/* 487 */       ERR_CHANTOORECENT, "%s :Channel created too recently",
+/* 488 */       ERR_TSLESSCHAN, "%s :Mode +%c not available on TS-less channel",
+                0, (char *)NULL,
+                0, (char *)NULL,
 /* 491 */	ERR_NOOPERHOST, ":No O-lines for your host",
 /* 492 */	ERR_NOSERVICEHOST, (char *)NULL,
 		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
@@ -160,25 +179,40 @@ static	Numeric	numeric_replies[] = {
 /* 322 */	RPL_LIST, "%s %d :%s",
 /* 323 */	RPL_LISTEND, ":End of /LIST",
 /* 324 */       RPL_CHANNELMODEIS, "%s %s %s",
-                0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
-                0, (char *)NULL, 
-/* 329 */       RPL_CREATIONTIME, "%s %lu",
+/* 325 */       RPL_CHANNELPASSIS, "%s %s",
+/* 326 */       RPL_NOCHANPASS, "%s :No channel password.",
+/* 327 */       RPL_CHPASSUNKNOWN, "%s :Channel password unknown.",
+                0, (char *)NULL,
+/* 329 */       RPL_CREATIONTIME, "%s %ld %ld %ld",
                 0, (char *)NULL, 
 /* 331 */	RPL_NOTOPIC, "%s :No topic is set.",
 /* 332 */	RPL_TOPIC, "%s :%s",
 #ifdef TOPIC_INFO
 /* 333 */       RPL_TOPICWHOTIME, "%s %s %lu",
 #else
-		0, (char *)NULL,
+/* 333 */	0, (char *)NULL,
 #endif
-		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
-		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
+		0, (char *)NULL,
+		0, (char *)NULL,
+		0, (char *)NULL,
+		0, (char *)NULL, 
+/* 338 */       RPL_CHANPASSOK, "%s :Channel password OK",
+/* 339 */       RPL_BADCHANPASS, "%s :Invalid channel password",
 		0, (char *)NULL,
 /* 341 */	RPL_INVITING, "%s %s",
 /* 342 */	RPL_SUMMONING, "%s :User summoned to irc",
-		0, (char *)NULL, 0, (char *)NULL,
-		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
-		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+#ifdef BAN_INFO
+/* 348 */       RPL_EXCEPTLIST, "%s %s %s %lu",
+#else
+/* 348 */       RPL_EXCEPTLIST, "%s %s",
+#endif
+/* 349 */       RPL_ENDOFEXCEPTLIST, "%s :End of Channel Exception List",
+                0, (char *)NULL,
 /* 351 */	RPL_VERSION, "%s.%s %s :%s",
 /* 352 */	RPL_WHOREPLY, "%s %s %s %s %s %s :%d %s",
 /* 353 */	RPL_NAMREPLY, "%s",
@@ -226,13 +260,13 @@ static	Numeric	numeric_replies[] = {
 #endif
 		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
 		0, (char *)NULL,
-/* 200 */	RPL_TRACELINK, "Link %s%s %s %s",
+/* 200 */	RPL_TRACELINK, "Link %s%s %s %s %s%s %d %d %d",
 /* 201 */	RPL_TRACECONNECTING, "Try. %d %s",
 /* 202 */	RPL_TRACEHANDSHAKE, "H.S. %d %s",
 /* 203 */	RPL_TRACEUNKNOWN, "???? %d %s",
 /* 204 */	RPL_TRACEOPERATOR, "Oper %d %s",
 /* 205 */	RPL_TRACEUSER, "User %d %s %d %d",
-/* 206 */	RPL_TRACESERVER, "Serv %d %dS %dC %s %s!%s@%s",
+/* 206 */	RPL_TRACESERVER, "Serv %d %dS %dC %s %s!%s@%s %s%s",
 /* 207 */	RPL_TRACESERVICE, "Service %d %s",
 /* 208 */	RPL_TRACENEWTYPE, "<newtype> 0 %s",
 /* 209 */	RPL_TRACECLASS, "Class %d %d",
@@ -288,10 +322,22 @@ static	Numeric	numeric_replies[] = {
 /* 261 */	RPL_TRACELOG, "File %s %d",
 /* 262 */	RPL_ENDOFTRACE, "%s :End of /TRACE list.",
 #ifdef DOG3
-/* 263 */	RPL_LOAD2HI, ":Server load too high, try again in a while"
+/* 263 */	RPL_LOAD2HI, ":Server load too high, try again in a while",
 #else
-		0, (char *)NULL
+		0, (char *)NULL,
 #endif
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+                0, (char *)NULL,
+/* 274 */       RPL_STATSDELTA, "%ld",
+                0, (char *)NULL
 };
 
 char	*err_str(numeric)
@@ -325,7 +371,8 @@ int	numeric;
 	Reg1	Numeric	*nptr;
 	Reg2	int	num = numeric;
 
-	if (num > 4)
+	/* highest <100 numeric */
+	if (num > 14)
 		num -= (num > 300) ? 300 : 100;
 
 	if (num < 0 || num > 200)

@@ -40,6 +40,8 @@
 #include <signal.h>
 #include <pwd.h>
 
+#include "zlib.h"
+
 #ifdef HAVE_SYS_FILIO_H
 #include <sys/filio.h>
 #endif

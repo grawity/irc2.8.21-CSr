@@ -32,6 +32,7 @@ static  char rcsid[] = "@(#)$Id: s_misc.c,v 1.2 1997/07/29 19:49:04 cbehrens Exp
 #include "h.h"
 
 static	void	exit_one_client PROTO((aClient *,aClient *,aClient *,char *));
+static  void    remove_dependents PROTO((aClient *, aClient *, aClient *, char *, char *));
 
 static	char	*months[] = {
 	"January",	"February",	"March",	"April",
@@ -55,6 +56,32 @@ static int userbuflen = 0, clonebuflen = 0;
  * stats stuff
  */
 struct	stats	ircst, *ircstp = &ircst;
+
+/*
+** Make a TS with the current time, taking timedelta into account, and 
+** checking the results for validity.  If all fails, return a value
+** just before the "end of time" (2^31).  -orabidoo
+*/
+ts_val	make_ts()
+{
+	struct	timeval	tv;
+	ts_val	r;
+
+	r = NOW;
+	if (r < MIN_NOW || r > MAX_NOW)
+	    {
+	    	/* whoops, try again */
+		if (gettimeofday(&tv, NULL) == -1 || 
+		    ((r = (ts_val)tv.tv_sec + timedelta) < MIN_NOW) || 
+		      r > MAX_NOW)
+		    {
+		    	ts_warn("generating aberrant time value (%ld -> %ld)!",
+				r, MAX_NOW);
+			return MAX_NOW;
+	    	    }
+	    }
+	return r;
+}
 
 char	*date(clock) 
 time_t	clock;
@@ -389,6 +416,18 @@ char	*comment;	/* Reason for the exit */
 #endif
 	char	comment1[HOSTLEN + HOSTLEN + 2];
 
+#ifdef RECOVER_NICK_KILLS
+	if (MyClient(sptr) && cptr != sptr &&
+	    ((sptr->flags & FLAGS_NKILL) || (IsServer(from) && !IsMe(from))))
+	   {
+	   	if (sptr->flags & FLAGS_NKILLED)
+			return 0;
+		sptr->flags |= FLAGS_NKILLED;
+	   }
+	else
+#endif
+		sptr->flags &= ~FLAGS_NKILLED;
+
 	if (MyConnect(sptr))
 	{
 		if (IsClient(sptr))
@@ -401,6 +440,10 @@ char	*comment;	/* Reason for the exit */
 			del_from_fdlist(sptr->fd, &new_operfdlist);
 		if (IsServer(sptr))
 			del_from_fdlist(sptr->fd, &new_servfdlist);
+
+		if (sptr->flags & FLAGS_NKILLED)
+			goto exit_client_done;
+
 		sptr->flags |= FLAGS_CLOSING;
 #ifdef CLIENT_NOTICES
                 if (IsPerson(sptr))
@@ -480,42 +523,180 @@ char	*comment;	/* Reason for the exit */
 		**	the following loops. 'cptr' is a *local* client,
 		**	all dependants are *remote* clients.
 		*/
-
-		/* This next bit is a a bit ugly but all it does is take the
-		** name of us.. me.name and tack it together with the name of
-		** the server sptr->name that just broke off and puts this
-		** together into exit_one_client() to provide some useful
-		** information about where the net is broken.      Ian 
-		*/
+	}
 
 /* The above comment says that only server connections can have depending
    remote clients.  This is true, and I don't see this changing...so I'm
    adding in this if(), because looking thru all the clients is really
    really lame -- Comstud */
+
+/* Now we're exiting dependents even on REMOTE servers  -orabidoo */
+
 	if (IsServer(sptr))
 	{
 		(void)strcpy(comment1, me.name);
 		(void)strcat(comment1," ");
 		(void)strcat(comment1, sptr->name);
-		for (acptr = client; acptr; acptr = next)
-		{
-			next = acptr->next;
-			if (!IsServer(acptr) && acptr->from == sptr)
-				exit_one_client(NULL, acptr, &me, comment1);
-		}
-		/*
-		** Second SQUIT all servers behind this link
+
+		remove_dependents(cptr, sptr, from, comment, comment1);
+
+		/* Just for paranoia... this shouldn't be necessary if the
+		** remove_dependents() stuff works, but it's still good
+		** to do it.    MyConnect(sptr) has been set to false,
+		** so we look at servptr, which should be ok  -orabidoo
 		*/
-		for (acptr = client; acptr; acptr = next)
+		if (sptr->servptr == &me)
 		{
-			next = acptr->next;
-			if (IsServer(acptr) && acptr->from == sptr)
-				exit_one_client(NULL, acptr, &me, me.name);
-		}
+
+			for (acptr = client; acptr; acptr = next)
+			{
+				next = acptr->next;
+				if (!IsServer(acptr) && acptr->from == sptr)
+					exit_one_client(NULL, acptr, 
+							&me, comment1);
+			}
+			/*
+			** Second SQUIT all servers behind this link
+			*/
+			for (acptr = client; acptr; acptr = next)
+			{
+				next = acptr->next;
+				if (IsServer(acptr) && acptr->from == sptr)
+					exit_one_client(NULL, acptr, 
+							&me, me.name);
+			}
+		} /* mine */
 	} /* IsServer */
-	} /* MyConnect */
+
+exit_client_done:
 	exit_one_client(cptr, sptr, from, comment);
 	return cptr == sptr ? FLUSH_BUFFER : 0;
+}
+
+/*
+** Recursively send QUITs and SQUITs for sptr and all its dependent clients
+** and servers to those servers that need them.  A server needs the client
+** QUITs if it can't figure them out from the SQUIT (ie pre-TS4) or if it
+** isn't getting the SQUIT because of @#(*&@)# hostmasking.  With TS4, once
+** a link gets a SQUIT, it doesn't need any QUIT/SQUITs for clients depending
+** on that one -orabidoo
+*/
+static	void recurse_send_quits(cptr, sptr, to, comment, myname)
+aClient	*cptr;
+aClient	*sptr;
+aClient	*to;
+char	*comment;	/* for servers */
+char	*myname;
+{
+	aClient *acptr;
+
+#ifndef TS4_ONLY
+	if (DoesTS4(to))
+#endif
+	    {
+	    	if (match(myname, sptr->name) == 0)
+		    {
+			for (acptr = sptr->serv->users; acptr; 
+			     acptr = acptr->lnext)
+				sendto_one(to, ":%s QUIT :%s", ID(acptr),
+					   comment);
+		    	for (acptr = sptr->serv->servers; acptr; 
+			     acptr = acptr->lnext)
+				recurse_send_quits(cptr, acptr, to, comment,
+						   myname);
+		    }
+		else
+			sendto_one(to, "SQUIT %s :%s", sptr->name, me.name);
+	    }
+#ifndef TS4_ONLY
+	else
+	    {
+		for (acptr = sptr->serv->users; acptr; acptr = acptr->lnext)
+		    	sendto_one(to, ":%s QUIT :%s", ID(acptr), comment);
+	    	for (acptr = sptr->serv->servers; acptr; acptr = acptr->lnext)
+			recurse_send_quits(cptr, acptr, to, comment, myname);
+		if (match(myname, sptr->name) != 0)
+			sendto_one(to, "SQUIT %s :%s", sptr->name, me.name);
+	    }
+#endif
+}
+
+/* 
+** Remove all clients that depend on sptr; assumes all (S)QUITs have
+** already been sent.  we make sure to exit a server's dependent clients 
+** and servers before the server itself; exit_one_client takes care of 
+** actually removing things off llists.   tweaked from +CSr31  -orabidoo
+*/
+static	void recurse_remove_clients(sptr, comment)
+aClient	*sptr;
+char	*comment;
+{
+	aClient	*acptr;
+
+	if (IsMe(sptr))
+		return;
+
+	while ((acptr = sptr->serv->servers))
+	    {
+		recurse_remove_clients(acptr, comment);
+		/*
+		** a server marked as "KILLED" won't send a SQUIT 
+		** in exit_one_client()   -orabidoo
+		*/
+		acptr->flags |= FLAGS_KILLED;
+		exit_one_client(NULL, acptr, &me, me.name);
+	    }
+	while ((acptr = sptr->serv->users))
+	    {
+		acptr->flags |= FLAGS_KILLED;
+		exit_one_client(NULL, acptr, &me, comment);
+	    }
+}
+
+/*
+** Remove *everything* that depends on sptr, from all lists, and sending
+** all necessary QUITs and SQUITs.  sptr itself is still on the lists,
+** and its SQUITs have been sent except for the upstream one  -orabidoo
+*/
+static	void remove_dependents(cptr, sptr, from, comment, comment1)
+aClient	*cptr;
+aClient	*sptr;
+aClient	*from;
+char	*comment;
+char	*comment1;
+{
+	Reg1	aClient *to;
+	Reg2	int i;
+	Reg3	aConfItem *aconf;
+	static	char myname[HOSTLEN+1];
+
+	for (i=0; i<=highest_fd; i++)
+	    {
+	    	if (!(to = local[i]) || !IsServer(to) || IsMe(to) ||
+		    to == sptr->from || (to == cptr && DoesTS4(to)))
+			continue;
+		/* MyConnect(sptr) is rotten at this point: if sptr
+		 * was mine, ->from is NULL.  we need to send a 
+		 * WALLOPS here only if we're "deflecting" a SQUIT
+		 * that hasn't hit its target  -orabidoo
+		 */
+		if (to != cptr &&	/* not to the originator */
+		    to != sptr->from && /* not to the destination */
+		    cptr != sptr->from	/* hasn't reached target */
+		    && sptr->servptr != &me) /* not mine [done in m_squit] */
+			sendto_one(to,
+				":%s WALLOPS :Received SQUIT %s from %s (%s)",
+				me.name, sptr->name, 
+				get_client_name(from, FALSE), comment);
+		if ((aconf = to->serv->nline))
+			strncpyzt(myname, my_name_for_link(me.name, aconf),
+				  HOSTLEN+1);
+		else
+			strncpyzt(myname, me.name, HOSTLEN+1);
+		recurse_send_quits(cptr, sptr, to, comment1, myname);
+	    }
+
+	recurse_remove_clients(sptr, comment1);
 }
 
 /*
@@ -547,14 +728,19 @@ char	*comment;
 	}
 #endif DOUGH_MALLOC
 
-	if (sptr->serv)
+	if (IsServer(sptr))
 	{
-		del_stuff(sptr);
 		if (sptr->servptr && sptr->servptr->serv)
-		del_client_from_llist(&(sptr->servptr->serv->servers), sptr);
+			del_client_from_llist(&(sptr->servptr->serv->servers),
+					      sptr);
+		else
+			ts_warn("server %s without servptr!", sptr->name);
 	}
 	else if (sptr->servptr && sptr->servptr->serv)
 		del_client_from_llist(&(sptr->servptr->serv->users), sptr);
+
+	/* there are clients w/o a servptr: unregistered ones */
+
 #ifdef DOUGH_MALLOC
 	if (IsServer(sptr) || (last+10 < NOW))
 	{
@@ -573,53 +759,24 @@ char	*comment;
 		sendto_ops("ERROR: tried to exit me! : %s", comment);
 		return;	/* ...must *never* exit self!! */
 	    }
-	else if (IsServer(sptr)) {
-	 /*
-	 ** Old sendto_serv_but_one() call removed because we now
-	 ** need to send different names to different servers
-	 ** (domain name matching)
-	 */
-	 	for (i = 0; i <= highest_fd; i++)
-		    {
-			Reg4	aConfItem *aconf;
-
-			if (!(acptr = local[i]) || !IsServer(acptr) ||
-			    acptr == cptr || IsMe(acptr))
-				continue;
-			if ((aconf = acptr->serv->nline) &&
-			    (match(my_name_for_link(me.name, aconf),
-				     sptr->name) == 0))
-				continue;
-			/*
-			** SQUIT going "upstream". This is the remote
-			** squit still hunting for the target. Use prefixed
-			** form. "from" will be either the oper that issued
-			** the squit or some server along the path that
-			** didn't have this fix installed. --msa
-			*/
-			if (sptr->from == acptr)
-			    {
-				sendto_one(acptr, ":%s SQUIT %s :%s",
-					   from->name, sptr->name, comment);
-#ifdef	USE_SERVICES
-				check_services_butone(SERVICE_WANT_SQUIT, sptr,
-							":%s SQUIT %s :%s",
-							from->name,
-							sptr->name, comment);
-#endif
-			    }
-			else
-			    {
-				sendto_one(acptr, "SQUIT %s :%s",
-					   sptr->name, comment);
-#ifdef	USE_SERVICES
-				check_services_butone(SERVICE_WANT_SQUIT, sptr,
-							"SQUIT %s :%s",
-							sptr->name, comment);
-#endif
-			    }
+	else if (IsServer(sptr)) 
+	    {
+		 /*
+		 ** Old sendto_serv_but_one() call removed because we now
+		 ** need to send different names to different servers
+		 ** (domain name matching)
+		 */
+		 /*
+		 ** The bulk of this is done in remove_dependents now, all
+		 ** we have left to do is send the SQUIT upstream.  -orabidoo
+		 */
+		acptr = sptr->from;
+		if (acptr && IsServer(acptr) && acptr != cptr &&
+		    !IsMe(acptr) && (sptr->flags & FLAGS_KILLED) == 0)
+			sendto_one(acptr, ":%s SQUIT %s :%s", ID(from), 
+				   sptr->name, comment); /* screw services :p */
 	    }
-	} else if (!(IsPerson(sptr) || IsService(sptr)))
+	else if (!(IsPerson(sptr) || IsService(sptr)))
 				    /* ...this test is *dubious*, would need
 				    ** some thougth.. but for now it plugs a
 				    ** nasty hole in the server... --msa
@@ -632,10 +789,10 @@ char	*comment;
 		** is no sense in sending the QUIT--KILL's have been
 		** sent instead.
 		*/
-		if ((sptr->flags & FLAGS_KILLED) == 0)
+		if ((sptr->flags & (FLAGS_KILLED|FLAGS_NKILLED)) == 0)
 		    {
 			sendto_serv_butone(cptr,":%s QUIT :%s",
-					   sptr->name, comment);
+					   ID(sptr), comment);
 #ifdef	USE_SERVICES
 			check_services_butone(SERVICE_WANT_QUIT,
 						":%s QUIT :%s", sptr->name,
@@ -653,13 +810,45 @@ char	*comment;
 			sendto_common_channels(sptr, ":%s QUIT :%s",
 						sptr->name, comment);
 
+#ifdef KEEP_OPS
+			if (sptr->servptr == &me)   /* local client */
+			    {
+			/* bad guys (killed, K-lined, etc) don't get their
+			** ops saved  -orabidoo
+			*/
+			    	if (from && 
+				    ((IsAnOper(from) && from != sptr) || 
+				    (IsMe(from) && 
+				    !(sptr->flags & FLAGS_NKILL))))
+					free_ko_chain(sptr->ko);
+				else
+					save_client_ops(sptr);
+			    }
+			/* this also frees (or keeps) any existing saved
+			** ops for the client;  if the client is nkilled,
+			** his saved ops are associated to him, otherwise
+			** they're put in the global pool, associated to
+			** his cookie.  -orabidoo
+			*/
+#endif /* KEEP_OPS */
+
 			while ((lp = sptr->user->channel))
+			    {
+				if (sptr->flags & FLAGS_NKILLED)
+					sendto_prefix_one(sptr, sptr, 
+						      ":%s PART %s", sptr->name,
+						      lp->value.chptr->chname);
 				remove_user_from_channel(sptr,lp->value.chptr);
+			    }
 
 			/* Clean up invitefield */
 			while ((lp = sptr->user->invited))
 				del_invite(sptr, lp->value.chptr);
 				/* again, this is all that is needed */
+
+			if (UserHasID(sptr))
+                                (void)del_from_id_hash_table(sptr->user->id,
+                                                                sptr);
 		    }
 	    }
 
@@ -670,7 +859,19 @@ char	*comment;
 			sptr->from ? sptr->from->sockhost : "??host",
 			sptr->from, sptr->next, sptr->prev, sptr->fd,
 			sptr->status, sptr->user));
-	remove_client_from_list(sptr);
+	
+	if (sptr->flags & FLAGS_NKILLED)
+	    {
+		sendto_one(sptr, err_str(ERR_NICKLOST), me.name, sptr->name,
+				sptr->name);
+		if (sptr->user)
+			sptr->user->id[0] = '\0';
+		strncpyzt(sptr->oldnick, sptr->name, NICKLEN+1);
+	    	sptr->name[0] = '\0';
+		sptr->flags &= ~FLAGS_KILLED;
+		sptr->status = STAT_UNKNOWN;
+	    }
+	else remove_client_from_list(sptr);
 	return;
 }
 

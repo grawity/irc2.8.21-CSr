@@ -30,6 +30,8 @@ static  char rcsid[] = "@(#)$Id: hash.c,v 1.1.1.1 1997/07/23 18:02:05 cbehrens E
 int	HASHSIZE = U_MAX;
 int	CHANNELHASHSIZE = CH_MAX;
 
+/* DEBUGMODE code isn't maintained with the addition of IDs  -orabidoo */
+
 #ifdef	DEBUGMODE
 static	aHashEntry	*clientTable = NULL;
 static	aHashEntry	*channelTable = NULL;
@@ -38,6 +40,7 @@ static	int	chhits, chmiss;
 #else
 
 static  aHashEntry      clientTable[U_MAX];
+static	aHashEntry	idTable[U_MAX];
 static	aHashEntry	channelTable[CH_MAX];
 
 #endif
@@ -70,7 +73,7 @@ static	aHashEntry	channelTable[CH_MAX];
  * is moved to the top of the chain.
  */
 
-unsigned int hash_nick_name(name)
+static	unsigned int hash_nick_name(name)
 char *name;
 {
 	register unsigned char *nname = (unsigned char *) name;
@@ -89,6 +92,24 @@ char *name;
 	ret = ((hash & U_MAX_INITIAL_MASK) << BITS_PER_COL) +
 		(hash2 & BITS_PER_COL_MASK);
 	return ret;
+}
+
+/*
+ * hash_id
+ *
+ * IDs are a easy to hash -- they're already evenly distributed,
+ * and they are always case sensitive.   -orabidoo
+ */
+static  unsigned int hash_id(char *nname)
+{
+	register unsigned char *name = (unsigned char *)nname;
+	register unsigned int hash, hash2;
+
+	hash = name[1];
+	hash = (hash << 8) | name[2];
+	hash2 = name[3];
+	return ((hash & U_MAX_INITIAL_MASK) << BITS_PER_COL) +
+		(hash2 & BITS_PER_COL_MASK);
 }
 
 /*
@@ -157,6 +178,11 @@ void	clear_client_hash_table()
 	bzero((char *)clientTable, sizeof(aHashEntry) * HASHSIZE);
 }
 
+void	clear_id_hash_table()
+{
+	bzero((char *)idTable, sizeof(aHashEntry) * HASHSIZE);
+}
+
 void	clear_channel_hash_table()
 {
 #ifdef	DEBUGMODE
@@ -183,6 +209,23 @@ aClient	*cptr;
 	clientTable[hashv].list = (void *)cptr;
 	clientTable[hashv].links++;
 	clientTable[hashv].hits++;
+	return 0;
+}
+
+/*
+ * add_to_id_hash_table
+ */
+int	add_to_id_hash_table(name, cptr)
+char	*name;
+aClient	*cptr;
+{
+	Reg1	int	hashv;
+
+	hashv = hash_id(name);
+	cptr->idhnext = (aClient *)idTable[hashv].list;
+	idTable[hashv].list = (void *)cptr;
+	idTable[hashv].links++;
+	idTable[hashv].hits++;
 	return 0;
 }
 
@@ -242,6 +285,39 @@ aClient	*cptr;
 }
 
 /*
+ * del_from_id_hash_table
+ */
+int	del_from_id_hash_table(id, cptr)
+char	*id;
+aClient	*cptr;
+{
+	Reg1	aClient	*tmp, *prev = NULL;
+	Reg2	int	hashv;
+
+	hashv = hash_id(id);
+	for (tmp = (aClient *)idTable[hashv].list; tmp; tmp = tmp->idhnext)
+	    {
+		if (tmp == cptr)
+		    {
+			if (prev)
+				prev->idhnext = tmp->idhnext;
+			else
+				idTable[hashv].list = (void *)tmp->idhnext;
+			tmp->idhnext = NULL;
+			if (idTable[hashv].links > 0)
+			    {
+				idTable[hashv].links--;
+				return 1;
+			    } 
+			else
+				return -1;
+		    }
+		prev = tmp;
+	    }
+	return 0;
+}
+
+/*
  * del_from_channel_hash_table
  */
 int	del_from_channel_hash_table(name, chptr)
@@ -275,6 +351,51 @@ aChannel	*chptr;
 	return 0;
 }
 
+/*
+ * hash_find_id
+ */
+aClient	*hash_find_id(name, cptr)
+char	*name;
+aClient	*cptr;
+{
+	Reg1	aClient	*tmp;
+	Reg2	aClient	*prv = NULL;
+	Reg3	aHashEntry	*tmp3;
+	int	hashv;
+
+	if (name == NULL)
+		return NULL;
+	hashv = hash_id(name);
+	tmp3 = &idTable[hashv];
+
+	/*
+	 * Got the bucket, now search the chain.
+	 */
+	for (tmp = (aClient *)tmp3->list; tmp; prv = tmp, tmp = tmp->idhnext)
+		if (tmp->user && strcmp(name, tmp->user->id) == 0)
+			goto c_move_to_top;
+
+	return (cptr);
+
+c_move_to_top:
+	/*
+	 * If the member of the hashtable we found isnt at the top of its
+	 * chain, put it there.  This builds a most-frequently used order into
+	 * the chains of the hash table, giving speadier lookups on those nicks
+	 * which are being used currently.  This same block of code is also
+	 * used for channels and servers for the same performance reasons.
+	 */
+	if (prv)
+	    {
+		aClient *tmp2;
+
+		tmp2 = (aClient *)tmp3->list;
+		tmp3->list = (void *)tmp;
+		prv->idhnext = tmp->idhnext;
+		tmp->idhnext = tmp2;
+	    }
+	return (tmp);
+}
 
 /*
  * hash_find_client
@@ -287,6 +408,18 @@ aClient	*cptr;
 	Reg2	aClient	*prv = NULL;
 	Reg3	aHashEntry	*tmp3;
 	int	hashv;
+
+	if (name == NULL)
+		return NULL;
+	if (name[0] == '.')
+		return hash_find_id(name, cptr);
+
+	/* Skip any "modifier"-like characters (@, %, +) in front of nicks,
+	** that misguided clients could have sent after parsing a names/whois
+	** reply with multiple modifier flags  -orabidoo
+	*/ 
+	while (*name == '+' || *name == '%' || *name == '@')
+		name++;
 
 	hashv = hash_nick_name(name);
 	tmp3 = &clientTable[hashv];
@@ -325,62 +458,6 @@ c_move_to_top:
 }
 
 /*
- * hash_find_nickserver
- */
-aClient	*hash_find_nickserver(name, cptr)
-char	*name;
-aClient *cptr;
-{
-	Reg1	aClient	*tmp;
-	Reg2	aClient	*prv = NULL;
-	Reg3	aHashEntry	*tmp3;
-	int	hashv;
-	char	*serv;
-
-	serv = index(name, '@');
-	*serv++ = '\0';
-	hashv = hash_nick_name(name);
-	tmp3 = &clientTable[hashv];
-
-	/*
-	 * Got the bucket, now search the chain.
-	 */
-	for (tmp = (aClient *)tmp3->list; tmp; prv = tmp, tmp = tmp->hnext)
-		if (mycmp(name, tmp->name) == 0 && tmp->user &&
-		    mycmp(serv, tmp->user->server) == 0)
-			goto c_move_to_top;
-
-#ifdef	DEBUGMODE
-	clmiss++;
-#endif
-	*--serv = '\0';
-	return (cptr);
-
-c_move_to_top:
-#ifdef	DEBUGMODE
-	clhits++;
-#endif
-	/*
-	 * If the member of the hashtable we found isnt at the top of its
-	 * chain, put it there.  This builds a most-frequently used order into
-	 * the chains of the hash table, giving speadier lookups on those nicks
-	 * which are being used currently.  This same block of code is also
-	 * used for channels and servers for the same performance reasons.
-	 */
-	if (prv)
-	    {
-		aClient *tmp2;
-
-		tmp2 = (aClient *)tmp3->list;
-		tmp3->list = (void *)tmp;
-		prv->hnext = tmp->hnext;
-		tmp->hnext = tmp2;
-	    }
-	*--serv = '\0';
-	return (tmp);
-}
-
-/*
  * hash_find_server
  */
 aClient	*hash_find_server(server, cptr)
@@ -394,6 +471,8 @@ aClient *cptr;
 
 	int hashv;
 
+	if (server == NULL)
+		return NULL;
 	hashv = hash_nick_name(server);
 	tmp3 = &clientTable[hashv];
 
@@ -463,6 +542,8 @@ aChannel *chptr;
 	Reg1	aChannel	*tmp, *prv = NULL;
 	aHashEntry	*tmp3;
 
+	if (name == NULL)
+		return NULL;
 	hashv = hash_channel_name(name);
 	tmp3 = &channelTable[hashv];
 

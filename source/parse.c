@@ -62,16 +62,6 @@ Reg1	aClient *cptr;
 	return cptr;
 }
 
-aClient	*find_nickserv(name, cptr)
-char	*name;
-Reg1	aClient *cptr;
-{
-	if (name)
-		cptr = hash_find_nickserver(name, cptr);
-
-	return cptr;
-}
-
 /*
 **  Find a user@host (server or user).
 **
@@ -216,12 +206,13 @@ struct	Message *mptr;
 		if (*sender && IsServer(cptr))
 		{
  			from = find_client(sender, (aClient *) NULL);
-			if (!from || match(from->name, sender))
+			if (!from || (*sender != '.' && *from->name == '*' &&
+			    match(from->name, sender)))
 				from = find_server(sender, (aClient *)NULL);
-			else if (!from && index(sender, '@'))
-				from = find_nickserv(sender, (aClient *)NULL);
 
 			para[0] = sender;
+			if (from && *sender == '.' && UserHasID(from))
+				strncpyzt(sender, from->name, NICKLEN+1);
 
 			/* Hmm! If the client corresponding to the
 			 * prefix is not found--what is the correct
@@ -298,7 +289,25 @@ struct	Message *mptr;
 			*/
 			if (buffer[0] != '\0')
 			{
-				if (IsPerson(from))
+			    	if (IsServer(cptr))
+				    {
+				    	/* 
+					** Servers aren't allowed to send
+					** unrecognized commands _after_ 
+					** the "SERVER" line anymore.   
+					** -orabidoo
+					*/
+					if (strlen(ch) > 20)
+						ch[20] = '\0';
+					sendto_ops(
+				"Invalid command (%s) from %s: closing link",
+						   ch, 
+						   get_client_name(cptr, TRUE));
+					return exit_client(cptr, cptr, &me, 
+							   "Invalid command");
+
+				    }
+				else if (IsPerson(from))
 					sendto_one(from,
 					    ":%s %d %s %s :Unknown command",
 					    me.name, ERR_UNKNOWNCOMMAND,
@@ -407,15 +416,12 @@ static	int	cancel_clients(cptr, sptr, cmd)
 aClient	*cptr, *sptr;
 char	*cmd;
 {
-	if (IsServer(sptr) || IsMe(sptr) || (IsServer(cptr) &&
-	    !DoesTS(cptr)))
-		sendto_ops("Message from %s[%s] != %s", sptr->name,
-			   sptr->from->name, get_client_name(cptr, TRUE));
-	if (IsServer(sptr) || IsMe(sptr))
-	{ 
-		sendto_ops("Dropping link for fake direction: %s", cptr->name);
-		return exit_client(cptr, cptr, &me, "Fake Direction");
-	}
+	/*
+	 * kill all possible points that are causing confusion here,
+	 * I'm not sure I've got this all right...
+	 * - avalon
+	 */
+
 	/*
 	** with TS, fake prefixes are a common thing, during the
 	** connect burst when there's a nick collision, and they
@@ -426,37 +432,27 @@ char	*cmd;
 	** servers to be dropped though, as well as the ones from
 	** non-TS servers -orabidoo
 	*/
-	if (IsServer(cptr))
-	{
-	/*
-	** If the fake prefix from a client is coming from a TS server,
-	** discard it silently -orabidoo
+
+	/* there are no more non-TS servers; this is only called when
+	** cptr is a server, so all we need to do is squit the fake
+	** prefix if it's a server.  -orabidoo 
 	*/
-		if (DoesTS(cptr))
-			return 0;
-		else
-		    {
-                	sendto_serv_butone(NULL,
-					   ":%s KILL %s :%s (%s[%s] != %s)",
-					   me.name, sptr->name, me.name,
-					   sptr->name, sptr->from->name,
-					   get_client_name(cptr, TRUE));
-	                sptr->flags |= FLAGS_KILLED;
-			return exit_client(cptr, sptr, &me, "Fake Prefix");
-		    }
-	}
-	/* Fake prefix came from a client of mine...something is screwed
-	   with it, so we can exit this one
-	*/
-	return exit_client(cptr, cptr, &me, "Fake prefix");
+	if (IsServer(sptr) || IsMe(sptr))
+	    {
+		sendto_ops("Fake direction on message for %s[%s!%s@%s] from %s",
+			   sptr->name, sptr->from->name, sptr->from->username,
+			   sptr->from->sockhost, get_client_name(cptr, TRUE));
+		sendto_ops("Dropping server %s", cptr->name);
+		return exit_client(cptr, cptr, &me, "Fake Direction");
+	    }
+
+	return 0;
 }
 
 static	void	remove_unknown(cptr, sender)
 aClient	*cptr;
 char	*sender;
 {
-	if (!IsRegistered(cptr) || IsClient(cptr))
-		return;
 	/*
 	 * Not from a server so don't need to worry about it.
 	 */
@@ -466,15 +462,15 @@ char	*sender;
 	 * Do kill if it came from a server because it means there is a ghost
 	 * user on the other server which needs to be removed. -avalon
 	 */
-	if (!index(sender, '.'))
+	/* Actually killing unknown prefixes _could_ cause some trouble
+	 * for non-ID'd clients, so only do it for ID's and servers. -orabidoo
+	 */
+	if (*sender == '.')
 		sendto_one(cptr, ":%s KILL %s :%s (%s(?) <- %s)",
 			   me.name, sender, me.name, sender,
 			   get_client_name(cptr, FALSE));
-	else
-	{
-		sendto_ops("Unknown sender %s came from %s", sender,
-			get_client_name(cptr, TRUE));
+	else if (index(sender, '.'))
 		sendto_one(cptr, ":%s SQUIT %s :(Unknown from %s)",
 			   me.name, sender, get_client_name(cptr, FALSE));
-	}
 }
+
