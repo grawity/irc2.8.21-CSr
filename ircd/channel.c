@@ -1061,9 +1061,9 @@ char	*parv[], *mbuf, *pbuf;
 	whatt = 0;
 
 	/* if it's a non-deopped non-op on a TS channel from a TS
-	** server, allow only deops and ignore everything else (to
-	** avoid "i deop you you deop me"-type desynchs) -orabidoo
-	*/
+	** server, allow only ops and deops and ignore everything
+	** else (to avoid having desynched ops) -orabidoo
+	*/ 
 	if (!ischop && isok)
 	    {
 		Reg1	int 	i;
@@ -1071,7 +1071,7 @@ char	*parv[], *mbuf, *pbuf;
 
 		new = oldm.mode;
 		for (i = 0, j = 0; i < opcnt; i++)
-			if (chops[i].flags == (MODE_CHANOP | MODE_DEL))
+			if (chops[i].flags == (MODE_CHANOP|MODE_VOICE))
 				chops[j++] = chops[i];
 			else
 				count--;
@@ -1231,8 +1231,7 @@ char	*parv[], *mbuf, *pbuf;
 				if (c == 'o' && whatt == MODE_ADD && isdeop &&
 				    !is_chan_op(lp->value.cptr, chptr))
 					set_deopped(lp, chptr);
-				if ((ischop || (isok && c == 'o' &&
-				    whatt == MODE_DEL)) && 
+				if (isok &&
 				    change_chan_flag(lp, chptr, MyClient(sptr)))
 				    {
 					*mbuf++ = c;

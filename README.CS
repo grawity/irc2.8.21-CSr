@@ -1,3 +1,6 @@
+New in CSr17:
+
+1) Updates for +TSora
 
 New in CSr16:
 

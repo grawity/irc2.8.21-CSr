@@ -485,7 +485,6 @@ struct Channel	{
 
 #define	TS_CURRENT	1	/* current TS protocol version */
 #define	TS_MIN		1	/* minimum supported TS protocol version */
-#define	TS_LEAVEIT	0x10000000
 #define	TS_DOESTS	0x20000000
 #define	DoesTS(x)	((x)->tsinfo == TS_DOESTS)
 

@@ -709,12 +709,9 @@ char	*parv[];
 			   me.name, parv[0]);
 		return 0;
 	    }
-	if (!IsServer(sptr) && IsServer(cptr))
-		if (parc > 2)
-			newts = atol(parv[2]);
-		else
-			newts = sptr->tsinfo;
-	else if (parc > 3 && IsServer(cptr))
+	if (!IsServer(sptr) && IsServer(cptr) && parc > 2)
+		newts = atol(parv[2]);
+	else if (IsServer(sptr) && parc > 3)
 		newts = atol(parv[3]);
 	    	
 	doests = (IsServer(cptr) && DoesTS(cptr));
@@ -877,7 +874,7 @@ char	*parv[];
 	** A new NICK being introduced by a neighbouring
 	** server (e.g. message type "NICK new" received)
 	*/
-		sameuser = (parc > 5) && 
+		sameuser = (parc > 6) && 
 			    mycmp(acptr->user->username, parv[5]) == 0 &&
 			    mycmp(acptr->user->host, parv[6]) == 0;
 		if (!doests || !newts || !acptr->tsinfo
@@ -1052,22 +1049,16 @@ nickkilldone:
 		** on a channel, send note of change to all clients
 		** on that channel. Propagate notice to other servers.
 		*/
-		if (mycmp(parv[0], nick) || (!MyClient(sptr) && parc > 2 &&
-		    newts < sptr->tsinfo))
+		if (mycmp(parv[0], nick))
 			sptr->tsinfo = newts ? newts : (ts_val)time(NULL) +
 					timedelta;
 		sendto_common_channels(sptr, ":%s NICK :%s", parv[0], nick);
 		if (sptr->user)
 			add_history(sptr);
-		if (sptr->tsinfo)
-		    {
-			sendto_TS_serv_butone(1, cptr, ":%s NICK %s :%ld",
-					      parv[0], nick, sptr->tsinfo);
-			sendto_TS_serv_butone(0, cptr, ":%s NICK :%s", parv[0],
-					      nick);
-		    }
-		else
-			sendto_serv_butone(cptr, ":%s NICK :%s", parv[0], nick);
+		sendto_TS_serv_butone(1, cptr, ":%s NICK %s :%ld",
+				parv[0], nick, sptr->tsinfo);
+		sendto_TS_serv_butone(0, cptr, ":%s NICK :%s", parv[0],
+				nick);
 #ifdef	USE_SERVICES
 		check_services_butone(SERVICE_WANT_NICK, sptr, ":%s NICK :%s",
 					parv[0], nick);
@@ -2325,6 +2316,7 @@ char	*parv[];
 ** m_pass
 **	parv[0] = sender prefix
 **	parv[1] = password
+**	parv[2] = optional extra version information
 */
 int	m_pass(cptr, sptr, parc, parv)
 aClient *cptr, *sptr;
@@ -2346,6 +2338,15 @@ char	*parv[];
 		return 0;
 	    }
 	strncpyzt(cptr->passwd, password, sizeof(cptr->passwd));
+	if (parc > 2)
+	{
+		int l = strlen(parv[2]);
+
+		if (l < 2)
+			return 0;
+		if (strcmp(parv[2]+l-2, "TS") == 0)
+			cptr->tsinfo = (ts_val)TS_DOESTS;
+	}
 	return 0;
     }
 

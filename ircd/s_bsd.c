@@ -932,7 +932,7 @@ aClient	*cptr;
 		return -1;
 	    }
 	if (!BadPtr(aconf->passwd))
-		sendto_one(cptr, "PASS :%s", aconf->passwd);
+		sendto_one(cptr, "PASS %s :TS", aconf->passwd);
 
 	aconf = find_conf(cptr->confs, cptr->name, CONF_NOCONNECT_SERVER);
 	if (!aconf)
@@ -940,8 +940,6 @@ aClient	*cptr;
 		sendto_ops("Lost N-Line for %s", get_client_name(cptr,FALSE));
 		return -1;
 	    }
-	sendto_one(cptr, "SVINFO %d %d %d :%ld", TS_CURRENT, TS_MIN,
-		   (ts_servcount() == 0 ? 1 : 0), (ts_val)time(NULL)+timedelta);
 	sendto_one(cptr, "SERVER %s 1 :%s",
 		   my_name_for_link(me.name, aconf), me.info);
 	if (!IsDead(cptr))

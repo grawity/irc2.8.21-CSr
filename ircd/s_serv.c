@@ -392,15 +392,17 @@ char	*parv[];
 {
 	Reg1	ts_val	v;
 
-	if (cptr != sptr || (!IsUnknown(cptr) && !IsHandshake(cptr)) ||
-	    parc < 5 || TS_CURRENT < atoi(parv[2]) || atoi(parv[1]) < TS_MIN)
+	if (!IsServer(sptr) || !MyConnect(sptr) || !DoesTS(sptr) || parc < 5 ||
+		TS_CURRENT < atoi(parv[2]) || atoi(parv[1]) < TS_MIN)
 		return 0;
 
 	if (atoi(parv[3]))
 	    	v = (atol(parv[4]) - (ts_val)time(NULL) - timedelta) / 2;
 	else
 	    	v = atol(parv[4]) - (ts_val)time(NULL) - timedelta;
-	cptr->tsinfo = (v ? v : (ts_val)TS_LEAVEIT);
+
+	if (ts_servcount() == 1)
+		timedelta += v;
 	return 0;
 }
 
@@ -749,13 +751,10 @@ Reg1	aClient	*cptr;
 	if (IsUnknown(cptr))
 	    {
 		if (bconf->passwd[0])
-			sendto_one(cptr,"PASS :%s",bconf->passwd);
+			sendto_one(cptr,"PASS %s :%TS",bconf->passwd);
 		/*
 		** Pass my info to the new server
 		*/
-		sendto_one(cptr, "SVINFO %d %d %d :%ld", TS_CURRENT, TS_MIN,
-			   (ts_servcount() == 0 ? 1 : 0),
-			   (ts_val)time(NULL) + timedelta);
 		sendto_one(cptr, "SERVER %s 1 :%s",
 			   my_name_for_link(me.name, aconf), 
 			   (me.info[0]) ? (me.info) : "IRCers United");
@@ -779,13 +778,11 @@ Reg1	aClient	*cptr;
 		*s = '@';
 	    }
 
-	if (cptr->tsinfo && cptr->tsinfo != (ts_val)TS_LEAVEIT &&
-	    !DoesTS(cptr) && ts_servcount() == 0)
-		timedelta += cptr->tsinfo;
-
-	if (cptr->tsinfo)
-		cptr->tsinfo = TS_DOESTS;
-	    
+	if (DoesTS(cptr))
+		sendto_one(cptr, "SVINFO %d %d %d :%ld", TS_CURRENT, TS_MIN,
+			(ts_servcount() == 0 ? 1 : 0),
+			(ts_val)time(NULL) + timedelta);
+ 
 	det_confs_butmask(cptr, CONF_LEAF|CONF_HUB|CONF_NOCONNECT_SERVER);
 	/*
 	** *WARNING*

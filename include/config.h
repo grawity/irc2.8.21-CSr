@@ -107,8 +107,8 @@
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/home/irc/irc2.8.21+CSr16/lib"	/* dir where all ircd stuff is */
-#define	SPATH	"/home/irc/irc2.8.21+CSr16/lib/ircd"
+#define	DPATH	"/home/irc/irc2.8.21+CSr17/lib"	/* dir where all ircd stuff is */
+#define	SPATH	"/home/irc/irc2.8.21+CSr17/lib/ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
 #define	LPATH	"ircd.log" /* Where the debug file lives, if DEBUGMODE */
@@ -122,8 +122,8 @@
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
 
-#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr16/logs/users.log" /* */
-#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr16/logs/opers.log" /* */
+#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr17/logs/users.log" /* */
+#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr17/logs/opers.log" /* */
 
 /* CHROOTDIR
  *
