@@ -1105,7 +1105,7 @@ int fd;
 
 #ifdef _SEQUENT_
 	rcvbufmax = sndbufmax = 8192;
-	readbuf = (char *)MyMalloc(8192 * sizeof(char));
+	readbuf = (char *)MyMalloc((rcvbufmax+1) * sizeof(char));
 	return;
 #endif
 
@@ -1117,7 +1117,7 @@ int fd;
 			(char *)&rcvbufmax, optlen) >= 0))
 		rcvbufmax += 1024;
 	getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char *)&rcvbufmax, &optlen);
-	readbuf = (char *)MyMalloc(rcvbufmax * sizeof(char));
+	readbuf = (char *)MyMalloc((rcvbufmax+1) * sizeof(char));
 #ifdef SOL20
 	sndbufmax = rcvbufmax;
 	if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF,
@@ -1129,7 +1129,7 @@ int fd;
 
 	rcvbufmax = READBUFSIZE;
 	sndbufmax = rcvbufmax > 8192 ? 8192 : rcvbufmax;
-	readbuf = (char *)MyMalloc(rcvbufmax * sizeof(char)); 
+	readbuf = (char *)MyMalloc((rcvbufmax+1) * sizeof(char)); 
 }
 
 /*
@@ -1683,6 +1683,11 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 		}
 		if (FD_ISSET(i, &read_set) && IsListening(cptr))
 		{
+#ifdef D_LINES
+			struct sockaddr_in addr;
+			int len = sizeof(struct sockaddr_in);
+			char host[HOSTLEN+2];
+#endif
 			FD_CLR(i, &read_set);
 			cptr->lasttime = NOW;
 			/*
@@ -1696,7 +1701,11 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 			** point, just assume that connections cannot
 			** be accepted until some old is closed first.
 			*/
+#ifdef D_LINES
+			if ((fd=accept(i, (struct sockaddr *)&addr, &len)) < 0)
+#else
 			if ((fd = accept(i, NULL, NULL)) < 0)
+#endif
 			{
 #ifdef SOL20
 		/* If a connection is closed before the accept(), it
@@ -1707,6 +1716,30 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 						cptr);
 				continue;
 			}
+#ifdef D_LINES
+			strncpyzt(host,
+				(char *)inetntoa((char *)&addr.sin_addr),
+				sizeof(host));
+			if (find_dline(host))
+			{
+#ifdef FNAME_DLINE_LOG
+				int     logfile;
+				char buf[512];
+
+				if ((logfile =
+					open(FNAME_DLINE_LOG,
+						O_WRONLY|O_APPEND)) != -1)
+				{
+		(void)irc_sprintf(buf, "%s Failed connection from %s\n",
+                                      myctime(NOW), host);
+					(void)write(logfile, buf, strlen(buf));
+					(void)close(logfile);
+				}
+#endif /* FNAME_DLINE_LOG */
+				close(fd);
+				continue;
+			}
+#endif
 			ircstp->is_ac++;
 			if (fd >= MAXCLIENTS)
 			{
@@ -2025,6 +2058,11 @@ time_t  delay; /* Don't ever use ZERO here, unless you mean to poll and then
                         continue;
                 if (rr && IsListening(cptr))
                 {
+#ifdef D_LINES
+			struct sockaddr_in addr;
+			int len = sizeof(struct sockaddr_in);
+			char host[HOSTLEN+2];
+#endif
 			rr = 0;
                         cptr->lasttime = NOW;
                         /*
@@ -2038,7 +2076,11 @@ time_t  delay; /* Don't ever use ZERO here, unless you mean to poll and then
                         ** point, just assume that connections cannot
                         ** be accepted until some old is closed first.
                         */
-                        if ((newfd = accept(fd, NULL, NULL)) < 0)
+#ifdef D_LINES
+			if ((newfd = accept(fd, (struct sockaddr *)&addr, &len)) < 0)
+#else
+			if ((newfd = accept(fd, NULL, NULL)) < 0)
+#endif
                             {
 #ifdef SOL20
                 /* If a connection is closed before the accept(), it
@@ -2049,6 +2091,30 @@ time_t  delay; /* Don't ever use ZERO here, unless you mean to poll and then
                                                 cptr);
                                 break;
                             }
+#ifdef D_LINES
+			strncpyzt(host,
+				(char *)inetntoa((char *)&addr.sin_addr),
+				sizeof(host));
+			if (find_dline(host))
+			{
+#ifdef FNAME_DLINE_LOG
+				int     logfile;
+				char buf[512];
+
+				if ((logfile =
+					open(FNAME_DLINE_LOG,
+						O_WRONLY|O_APPEND)) != -1)
+				{
+		(void)irc_sprintf(buf, "%s Failed connection from %s\n",
+                                      myctime(NOW), host);
+					(void)write(logfile, buf, strlen(buf));
+					(void)close(logfile);
+				}
+#endif /* FNAME_DLINE_LOG */
+				close(newfd);
+				continue;
+			}
+#endif
                         ircstp->is_ac++;
                         if (newfd >= MAXCLIENTS)
                             {

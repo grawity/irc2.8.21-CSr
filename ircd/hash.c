@@ -26,43 +26,21 @@ static char sccsid[] = "@(#)hash.c	2.10 7/3/93 (C) 1991 Darren Reed";
 #include "hash.h"
 #include "h.h"
 
-#define MAX_INITIAL  4096
-#define MAX_INITIAL_MASK (MAX_INITIAL-1)
-
-#define CH_MAX_INITIAL  1024
-#define CH_MAX_INITIAL_MASK (CH_MAX_INITIAL-1)
-
-#define BITS_PER_COL 3
-#define BITS_PER_COL_MASK 0x7
-#define MAX_SUB     (1<<BITS_PER_COL)
-
-#define MAX_NEW (MAX_INITIAL*MAX_SUB)
-#define CH_MAX_NEW (CH_MAX_INITIAL*MAX_SUB)
-
-int     HASHSIZE = MAX_NEW;
-int	CHANNELHASHSIZE = CH_MAX_NEW;
+int	HASHSIZE = U_MAX;
+int	CHANNELHASHSIZE = CH_MAX;
 
 #ifdef	DEBUGMODE
-
 static	aHashEntry	*clientTable = NULL;
 static	aHashEntry	*channelTable = NULL;
 static	int	clhits, clmiss;
 static	int	chhits, chmiss;
-
 #else
 
-static  aHashEntry      clientTable[MAX_NEW];
-static	aHashEntry	channelTable[CH_MAX_NEW];
+static  aHashEntry      clientTable[U_MAX];
+static	aHashEntry	channelTable[CH_MAX];
 
 #endif
 
-static	int	hash_mult[] = { 173, 179, 181, 191, 193, 197,
-				199, 211, 223, 227, 229, 233,
-				239, 241, 251, 257, 263, 269,
-				271, 277, 281, 293, 307, 311,
-				401, 409, 419, 421, 431, 433,
-				439, 443, 449, 457, 461, 463
-				};
 /*
  * Hashing.
  *
@@ -91,13 +69,14 @@ static	int	hash_mult[] = { 173, 179, 181, 191, 193, 197,
  * is moved to the top of the chain.
  */
 
-unsigned int hash_nick_name(nname)
-char *nname;
+unsigned int hash_nick_name(name)
+char *name;
 {
-	Reg1 unsigned int hash = 0;
-	Reg2 int hash2 = 0;
-	Reg3 int ret;
-	Reg4 char lower;
+	register unsigned char *nname = (unsigned char *) name;
+	register unsigned int hash = 0;
+	register int hash2 = 0;
+	register int ret;
+	register char lower;
 
 	while (*nname)
 	{
@@ -106,7 +85,7 @@ char *nname;
 		hash2 = (hash2 >> 1) + lower;
 		nname++;
 	}
-	ret = ((hash & MAX_INITIAL_MASK) << BITS_PER_COL) +
+	ret = ((hash & U_MAX_INITIAL_MASK) << BITS_PER_COL) +
 		(hash2 & BITS_PER_COL_MASK);
 	return ret;
 }
@@ -122,11 +101,11 @@ char *nname;
 unsigned int hash_channel_name(name)
 char *name;
 {
-        register char *hname = name;
-        register unsigned int hash = 0;
-        register int hash2 = 0;
-        register char lower;
-        register int i = 30;
+	register unsigned char *hname = (unsigned char *) name;
+	register unsigned int hash = 0;
+	register int hash2 = 0;
+	register char lower;
+	register int i = 30;
 
         while(*hname && --i)
         {
@@ -137,6 +116,27 @@ char *name;
         }
         return ((hash & CH_MAX_INITIAL_MASK) << BITS_PER_COL) +
                 (hash2 & BITS_PER_COL_MASK);
+}
+
+unsigned int hash_whowas_name(name)
+char *name;
+{
+	register unsigned char *nname = (unsigned char *) name;
+	register unsigned int hash = 0;
+	register int hash2 = 0;
+	register int ret;
+	register char lower;
+
+	while (*nname)
+	{
+		lower = tolower(*nname);
+		hash = (hash << 1) + lower;
+		hash2 = (hash2 >> 1) + lower;
+		nname++;
+	}
+	ret = ((hash & WW_MAX_INITIAL_MASK) << BITS_PER_COL) +
+		(hash2 & BITS_PER_COL_MASK);
+	return ret;
 }
 
 /*

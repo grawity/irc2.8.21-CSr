@@ -626,7 +626,6 @@ int	sig;
 	if (sig != 2)
 		flush_cache();
 */
-
 	clear_conf_list(&KList1, 1);
 	clear_conf_list(&KList2, 1);
 	clear_conf_list(&KList3, 1);
@@ -640,6 +639,16 @@ int	sig;
 	clear_conf_list(&EList2, 1);
 	clear_conf_list(&EList3, 1);
 #endif /* E_LINES */
+#ifdef D_LINES
+	clear_conf_list(&DList1, 1);
+	clear_conf_list(&DList2, 1);
+	clear_conf_list(&DList3, 1);
+#endif /* D_LINES */
+#ifdef J_LINES
+	clear_conf_list(&JList1, 1);
+	clear_conf_list(&JList2, 1);
+	clear_conf_list(&JList3, 1);
+#endif /* J_LINES */
 	(void) initconf(0, configfile);
 	(void) initconf(0, klinefile);
 	close_listeners();
@@ -734,7 +743,7 @@ char *tmp;
 			case '+':
 				aconf->flags |= FLAGS_NEED_IDENTD;
 				break;
-			case '#':
+			case '$':
 				aconf->flags |= FLAGS_PASS_IDENTD;
 				break;
 		}
@@ -844,6 +853,12 @@ char *filename;
 				ccount++;
 				aconf->status = CONF_CONNECT_SERVER;
 				break;
+#ifdef D_LINES
+			case 'D':
+			case 'd':
+				aconf->status = CONF_DLINE;
+				break;
+#endif
 #ifdef E_LINES
                         case 'E': /* Addresses that we don't want to check */
                         case 'e': /* for bots. */
@@ -858,6 +873,12 @@ char *filename;
 			case 'i': /* to connect me */
 				aconf->status = CONF_CLIENT;
 				break;
+#ifdef J_LINES
+                        case 'J': /* Unused as of yet..*/
+                        case 'j':
+                                aconf->status = CONF_JLINE;
+                                break;
+#endif /* J_LINES */
 			case 'K': /* Kill user line on irc.conf           */
 			case 'k':
 				aconf->status = CONF_KILL;
@@ -1096,6 +1117,50 @@ char *filename;
                         MyFree(host);
                 }
 #endif /* E_LINES */
+#ifdef D_LINES
+                if (aconf->host && (aconf->status & CONF_DLINE))
+                {
+                        char    *host = host_field(aconf);
+
+			dontadd = 1;
+                        switch (sortable(host))
+                        {
+                                case 0 :
+                                        l_addto_conf_list(&DList3, aconf, host_field);
+                                        break;
+                                case 1 :
+                                        addto_conf_list(&DList1, aconf, host_field);
+                                        break;
+                                case -1 :
+                                        addto_conf_list(&DList2, aconf, rev_host_field);
+                                        break;
+                        }
+
+                        MyFree(host);
+                }
+#endif /* D_LINES */
+#ifdef J_LINES
+                if (aconf->host && (aconf->status & CONF_JLINE))
+                {
+                        char    *host = host_field(aconf);
+
+			dontadd = 1;
+                        switch (sortable(host))
+                        {
+                                case 0 :
+                                        l_addto_conf_list(&JList3, aconf, host_field);
+                                        break;
+                                case 1 :
+                                        addto_conf_list(&JList1, aconf, host_field);
+                                        break;
+                                case -1 :
+                                        addto_conf_list(&JList2, aconf, rev_host_field);
+                                        break;
+                        }
+
+                        MyFree(host);
+                }
+#endif /* J_LINES */
 
 		(void)collapse(aconf->host);
 		(void)collapse(aconf->name);
@@ -1211,7 +1276,7 @@ char            *kuser, *khost;
                         if (tmp->status == CONF_KILL)
                         if (!match(name,kuser) && !match(host,khost))
 			{
-				if (MyClient(sptr))
+				if (sptr && MyClient(sptr))
 				sendto_one(sptr, ":%s NOTICE %s :K: line not added. %s@%s already matched by %s@%s", me.name, sptr->name, kuser, khost, name, host );
 				return 1;
                         }
@@ -1376,7 +1441,7 @@ aConfList	*List3;
 {
 	char	*host, *name;
 	aConfItem *tmp;
-	char		*rev;
+	char		*rev = NULL;
 	aConfList	*list;
 
 	if (!cptr->user)
@@ -1443,6 +1508,62 @@ aClient *cptr;
 	return find_conf_match(cptr, &EList1, &EList2, &EList3);
 }
 #endif /* E_LINES */
+
+#ifdef D_LINES
+int	find_dline(ip)
+char *ip;
+{
+	aConfItem *tmp;
+	char *rev = NULL;
+
+	if (strlen(ip)  > (size_t) HOSTLEN)
+		return 0;
+
+        rev = (char *) MyMalloc(strlen(ip)+1);
+        reverse(rev, ip);
+
+        /* Start with hostnames of the form "*word" (most frequent) -Sol */
+	if ((tmp = find_matching_conf(DList2, rev)) != NULL)
+		goto found_match;
+	if ((tmp = find_matching_conf(DList1, ip)) != NULL)
+		goto found_match;
+	if ((tmp = l_find_matching_conf(DList3, ip)) != NULL)
+		goto found_match;
+
+found_match:
+        MyFree(rev);
+
+        return (tmp ? -1 : 0);
+}
+#endif /* D_LINES */
+
+#ifdef J_LINES
+int	find_jline(ip)
+char *ip;
+{
+	aConfItem *tmp;
+	char *rev = NULL;
+
+	if (strlen(ip)  > (size_t) HOSTLEN)
+		return 0;
+
+        rev = (char *) MyMalloc(strlen(ip)+1);
+        reverse(rev, ip);
+
+        /* Start with hostnames of the form "*word" (most frequent) -Sol */
+	if ((tmp = find_matching_conf(JList2, rev)) != NULL)
+		goto found_match;
+	if ((tmp = find_matching_conf(JList1, ip)) != NULL)
+		goto found_match;
+	if ((tmp = l_find_matching_conf(JList3, ip)) != NULL)
+		goto found_match;
+
+found_match:
+        MyFree(rev);
+
+        return (tmp ? -1 : 0);
+}
+#endif /* J_LINES */
 
 #ifdef R_LINES
 /* find_restrict works against host/name and calls an outside program 

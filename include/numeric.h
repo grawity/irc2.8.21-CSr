@@ -301,6 +301,8 @@
 #define RPL_UMODEIS          221
 #define RPL_STATSBLINE       222
 #define RPL_STATSELINE       223
+#define RPL_STATSDLINE       224
+#define RPL_STATSJLINE       225
  
 #define RPL_SERVICEINFO      231
 #define RPL_ENDOFSERVICES    232

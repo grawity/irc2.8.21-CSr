@@ -31,14 +31,13 @@ extern	int errno; /* ...seems that errno.h doesn't define this everywhere */
 extern	void	outofmemory();
 #endif
 
-char	*mystrdup(s)
-char	*s;
+char *mstrcpy(dest, src)
+char **dest;
+char *src;
 {
-	char *t;
-
-	if ((t = (char *) MyMalloc(strlen(s) + 1)) == NULL)
+	if ((*dest = (char *) MyMalloc(strlen(src) + 1)) == NULL)
 		return NULL;
-	return (char *) strcpy(t, s);
+	return (char *) strcpy(*dest, src);
 }
 
 #ifdef NEED_STRTOKEN

@@ -1,6 +1,6 @@
 ---
 
-This is the README for irc2.8.21+CSr27.  Basically, this is just a list
+This is the README for irc2.8.21+CSr28.  Basically, this is just a list
 of changes...more information can be found in include/comstud.h.
 
 Any questions or comments can be directed to cbehrens@concentric.net
@@ -12,9 +12,34 @@ The newest versions of +CS ircds can be found at:
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
 
-New in CSr27:
+New in CSr28:
 
-Still being developed...
+1) duh. '#' won't work in I: lines for passing identd (See #1 in CSr27
+   below).  This has been changed to '$'.
+2) Fixed a memory leak in DICHCONF/Kline stuff.
+3) /whowas code totally rewritten.  This code is better than Avalon's
+   ever was.  You can now raise NICKNAMEHISTORYLENGTH in config.h to
+   a value that makes sense with today's number of clients.  Without
+   rewriting, you could expect server lockup, mostly during splits.
+   These changes should lower CPU usage quite a bit, especially during
+   splits.
+4) /who code tweaked.  IsMember() = CPU hog...IsMember() has been changed
+   and m_who does less find_user_link()s now...much less.  This is
+   a big reducer of CPU usage.  Also another "bug" was removed from
+   m_who that can possibly cause server lockups.  The possibility still
+   remains, though...not sure how to improve it further without totally
+   breaking /who.
+5) This goes with #4, but...
+   /who nickname was optimized tremendously.  However, this breaks /who
+   if you do /who username and username happens to match a nickname.
+   Oh well...too bad.
+6) Hash table values for clients and channels raised
+7) Various res.c changes that are in 2.9.x.  I'm hoping these will fix
+   my coredumps, but I highly doubt it.
+8) Maybe other things...I dunno...
+
+
+New in CSr27:
 
 1) There are noticable differences in I: lines now.
    There are 4 special characters that you can stick in front

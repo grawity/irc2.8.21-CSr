@@ -24,14 +24,15 @@ INCLUDEDIR=../include
 #-I/usr/gnu/include
 
 # Default flags:
-CFLAGS= -I$(INCLUDEDIR) -O2 -fexpensive-optimizations -funroll-loops -fomit-frame-pointer
+CFLAGS= -I$(INCLUDEDIR) -g
+#-O2 -fexpensive-optimizations -funroll-loops -fomit-frame-pointer
 
 #O2
 #IRCDLIBS=-L/usr/lib -L/usr/gnu/lib -lgnuc -O2
 #IRCLIBS=-lcurses -ltermcap
 
 # Solaris 2
-IRCDLIBS=-L/usr/lib -lsocket -lnsl -lresolv
+IRCDLIBS=-lsocket -lnsl -lresolv
 
 
 

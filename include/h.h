@@ -34,7 +34,7 @@ extern        void    check_max_count();
 
 #ifdef BETTER_MOTD
 	extern aMotd *motd;
-	extern struct tm *motd_tm;
+	extern struct tm motd_tm;
 #endif
 
 
@@ -64,6 +64,18 @@ extern aConfList       EList1;   /* ordered */
 extern aConfList       EList2;   /* ordered, reversed */
 extern aConfList       EList3;   /* what we can't sort */
 #endif /* E_LINES */
+
+#ifdef D_LINES
+extern aConfList       DList1;   /* ordered */
+extern aConfList       DList2;   /* ordered, reversed */
+extern aConfList       DList3;   /* what we can't sort */
+#endif /* D_LINES */
+
+#ifdef J_LINES
+extern aConfList       JList1;   /* ordered */
+extern aConfList       JList2;   /* ordered, reversed */
+extern aConfList       JList3;   /* what we can't sort */
+#endif /* J_LINES */
 
 #ifdef DOG3
 #include "fdlist.h"
@@ -213,6 +225,8 @@ extern	void	sendto_ops();
 /*VARARGS3*/
 extern	void	sendto_ops_butone();
 /*VARARGS3*/
+extern	void	sendto_wallops_butone();
+/*VARARGS3*/
 extern	void	sendto_prefix_one();
 
 extern	int	writecalls, writeb[];
@@ -254,6 +268,7 @@ extern	aClass	*make_class PROTO(());
 extern	aServer	*make_server PROTO(());
 extern	aClient	*make_client PROTO((aClient *));
 extern	Link	*find_user_link PROTO((Link *, aClient *));
+extern	Link	*find_channel_link PROTO((Link *, aChannel *));
 extern	void	add_client_to_list PROTO((aClient *));
 extern	void	checklist PROTO(());
 extern	void	remove_client_from_list PROTO((aClient *));
@@ -288,7 +303,7 @@ extern	aClient	*hash_find_client PROTO((char *, aClient *));
 extern	aClient	*hash_find_nickserver PROTO((char *, aClient *));
 extern	aClient	*hash_find_server PROTO((char *, aClient *));
 
-extern	void	add_history PROTO((aClient *));
+extern	void	add_history PROTO((aClient *, int));
 extern	aClient	*get_history PROTO((char *, time_t));
 extern	void	initwhowas PROTO(());
 extern	void	off_history PROTO((aClient *));

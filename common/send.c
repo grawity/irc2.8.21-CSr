@@ -46,12 +46,7 @@ void sendto_fdlist();
 #define NEWLINE	"\r\n"
 #endif
 
-static	char	sendbuf[2048];
 static	int	send_message PROTO((aClient *, char *, int));
-
-#ifndef CLIENT_COMPILE
-static	int	sentalong[MAXCONNECTIONS];
-#endif
 
 /*
 ** dead_link
@@ -315,7 +310,7 @@ va_dcl
 {
 	va_list	vl;
 #endif
-
+	char	sendbuf[2048];
 /*
 # ifdef NPATH
         check_command((long)1, pattern, p1, p2, p3);
@@ -384,6 +379,7 @@ va_dcl
 	Reg1	Link	*lp;
 	Reg2	aClient *acptr;
 	Reg3	int	i;
+	int	sentalong[MAXCONNECTIONS];
 
 # ifdef	USE_VARARGS
 	va_start(vl);
@@ -591,6 +587,7 @@ va_dcl
 	register Link *channels;
 	register Link *users;
 	register aClient *cptr;
+	int	sentalong[MAXCONNECTIONS];
 
 # ifdef	USE_VARARGS
 	va_start(vl);
@@ -1145,6 +1142,7 @@ va_dcl
 #endif
 	Reg1	int	i;
 	Reg2	aClient *cptr;
+	int	sentalong[MAXCONNECTIONS];
 
 #ifdef	USE_VARARGS
 	va_start(vl);
@@ -1173,7 +1171,63 @@ va_dcl
 # endif
 	return;
 }
+
+/*
+** sendto_wallops_butone
+**      Send message to all operators.
+** one - client not to send message to
+** from- client which message is from *NEVER* NULL!!
+*/
+#ifndef USE_VARARGS
+/*VARARGS*/
+void    sendto_wallops_butone(one, from, pattern, p1, p2, p3, p4, p5, p6, p7, p8)
+aClient *one, *from;
+char    *pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8;
+{
+#else
+void    sendto_wallops_butone(one, from, pattern, va_alist)
+aClient *one, *from;
+char    *pattern;
+va_dcl
+{
+        va_list vl;
 #endif
+        Reg1    int     i;
+        Reg2    aClient *cptr;
+	int	sentalong[MAXCONNECTIONS];
+
+#ifdef  USE_VARARGS
+        va_start(vl);
+#endif
+        bzero((char *)sentalong,sizeof(sentalong));
+        for (cptr = client; cptr; cptr = cptr->next)
+            {
+                if (!SendWallops(cptr))
+                        continue;
+		if (!(IsServer(from) || IsMe(from)) &&
+			MyClient(cptr) && !IsOper(cptr))
+			continue;
+                if (MyClient(cptr) && !IsAnOper(cptr) &&
+				!(IsServer(from) || IsMe(from)))
+                        continue;
+                i = cptr->from->fd;     /* find connection oper is on */
+                if (sentalong[i])       /* sent message along it already ? */
+                        continue;
+                if (cptr->from == one)
+                        continue;       /* ...was the one I should skip */
+                sentalong[i] = 1;
+# ifdef USE_VARARGS
+                sendto_prefix_one(cptr->from, from, pattern, vl);
+            }
+        va_end(vl);
+# else
+                sendto_prefix_one(cptr->from, from, pattern,
+                                  p1, p2, p3, p4, p5, p6, p7, p8);
+            }
+# endif
+        return;
+}
+#endif /* CLIENT_COMPILE */
 
 /*
  * to - destination client
@@ -1198,7 +1252,7 @@ va_dcl
 {
 	va_list	vl;
 #endif
-	static	char	sender[HOSTLEN+NICKLEN+USERLEN+5];
+	char	sender[HOSTLEN+NICKLEN+USERLEN+5];
 	Reg3	anUser	*user;
 	char	*par;
 	int	flag = 0;
@@ -1287,6 +1341,8 @@ char    *formp;
 char *p1,*p2,*p3,*p4,*p5,*p6,*p7,*p8,*p9;
 {
 	register int len,j,i,fd;
+	char	sendbuf[2048];
+
 	len = format(sendbuf,formp,p1,p2,p3,p4,p5,p6,p7,p8,p9);
 
 	for(fd=listp->entry[j=1]; j<= listp->last_entry ; fd=listp->entry[++j])

@@ -1317,7 +1317,7 @@ int	mask;
 			if (IsNeedIdentd(tmp))
 				strcat(string, "+");
 			if (IsPassIdentd(tmp))
-				strcat(string, "#");
+				strcat(string, "$");
 			/*
 			 * On K line the passwd contents can be
 			/* displayed on STATS reply. 	-Vesa
@@ -1504,6 +1504,10 @@ gohere:
 		    {
 			if (!(acptr = local[i]))
 				continue;
+			if (IsPerson(acptr) &&
+				!IsAnOper(acptr) && !IsAnOper(sptr) &&
+				(acptr != sptr))
+				continue;
 			if (IsInvisible(acptr) && (doall || wilds) &&
 			    !(MyConnect(sptr) && IsOper(sptr)) &&
 			    !IsAnOper(acptr) && (acptr != sptr))
@@ -1537,6 +1541,16 @@ gohere:
                 report_configured_links(sptr, CONF_CONNECT_SERVER|
 					CONF_NOCONNECT_SERVER);
 		break;
+#ifdef D_LINES
+	case 'D' : case 'd' :
+		report_conf_links(sptr, &DList1, RPL_STATSDLINE, 'D',
+                        NULL, NULL, NULL);
+		report_conf_links(sptr, &DList2, RPL_STATSDLINE, 'D',
+                        NULL, NULL, NULL);
+		report_conf_links(sptr, &DList3, RPL_STATSDLINE, 'D',
+                        NULL, NULL, NULL);
+	break;
+#endif 
 #ifdef E_LINES
 	case 'E' : case 'e' :
 		report_conf_links(sptr, &EList1, RPL_STATSELINE, 'E',
@@ -1553,6 +1567,16 @@ gohere:
 	case 'I' : case 'i' :
 		report_configured_links(sptr, CONF_CLIENT);
 		break;
+#ifdef J_LINES
+	case 'J' : case 'j' :
+		report_conf_links(sptr, &JList1, RPL_STATSJLINE, 'J',
+                        NULL, NULL, NULL);
+		report_conf_links(sptr, &JList2, RPL_STATSJLINE, 'J',
+                        NULL, NULL, NULL);
+		report_conf_links(sptr, &JList3, RPL_STATSJLINE, 'J',
+                        NULL, NULL, NULL);
+	break;
+#endif 
 	case 'K' : case 'k' :
 		tmpptr = NULL;
 		user = host = NULL;
@@ -1979,7 +2003,7 @@ char	*parv[];
 		return 0;
 	    }
 
-	if (!IsServer(sptr))
+	if (!IsServer(sptr) && MyConnect(sptr) && !IsOper(sptr))
 	    {
 		pv[0] = parv[0];
 		pv[1] = "#wallops";
@@ -1987,7 +2011,7 @@ char	*parv[];
 		pv[3] = NULL;
 		return m_private(cptr, sptr, 3, pv);
 	    }
-	sendto_ops_butone(IsServer(cptr) ? cptr : NULL, sptr,
+	sendto_wallops_butone(IsServer(cptr) ? cptr : NULL, sptr,
 			":%s WALLOPS :%s", parv[0], message);
 #ifdef	USE_SERVICES
 	check_services_butone(SERVICE_WANT_WALLOP, sptr, ":%s WALLOP :%s",
@@ -2048,6 +2072,7 @@ char	*parv[];
 			   me.name, parv[0], me.name);
 	return 0;
     }
+
 
 #ifdef QUOTE_KLINE
 
@@ -2366,7 +2391,6 @@ char    *parv[];
 		sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);
         close(out);
         sendto_one(sptr, ":%s NOTICE %s :Added K-Line [%s@%s] to configfile", me.name, parv[0], user, host);
-
 	return 0;
 }
 
@@ -2736,26 +2760,24 @@ void read_motd(filename)
 char *filename;
 {
 	int fd;
-        register aMotd *temp, *last;
-        struct stat sb;
-        char    line[80];
+	register aMotd *temp, *last;
+	struct stat sb;
+	char    line[80];
 	register char *tmp;
 
-	while(motd)
-	{
-		temp = motd->next;
-		MyFree(motd);
-		motd = temp;
-	}
- 
-
-        if ((fd = open(MOTD, O_RDONLY)) == -1)
+	if ((fd = open(MOTD, O_RDONLY)) == -1)
 		return;
-        (void)fstat(fd, &sb);
-        motd_tm = localtime(&sb.st_mtime);
-        (void)dgets(-1, NULL, 0); /* make sure buffer is at empty pos */
+	if (fstat(fd, &sb) == -1)
+		return;
+	for(;motd;motd=last)
+	{
+		last = motd->next;
+		MyFree(motd);
+	}
+	motd_tm = *localtime(&sb.st_mtime);
+	(void)dgets(-1, NULL, 0); /* make sure buffer is at empty pos */
 	last = NULL;
-        while (dgets(fd, line, sizeof(line)-1) > 0)
+	while (dgets(fd, line, sizeof(line)-1) > 0)
 	{
 		if ((tmp = (char *)index(line,'\n')))
 			*tmp = '\0';
@@ -2772,8 +2794,8 @@ char *filename;
 			last->next = temp;
 		last = temp;
 	}
-        (void)dgets(-1, NULL, 0); /* make sure buffer is at empty pos */
-        (void)close(fd);
+	(void)dgets(-1, NULL, 0); /* make sure buffer is at empty pos */
+	(void)close(fd);
 }
 
 #endif
@@ -2806,23 +2828,18 @@ char	*parv[];
 		return 0;
 
 #ifdef BETTER_MOTD
-	tm = motd_tm;
+	tm = &motd_tm;
 	if (motd == NULL)
 	{
 		sendto_one(sptr, err_str(ERR_NOMOTD), me.name, parv[0]);
 		return 0;
 	}
 	sendto_one(sptr, rpl_str(RPL_MOTDSTART), me.name, parv[0], me.name);
-	if (tm)
 	sendto_one(sptr, ":%s %d %s :- %d/%d/%d %d:%02d", me.name, RPL_MOTD,
 		parv[0], tm->tm_mday, tm->tm_mon+1, 1900+tm->tm_year,
 		tm->tm_hour, tm->tm_min);
-	temp=motd;
-	while(temp)
-	{
+	for(temp=motd;temp;temp=temp->next)
 		sendto_one(sptr, rpl_str(RPL_MOTD), me.name, parv[0], temp->line);
-		temp=temp->next;
-	}
 	sendto_one(sptr, rpl_str(RPL_ENDOFMOTD), me.name, parv[0]);
 	return 0;
 #else

@@ -202,7 +202,6 @@ char	serveropts[] = {
 #include "numeric.h"
 #include "common.h"
 #include "sys.h"
-#include "whowas.h"
 #include "hash.h"
 #include <sys/file.h>
 #ifdef HPUX
@@ -445,8 +444,9 @@ char	*nick;
 		totww = 0,
 		tot = 0;
 
-	count_whowas_memory(&wwu, &wwa, &wwam);
-	wwm = sizeof(aName) * NICKNAMEHISTORYLENGTH;
+	count_whowas_memory(&wwu, &wwm, &wwa, &wwam);
+	wwm += sizeof(aWhowas) * NICKNAMEHISTORYLENGTH;
+	wwm += sizeof(aWhowas *) * WW_MAX;
 
 	for (acptr = client; acptr; acptr = acptr->next)
 	    {

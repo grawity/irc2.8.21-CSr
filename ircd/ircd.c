@@ -49,15 +49,29 @@ aConfList       BList2 = { 0, NULL };   /* ordered, reversed */
 aConfList       BList3 = { 0, NULL };   /* what we can't sort */
 #endif /* B_LINES */
 
+#ifdef D_LINES
+/* Lists of sites to totally ignore! */
+aConfList       DList1 = { 0, NULL };   /* ordered */
+aConfList       DList2 = { 0, NULL };   /* ordered, reversed */
+aConfList       DList3 = { 0, NULL };   /* what we can't sort */
+#endif /* D_LINES */
+
 #ifdef E_LINES
 aConfList       EList1 = { 0, NULL };   /* ordered */
 aConfList       EList2 = { 0, NULL };   /* ordered, reversed */
 aConfList       EList3 = { 0, NULL };   /* what we can't sort */
 #endif /* E_LINES */
 
+#ifdef J_LINES
+/* Lists of sites to totally ignore! */
+aConfList       JList1 = { 0, NULL };   /* ordered */
+aConfList       JList2 = { 0, NULL };   /* ordered, reversed */
+aConfList       JList3 = { 0, NULL };   /* what we can't sort */
+#endif /* J_LINES */
+
 #ifdef BETTER_MOTD
 	aMotd *motd;
-	struct tm *motd_tm;
+	struct tm motd_tm;
 #endif
 
 int	s_count = 1;    /* All servers */
@@ -740,7 +754,6 @@ char	*argv[];
 #endif
 #ifdef BETTER_MOTD
         motd = NULL;
-        motd_tm = NULL;
         read_motd(MOTD);
 #endif
 #ifndef IRC_UID
@@ -1015,6 +1028,17 @@ done_check:
 		if (dorehash)
 		    {
 			(void)rehash(&me, &me, 1);
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE
+{
+        struct tm *tmptr;
+        char timebuffer[20], filename[200];
+
+        tmptr = localtime(&NOW);
+        strftime(timebuffer, 20, "%y%m%d", tmptr);
+        sprintf(filename, "%s.%s", klinefile, timebuffer);
+        initconf(0,filename);
+}
+#endif
 			dorehash = 0;
 		    }
 		/*

@@ -382,6 +382,7 @@ char		*(*cmp_field)();
 				memset(base[compare].sub, 0, sizeof(aConfList));
 			}
 			addto_conf_list(base[compare].sub, my_conf, cmp_field);
+			MyFree(field);
 			return;
 		}
 		if (!matches(field, base[compare].pattern))

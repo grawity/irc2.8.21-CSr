@@ -47,6 +47,8 @@
 #include <sys/time.h>
 #endif
 
+#include "hash.h"
+
 typedef	struct	ConfItem aConfItem;
 typedef	struct 	Client	aClient;
 typedef	struct	Channel	aChannel;
@@ -59,6 +61,8 @@ typedef	long	ts_val;
 typedef struct	IdleItem anIdle;
 typedef struct  CloneItem aClone;
 typedef struct	MotdItem aMotd;
+
+typedef struct Whowas aWhowas;
 
 #ifndef VMSP
 #include "class.h"
@@ -302,6 +306,23 @@ struct	MotdItem	{
 	struct	MotdItem *next;
 };
 
+struct Whowas
+{
+	int hashv;
+	char *name;
+	char *username;
+	char *hostname;
+	char *servername;
+	char *realname;
+	char *away;
+	time_t logoff;
+	struct Client *online; /* Pointer to new nickname for chasing or NULL */
+	struct Whowas *next;  /* for hash table... */
+	struct Whowas *prev;  /* for hash table... */
+	struct Whowas *cnext; /* for client struct linked list */
+	struct Whowas *cprev; /* for client struct linked list */
+};
+
 struct	ConfItem	{
 	unsigned int	status;	/* If CONF_ILLEGAL, delete when no clients */
 	int	clients;	/* Number of *LOCAL* clients using this */
@@ -339,6 +360,8 @@ struct	ConfItem	{
 #define	CONF_HUB		0x04000
 #define CONF_BOT_IGNORE		0x08000
 #define CONF_ELINE		0x10000
+#define CONF_DLINE		0x20000
+#define CONF_JLINE		0x40000
 
 #define	CONF_OPS		(CONF_OPERATOR | CONF_LOCOP)
 #define	CONF_SERVER_MASK	(CONF_CONNECT_SERVER | CONF_NOCONNECT_SERVER)
@@ -389,6 +412,7 @@ struct Client	{
 	struct	Client *next,*prev, *hnext;
 	anUser	*user;		/* ...defined, if this is a User */
 	aServer	*serv;		/* ...defined, if this is a server */
+	aWhowas *whowas;	/* Pointers to whowas structs */
 #ifdef USE_SERVICES
 	aService *service;
 #endif
@@ -600,8 +624,12 @@ struct Channel	{
 #define	ShowChannel(v,c)	(PubChannel(c) || IsMember((v),(c)))
 #define	PubChannel(x)		((!x) || ((x)->mode.mode &\
 				 (MODE_PRIVATE | MODE_SECRET)) == 0)
-
+#ifdef THIS_ONE_IS_MUCH_BETTER
 #define	IsMember(user,chan) (find_user_link((chan)->members,user) ? 1 : 0)
+#endif
+#define	IsMember(blah,chan) ((blah && blah->user && \
+		find_channel_link((blah->user)->channel, chan)) ? 1 : 0)
+
 #define	IsChannelName(name) ((name) && (*(name) == '#' || *(name) == '&'))
 
 /* Misc macros */

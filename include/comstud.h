@@ -1,6 +1,31 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/* D_LINES
+		   - Define this for .conf lines that basically
+                     ignore a site.  If they try to connect to your
+                     server, the connection will be closed immediately.
+                     Note: You must specify ip#'s...and usernames aren't
+                     allowed (won't be matched).
+*/
+
+#define D_LINES
+
+/* FNAME_DLINE_LOG
+                   - Define this to a filename to log ip#'s that have
+                     been rejected from connecting to the server...
+*/
+
+#define FNAME_DLINE_LOG "./logs/dlines.log"
+
+
+/* STRICT_USERNAMES
+                   - Define this if you only want letters, numbers,
+                     -, and _ to be allowed in usernames...
+*/
+
+#define STRICT_USERNAMES
+
 /* RESTRICT_STATSK
                    - Define this if you want to restrict /stats k so
                      that it will only show if a certain spec is banned.
@@ -76,7 +101,7 @@
                      kline.conf.
 */
 
-#undef SEPARATE_QUOTE_KLINES_BY_DATE
+#define SEPARATE_QUOTE_KLINES_BY_DATE
 
 /* LIMIT_UH        - Use this if you want to use the connect frequency
 		     field in the Y: lines to limit that class to a
@@ -188,7 +213,7 @@ they are increased!
                       using /QUOTE KLINE
 */
 
-#define NO_LOCAL_KLINE
+#undef NO_LOCAL_KLINE
 
 /* USE_UH           - define this if you want to use n!u@h
                       for BAN_INFO
@@ -309,7 +334,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc2.8.21+CSr27/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "./logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -399,7 +424,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr27/lib/logs/clones.log"
+#define FNAME_CLONELOG "./logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

@@ -48,6 +48,7 @@ static	void	resend_query PROTO((ResRQ *));
 static	int	proc_answer PROTO((ResRQ *, HEADER *, char *, char *));
 static	int	query_name PROTO((char *, int, int, ResRQ *));
 static	aCache	*make_cache PROTO((ResRQ *));
+static  aCache  *rem_list PROTO((aCache *));
 static	aCache	*find_cache_name PROTO((char *));
 static	aCache	*find_cache_number PROTO((ResRQ *, char *));
 static	int	add_request PROTO((ResRQ *));
@@ -87,7 +88,7 @@ int	op;
 	int	ret = 0;
 
 #ifdef	LRAND48
-	srand48(NOW);
+	srand48(time(NULL));
 #endif
 	if (op & RES_INITLIST)
 	    {
@@ -225,17 +226,16 @@ time_t	now;
 	    {
 		r2ptr = rptr->next;
 		tout = rptr->sentat + rptr->timeout;
-		if (now >= tout)
-			if (--rptr->retries <= 0)
-			    {
+		if ((now >= tout) && (--rptr->retries <= 0))
+		{
 #ifdef DEBUG
-				Debug((DEBUG_ERROR,"timeout %x now %d cptr %x",
-					rptr, now, rptr->cinfo.value.cptr));
+			Debug((DEBUG_ERROR,"timeout %x now %d cptr %x",
+				rptr, now, rptr->cinfo.value.cptr));
 #endif
-				reinfo.re_timeouts++;
-				cptr = rptr->cinfo.value.cptr;
-				switch (rptr->cinfo.flags)
-				{
+			reinfo.re_timeouts++;
+			cptr = rptr->cinfo.value.cptr;
+			switch (rptr->cinfo.flags)
+			{
 				case ASYNC_CLIENT :
 					ClearDNS(cptr);
 					if (!DoingAuth(cptr))
@@ -245,21 +245,22 @@ time_t	now;
 					sendto_ops("Host %s unknown",
 						   rptr->name);
 					break;
-				}
-				rem_request(rptr);
-				continue;
-			    }
-			else
-			    {
+			}
+			rem_request(rptr);
+			continue;
+		}
+		else
+		{
 				rptr->sentat = now;
 				rptr->timeout += rptr->timeout;
 				resend_query(rptr);
+				tout = now + rptr->timeout;
 #ifdef DEBUG
 				Debug((DEBUG_INFO,"r %x now %d retry %d c %x",
 					rptr, now, rptr->retries,
 					rptr->cinfo.value.cptr));
 #endif
-			    }
+		}
 		if (!next || tout < next)
 			next = tout;
 	    }
@@ -443,7 +444,7 @@ ResRQ	*rptr;
 
 	bzero(buf, sizeof(buf));
 	r = res_mkquery(QUERY, name, class, type, NULL, 0, NULL,
-			buf, sizeof(buf));
+			(u_char *)buf, sizeof(buf));
 	if (r <= 0)
 	    {
 		h_errno = NO_RECOVERY;
@@ -523,7 +524,7 @@ HEADER	*hptr;
 #else
 	while (hptr->qdcount-- > 0)
 #endif
-		if ((n = dn_skipname(cp, eob)) == -1)
+		if ((n = dn_skipname((u_char *)cp, (u_char *)eob)) == -1)
 			break;
 		else
 			cp += (n + QFIXEDSZ);
@@ -531,18 +532,19 @@ HEADER	*hptr;
 	 * proccess each answer sent to us blech.
 	 */
 	while (hptr->ancount-- > 0 && cp && cp < eob) {
-		n = dn_expand(buf, eob, cp, hostbuf, sizeof(hostbuf));
+		n = dn_expand((u_char *)buf, (u_char *)eob, (u_char *)cp,
+			hostbuf, sizeof(hostbuf));
 		if (n <= 0)
 			break;
 
 		cp += n;
-		type = (int)_getshort(cp);
+		type = (int)_getshort((u_char *)cp);
 		cp += sizeof(short);
-		class = (int)_getshort(cp);
+		class = (int)_getshort((u_char *)cp);
 		cp += sizeof(short);
-		rptr->ttl = _getlong(cp);
+		rptr->ttl = _getlong((u_char *)cp);
 		cp += sizeof(rptr->ttl);
-		dlen =  (int)_getshort(cp);
+		dlen =  (int)_getshort((u_char *)cp);
 		cp += sizeof(short);
 		rptr->type = type;
 
@@ -579,8 +581,9 @@ HEADER	*hptr;
 			cp += dlen;
  			break;
 		case T_PTR :
-			if((n = dn_expand(buf, eob, cp, hostbuf,
-					  sizeof(hostbuf) )) < 0)
+			if ((n = dn_expand((u_char *)buf, (u_char *)eob,
+				(u_char *)cp, hostbuf,
+				  sizeof(hostbuf) )) < 0)
 			    {
 				cp = NULL;
 				break;
@@ -727,6 +730,9 @@ char	*lp;
 	if (a && rptr->type == T_PTR)
 	    {
 		struct	hostent	*hp2 = NULL;
+
+		if (BadPtr(rptr->he.h_name))    /* Kludge!      960907/Vesa */
+			goto getres_err;
 
 		Debug((DEBUG_DNS, "relookup %s <-> %s",
 			rptr->he.h_name, inetntoa((char *)&rptr->he.h_addr)));
@@ -938,12 +944,8 @@ aCache	*cachep;
 			Debug((DEBUG_DNS,"u_l:add name %s hal %x ac %d",
 				s, cp->he.h_aliases, addrcount));
 #endif
-			base[addrcount-1] = s;
+			mstrcpy(&base[addrcount-1], s);
 			base[addrcount] = NULL;
-			if (i)
-				rptr->he.h_aliases[i-1] = NULL;
-			else
-				rptr->he.h_name = NULL;
 		    }
 	    }
 	for (i = 0; cp->he.h_addr_list[i]; i++)
@@ -971,12 +973,14 @@ aCache	*cachep;
 		 */
 		if (!t)
 		    {
-			base = cp->he.h_addr_list;
+			struct in_addr **ab;
+
+			ab = (struct in_addr **)cp->he.h_addr_list;
 			addrcount++;
-			t = (char *)MyRealloc(*base,
+			t = (char *)MyRealloc((char *)*ab,
 					addrcount * sizeof(struct in_addr));
-			base = (char **)MyRealloc((char *)base,
-					(addrcount + 1) * sizeof(char *));
+			base = (char **)MyRealloc((char *)ab,
+					(addrcount + 1) * sizeof(*ab));
 			cp->he.h_addr_list = base;
 #ifdef	DEBUG
 			Debug((DEBUG_DNS,"u_l:add IP %x hal %x ac %d",
@@ -985,12 +989,12 @@ aCache	*cachep;
 				addrcount));
 #endif
 			for (; addrcount; addrcount--)
-			    {
-				*base++ = t;
+			{
+				*ab++ = (struct in_addr *)t;
 				t += sizeof(struct in_addr);
-			    }
-			*base = NULL;
-			bcopy(s, *--base, sizeof(struct in_addr));
+			}
+			*ab = NULL;
+			bcopy(s, (char *)*--ab, sizeof(struct in_addr));
 		    }
 	    }
 	return;
@@ -1071,7 +1075,12 @@ char	*numb;
 			    }
 
 	for (cp = cachetop; cp; cp = cp->list_next)
-	    {
+	{
+		if (!cp->he.h_addr_list && !cp->he.h_aliases)
+		{
+			cp = rem_list(cp);
+			continue;
+		}
 		/*
 		 * single address entry...would have been done by hashed
 		 * search above...
@@ -1092,7 +1101,7 @@ char	*numb;
 				update_list(rptr, cp);
 				return cp;
 			    }
-	    }
+	}
 	return NULL;
 }
 
@@ -1113,9 +1122,7 @@ ResRQ	*rptr;
 	** Make cache entry.  First check to see if the cache already exists
 	** and if so, return a pointer to it.
 	*/
-	if ((cp = find_cache_number(rptr, (char *)&rptr->he.h_addr.s_addr)))
-		return cp;
-	for (i = 1; rptr->he.h_addr_list[i].s_addr; i++)
+	for (i = 0; rptr->he.h_addr_list[i].s_addr; i++)
 		if ((cp = find_cache_number(rptr,
 				(char *)&(rptr->he.h_addr_list[i].s_addr))))
 			return cp;
@@ -1126,7 +1133,7 @@ ResRQ	*rptr;
 	cp = (aCache *)MyMalloc(sizeof(aCache));
 	bzero((char *)cp, sizeof(aCache));
 	hp = &cp->he;
-	for (i = 0; i < MAXADDRS; i++)
+	for (i = 0; i < MAXADDRS - 1; i++)
 		if (!rptr->he.h_addr_list[i].s_addr)
 			break;
 
@@ -1142,7 +1149,7 @@ ResRQ	*rptr;
 	for (n = 0; n < i; n++, s += sizeof(struct in_addr))
 	    {
 		*t++ = s;
-		bcopy((char *)&(rptr->he.h_addr_list[n].s_addr), s,
+		bcopy((char *)&rptr->he.h_addr_list[n], s,
 		      sizeof(struct in_addr));
 	    }
 	*t = (char *)NULL;
@@ -1150,7 +1157,7 @@ ResRQ	*rptr;
 	/*
 	** an array of pointers to CNAMEs.
 	*/
-	for (i = 0; i < MAXALIASES; i++)
+	for (i = 0; i < MAXALIASES - 1; i++)
 		if (!rptr->he.h_aliases[i])
 			break;
 	i++;
@@ -1178,6 +1185,27 @@ ResRQ	*rptr;
 #endif
 	return add_to_cache(cp);
 }
+
+/*
+* rem_list
+*/
+static aCache  *rem_list(cp)
+aCache *cp;
+{
+	aCache  **cpp, *cr = cp->list_next;
+	/*
+	 * remove cache entry from linked list
+	*/
+	for (cpp = &cachetop; *cpp; cpp = &((*cpp)->list_next))
+		if (*cpp == cp)
+		{
+			*cpp = cp->list_next;
+			MyFree((char *)cp);
+			break;
+		}
+	return cr;
+}
+
 
 /*
  * rem_cache

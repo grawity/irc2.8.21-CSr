@@ -262,7 +262,7 @@ Reg1	aClient	*cptr;
 		cptr->next->prev = cptr->prev;
 	if (IsPerson(cptr) && cptr->user)
 	    {
-		add_history(cptr);
+		add_history(cptr, 0);
 		off_history(cptr);
 	    }
 	if (cptr->user)
@@ -315,12 +315,21 @@ Reg1	Link	*lp;
 Reg2	aClient *ptr;
 {
 	if (ptr)
-	while (lp)
-	   {
-		if (lp->value.cptr == ptr)
-			return (lp);
-		lp = lp->next;
-	    }
+		for(;lp;lp=lp->next)
+			if (lp->value.cptr == ptr)
+				return (lp);
+	return NULL;
+}
+
+
+Link *find_channel_link(lp, chptr)
+Reg1	Link	*lp;
+Reg2	aChannel *chptr;
+{
+	if (chptr)
+		for(;lp;lp=lp->next)
+			if (lp->value.chptr == chptr)
+				return lp;
 	return NULL;
 }
 
@@ -462,3 +471,47 @@ char	*name;
 		   me.name, RPL_STATSDEBUG, name, inuse, mem);
 }
 #endif
+
+void add_whowas_to_clist(bucket, whowas)
+aWhowas **bucket;
+aWhowas *whowas;
+{
+        whowas->cprev = NULL;
+        if ((whowas->cnext = *bucket) != NULL)
+                whowas->cnext->cprev = whowas;
+        *bucket = whowas;
+}
+
+void    del_whowas_from_clist(bucket, whowas)
+aWhowas **bucket;
+aWhowas *whowas;
+{
+        if (whowas->cprev)
+                whowas->cprev->cnext = whowas->cnext;
+        else
+                *bucket = whowas->cnext;
+        if (whowas->cnext)
+                whowas->cnext->cprev = whowas->cprev;
+}
+
+void add_whowas_to_list(bucket, whowas)
+aWhowas **bucket;
+aWhowas *whowas;
+{
+        whowas->prev = NULL;
+        if ((whowas->next = *bucket) != NULL)
+                whowas->next->prev = whowas;
+        *bucket = whowas;
+}
+
+void    del_whowas_from_list(bucket, whowas)
+aWhowas **bucket;
+aWhowas *whowas;
+{
+        if (whowas->prev)
+                whowas->prev->next = whowas->next;
+        else
+                *bucket = whowas->next;
+        if (whowas->next)
+                whowas->next->prev = whowas->prev;
+}

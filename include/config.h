@@ -115,8 +115,8 @@
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/home/irc/irc2.8.21+CSr27"	/* dir where all ircd stuff is */
-#define	SPATH	"/home/irc/irc2.8.21+CSr27/lib/ircd"
+#define	DPATH	"./"	/* dir where all ircd stuff is */
+#define	SPATH	"./ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define KPATH	"klines/klines.conf"	/* config file containing K: lines */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
@@ -131,8 +131,8 @@
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
 
-#define FNAME_USERLOG "users.log"
-#define FNAME_OPERLOG "opers.log"
+#define FNAME_USERLOG "./logs/users.log"
+#define FNAME_OPERLOG "./logs/opers.log"
 
 /* CHROOTDIR
  *
@@ -418,16 +418,6 @@
 /*
  * this defines the length of the nickname history.  each time a user changes
  * nickname or signs off, their old nickname is added to the top of the list.
- * The following sizes are recommended:
- * 8MB or less  core memory : 500	(at least 1/4 of max users)
- * 8MB-16MB     core memory : 500-750	(1/4 -> 1/2 of max users)
- * 16MB-32MB    core memory : 750-1000	(1/2 -> 3/4 of max users)
- * 32MB or more core memory : 1000+	(> 3/4 if max users)
- * where max users is the expected maximum number of users.
- * (100 nicks/users ~ 25k)
- * NOTE: this is directly related to the amount of memory ircd will use whilst
- *	 resident and running - it hardly ever gets swapped to disk! You can
- *	 ignore these recommendations- they only are meant to serve as a guide
  */
 #define NICKNAMEHISTORYLENGTH 15000
 

@@ -431,6 +431,13 @@ char	*nick, *username;
 			strncpyzt(user->host, me.sockhost, HOSTLEN+1);
 		else
 			strncpyzt(user->host, sptr->sockhost, HOSTLEN+1);
+		if (strchr(user->host, '\n'))
+		{
+			sendto_flagops(OPERS, "%s tried an invalid hostname",
+				sptr->name);
+			ircstp->is_ref++;
+			return exit_client(cptr, sptr, &me, "Invalid hostname");
+		}
 		aconf = sptr->confs->value.aconf;
 		if (sptr->flags & FLAGS_GOTID)
 			strncpyzt(user->username, sptr->username, USERLEN+1);
@@ -481,7 +488,33 @@ char	*nick, *username;
 #endif
 		if (oldstatus == STAT_MASTER && MyConnect(sptr))
 			(void)m_oper(&me, sptr, 1, parv);
+#ifdef STRICT_USERNAMES
+{
+		register char *tmpstr;
+		register int special = 0;
+		static char validchars[]=
+	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-_";
 
+		tmpstr = (user->username[0] == '~') ?
+				user->username+1 :
+				user->username;
+		while(*tmpstr)
+		{
+			if (!strchr(validchars, *tmpstr))
+				special++;
+			tmpstr++;
+		}
+		if (special)
+		{
+			sendto_flagops(BMODE,"Invalid username: %s [%s@%s]",
+				nick, user->username, user->host);
+			ircstp->is_ref++;
+			sendto_one(sptr, ":%s NOTICE %s :Sorry, your userid contains invalid characters.", me.name, parv[0]);
+			sendto_one(sptr, ":%s NOTICE %s :Only letters and numbers are allowed.", me.name, parv[0]);
+			return exit_client(cptr, sptr, &me, "Invalid username");
+		}
+}
+#else /* STRICT_USERNAMES */
 #if defined(NO_MIXED_CASE) || defined(NO_SPECIAL)
 {
                 register char *tmpstr, c;
@@ -531,6 +564,8 @@ char	*nick, *username;
 #if defined(NO_MIXED_CASE) || defined(NO_SPECIAL)
 }
 #endif
+#endif /* STRICT_USERNAMES */
+
 
 #ifdef REJECT_BOTS
 	bottype = "Rejecting";
@@ -1171,7 +1206,7 @@ nickkilldone:
 					timedelta;
 		sendto_common_channels(sptr, ":%s NICK :%s", parv[0], nick);
 		if (sptr->user)
-			add_history(sptr);
+			add_history(sptr, 1);
 		sendto_TS_serv_butone(1, cptr, ":%s NICK %s :%ld",
 				parv[0], nick, sptr->tsinfo);
 		sendto_TS_serv_butone(0, cptr, ":%s NICK :%s", parv[0],
@@ -1452,9 +1487,11 @@ char	*parv[];
 	return m_message(cptr, sptr, parc, parv, 1);
 }
 
-static	void	do_who(sptr, acptr, repchan)
-aClient *sptr, *acptr;
+static	void	do_who(sptr, acptr, repchan, lp)
+aClient *sptr;
+aClient *acptr;
 aChannel *repchan;
+Link *lp;
 {
 	char	status[5];
 	int	i = 0;
@@ -1465,17 +1502,21 @@ aChannel *repchan;
 		status[i++] = 'H';
 	if (IsAnOper(acptr))
 		status[i++] = '*';
-	if (repchan && is_chan_op(acptr, repchan))
-		status[i++] = '@';
-	else if (repchan && has_voice(acptr, repchan))
-		status[i++] = '+';
+	if ((repchan != NULL) && (lp == NULL))
+		lp = find_user_link(repchan->members, acptr);
+	if (lp != NULL)
+	{
+		if (lp->flags & CHFL_CHANOP)
+			status[i++] = '@';
+		else if (lp->flags & CHFL_VOICE)
+			status[i++] = '+';
+	}
 	status[i] = '\0';
 	sendto_one(sptr, rpl_str(RPL_WHOREPLY), me.name, sptr->name,
 		   (repchan) ? (repchan->chname) : "*", acptr->user->username,
 		   acptr->user->host, acptr->user->server, acptr->name,
 		   status, acptr->hopcount, acptr->info);
 }
-
 
 /*
 ** m_who
@@ -1492,20 +1533,11 @@ char	*parv[];
 	Reg2	char	*mask = parc > 1 ? parv[1] : NULL;
 	Reg3	Link	*lp;
 	aChannel *chptr;
-	aChannel *mychannel;
+	aChannel *mychannel = NULL;
 	char	*channame = NULL, *s;
 	int	oper = parc > 2 ? (*parv[2] == 'o' ): 0; /* Show OPERS only */
 	int	member;
-
-	if (!BadPtr(mask))
-	    {
-		if ((s = (char *)index(mask, ',')))
-		    {
-			parv[1] = ++s;
-			(void)m_who(cptr, sptr, parc, parv);
-		    }
-		clean_channelname(mask);
-	    }
+	int	maxmatches = 500;
 
 	mychannel = NullChn;
 	if (sptr->user)
@@ -1513,49 +1545,74 @@ char	*parv[];
 			mychannel = lp->value.chptr;
 
 	/* Allow use of m_who without registering */
-	
+	/* Not anymore...- Comstud */
+
+	if (check_registered_user(sptr))
+		return 0;
+
 	/*
 	**  Following code is some ugly hacking to preserve the
 	**  functions of the old implementation. (Also, people
 	**  will complain when they try to use masks like "12tes*"
 	**  and get people on channel 12 ;) --msa
 	*/
-	if (!mask || *mask == '\0')
-		mask = NULL;
-	else if (mask[1] == '\0' && mask[0] == '*')
-	    {
-		mask = NULL;
-		if (mychannel)
-			channame = mychannel->chname;
-	    }
-	else if (mask[1] == '\0' && mask[0] == '0') /* "WHO 0" for irc.el */
-		mask = NULL;
+	if (mask)
+		(void)collapse(mask);
+	if (!mask || (*mask == (char) 0))
+		goto endofwho;
+	else if ((*(mask+1) == (char) 0) && (*mask == '*'))
+	{
+		if (!mychannel)
+			goto endofwho;
+		channame = mychannel->chname;
+	}
 	else
 		channame = mask;
-	(void)collapse(mask);
 
 	if (IsChannelName(channame))
-	    {
+	{
 		/*
 		 * List all users on a given channel
 		 */
 		chptr = find_channel(channame, NULL);
 		if (chptr)
-		  {
-		    member = IsMember(sptr, chptr);
-		    if (member || !SecretChannel(chptr))
+		{
+			member = IsMember(sptr, chptr);
+			if (member || !SecretChannel(chptr))
 			for (lp = chptr->members; lp; lp = lp->next)
-			    {
+			{
 				if (oper && !IsAnOper(lp->value.cptr))
 					continue;
 				if (IsInvisible(lp->value.cptr) && !member)
 					continue;
-				do_who(sptr, lp->value.cptr, chptr);
-			    }
-		  }
-	    }
+				do_who(sptr, lp->value.cptr, chptr, lp);
+			}
+		}
+	}
+	else if (mask && 
+		((acptr = find_client(mask, NULL)) != NULL) &&
+		IsPerson(acptr) && (!oper || IsAnOper(acptr)))
+	{
+		int isinvis = 0;
+		aChannel *ch2ptr = NULL;
+
+		isinvis = IsInvisible(acptr);
+		for (lp = acptr->user->channel; lp; lp = lp->next)
+		{
+			chptr = lp->value.chptr;
+			member = IsMember(sptr, chptr);
+			if (isinvis && !member)
+				continue;
+			if (member || (!isinvis && PubChannel(chptr)))
+			{
+				ch2ptr = chptr;
+				break;
+			}
+		}
+		do_who(sptr, acptr, ch2ptr, NULL);
+	}
 	else for (acptr = client; acptr; acptr = acptr->next)
-	    {
+	{
 		aChannel *ch2ptr = NULL;
 		int	showperson, isinvis;
 
@@ -1563,6 +1620,7 @@ char	*parv[];
 			continue;
 		if (oper && !IsAnOper(acptr))
 			continue;
+
 		showperson = 0;
 		/*
 		 * Show user if they are on the same channel, or not
@@ -1573,37 +1631,37 @@ char	*parv[];
 		 */
 		isinvis = IsInvisible(acptr);
 		for (lp = acptr->user->channel; lp; lp = lp->next)
-		    {
+		{
 			chptr = lp->value.chptr;
 			member = IsMember(sptr, chptr);
 			if (isinvis && !member)
 				continue;
-			if (member || (!isinvis && ShowChannel(sptr, chptr)))
-			    {
+			if (member || (!isinvis && PubChannel(chptr)))
+			{
 				ch2ptr = chptr;
 				showperson = 1;
 				break;
-			    }
+			}
 			if (HiddenChannel(chptr) && !SecretChannel(chptr) &&
 			    !isinvis)
 				showperson = 1;
-		    }
+		}
 		if (!acptr->user->channel && !isinvis)
 			showperson = 1;
-		/*
-		** This is brute force solution, not efficient...? ;( 
-		** Show entry, if no mask or any of the fields match
-		** the mask. --msa
-		*/
 		if (showperson &&
-		    (!mask ||
-		     match(mask, acptr->name) == 0 ||
-		     match(mask, acptr->user->username) == 0 ||
-		     match(mask, acptr->user->host) == 0 ||
-		     match(mask, acptr->user->server) == 0 ||
-		     match(mask, acptr->info) == 0))
-			do_who(sptr, acptr, ch2ptr);
-	    }
+			(!mask ||
+			!match(mask, acptr->name) ||
+			!match(mask, acptr->user->username) ||
+			!match(mask, acptr->user->host) ||
+			!match(mask, acptr->user->server) ||
+			!match(mask, acptr->info)))
+		{
+			do_who(sptr, acptr, ch2ptr, NULL);
+			if (!--maxmatches)
+				goto endofwho;
+		}
+	}
+endofwho:
 	sendto_one(sptr, rpl_str(RPL_ENDOFWHO), me.name, parv[0],
 		   BadPtr(mask) ?  "*" : mask);
 	return 0;
