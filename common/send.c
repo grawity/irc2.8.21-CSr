@@ -1023,14 +1023,14 @@ va_dcl
 */
         for (i = 0; i <= highest_fd; i++)
                 if ((cptr = local[i]) && !IsServer(cptr) && !IsMe(cptr) &&
-			(((flag == OPERS) && IsAnOper(cptr)) ||
-			 ((flag == CMODE) && IsAnOper(cptr) && IsCMode(cptr)) ||
-			((flag == KMODE) && IsKMode(cptr)) ||
-			((flag == FMODE) && IsFMode(cptr)) ||
-			((flag == BMODE) && IsBMode(cptr)) ||
-			((flag == UMODE) && IsUMode(cptr)) ||
-			((flag == DMODE) && IsDMode(cptr)) ||
-			((flag == LMODE) && IsLMode(cptr))))
+			(((flag == UFLAGS_OPERS) && IsAnOper(cptr)) ||
+			 ((flag == UFLAGS_CMODE) && IsAnOper(cptr) && IsCMode(cptr)) ||
+			((flag == UFLAGS_KMODE) && IsKMode(cptr)) ||
+			((flag == UFLAGS_FMODE) && IsFMode(cptr)) ||
+			((flag == UFLAGS_BMODE) && IsBMode(cptr)) ||
+			((flag == UFLAGS_UMODE) && IsUMode(cptr)) ||
+			((flag == UFLAGS_DMODE) && IsDMode(cptr)) ||
+			((flag == UFLAGS_LMODE) && IsLMode(cptr))))
                     {
                         (void)irc_sprintf(nbuf, ":%s NOTICE %s :*** Notice -- ",
                                         me.name, cptr->name);

@@ -91,7 +91,6 @@ int rcvbufmax = 0, sndbufmax = 0;
 
 aClient	*local[MAXCONNECTIONS];
 int	highest_fd = 0, readcalls = 0, udpfd = -1, resfd = -1;
-static	struct	sockaddr_in	mysk;
 static	void	polludp();
 
 static	struct	sockaddr *connect_inet PROTO((aConfItem *, aClient *, int *));
@@ -228,47 +227,56 @@ int	port;
 	int	ad[4], len = sizeof(server);
 	char	ipname[20];
 
-	ad[0] = ad[1] = ad[2] = ad[3] = 0;
+	if (name != NULL)
+	{
+		ad[0] = ad[1] = ad[2] = ad[3] = 0;
 
 	/*
 	 * do it this way because building ip# from separate values for each
 	 * byte requires endian knowledge or some nasty messing. Also means
 	 * easy conversion of "*" 0.0.0.0 or 134.* to 134.0.0.0 :-)
 	 */
-	(void)sscanf(name, "%d.%d.%d.%d", &ad[0], &ad[1], &ad[2], &ad[3]);
-	(void)irc_sprintf(ipname, "%d.%d.%d.%d", ad[0], ad[1], ad[2], ad[3]);
+		(void)sscanf(name, "%d.%d.%d.%d", &ad[0], &ad[1],
+			&ad[2], &ad[3]);
+		(void)irc_sprintf(ipname, "%d.%d.%d.%d", ad[0], ad[1],
+			ad[2], ad[3]);
+	}
+	else
+		strcpy(ipname, inetntoa((char *)&me.ip));
 
 	if (cptr != &me)
-	    {
+	{
 		(void)irc_sprintf(cptr->sockhost, "%-.42s.%.u",
-			name, (unsigned int)port);
+			ipname, (unsigned int)port);
 		(void)strcpy(cptr->name, me.name);
-	    }
+	}
 	/*
 	 * At first, open a new socket
 	 */
 	if (cptr->fd == -1)
 		cptr->fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (cptr->fd < 0)
-	    {
+	{
 		report_error("opening stream socket %s:%s", cptr);
 		return -1;
-	    }
+	}
 	else if (cptr->fd >= MAXCLIENTS)
-	    {
-		sendto_flagops(UMODE,"No more connections allowed (%s)", cptr->name);
+	{
+		sendto_flagops(UFLAGS_UMODE,"No more connections allowed (%s)",
+			cptr->name);
 		(void)close(cptr->fd);
 		return -1;
-	    }
+	}
 	set_sock_opts(cptr->fd, cptr);
 	/*
 	 * Bind a port to listen for new connections if port is non-null,
 	 * else assume it is already open and try get something from it.
 	 */
 	if (port)
-	    {
+	{
+		bzero((char *)&server, sizeof(server));
 		server.sin_family = AF_INET;
-		server.sin_addr.s_addr = INADDR_ANY;
+		server.sin_addr = me.ip;
 		server.sin_port = htons(port);
 		/*
 		 * Try 10 times to bind the socket with an interval of 20
@@ -278,31 +286,32 @@ int	port;
 		 * This used to be the case.  Now it no longer is.
 		 * Could cause the server to hang for too long - avalon
 		 */
-		if (bind(cptr->fd, (struct sockaddr *)&server, sizeof(server)) == -1)
-		    {
+		if (bind(cptr->fd, (struct sockaddr *)&server,
+				sizeof(server)) == -1)
+		{
 			report_error("binding stream socket %s:%s", cptr);
 			(void)close(cptr->fd);
 			return -1;
-		    }
-	    }
+		}
+	}
 	if (getsockname(cptr->fd, (struct sockaddr *)&server, &len))
-	    {
+	{
 		report_error("getsockname failed for %s:%s",cptr);
 		(void)close(cptr->fd);
 		return -1;
-	    }
+	}
 
 	if (cptr == &me) /* KLUDGE to get it work... */
-	    {
+	{
 		char	buf[1024];
 
 		(void)irc_sprintf(buf, rpl_str(RPL_MYPORTIS), me.name, "*",
 			ntohs(server.sin_port));
 		(void)write(0, buf, strlen(buf));
-	    }
+	}
 	if (cptr->fd > highest_fd)
 		highest_fd = cptr->fd;
-	cptr->ip.s_addr = inet_addr(ipname);
+	cptr->ip.s_addr = name ? inet_addr(ipname) : me.ip.s_addr;
 	cptr->port = (int)ntohs(server.sin_port);
 	(void)listen(cptr->fd, 1024);
 	local[cptr->fd] = cptr;
@@ -374,7 +383,7 @@ int	port;
 	    }
 	else if (cptr->fd >= MAXCLIENTS)
 	    {
-		sendto_flagops(UMODE,"No more connections allowed (%s)", cptr->name);
+		sendto_flagops(UFLAGS_UMODE,"No more connections allowed (%s)", cptr->name);
 		(void)close(cptr->fd);
 		return -1;
 	    }
@@ -389,11 +398,11 @@ int	port;
 	get_sockhost(cptr, unixpath);
 
 	if (bind(cptr->fd, (struct sockaddr *)&un, strlen(unixpath)+2) == -1)
-	    {
+	{
 		report_error("error binding unix socket %s:%s", cptr);
 		(void)close(cptr->fd);
 		return -1;
-	    }
+	}
 	if (cptr->fd > highest_fd)
 		highest_fd = cptr->fd;
 	(void)listen(cptr->fd, 1024);
@@ -676,7 +685,7 @@ char	*username;
 		cptr->name, sockname));
 
 	if (inet_netof(cptr->ip) == IN_LOOPBACKNET || IsUnixSocket(cptr) ||
-	    inet_netof(cptr->ip) == inet_netof(mysk.sin_addr))
+	    inet_netof(cptr->ip) == inet_netof(me.ip))
 	    {
 		ircstp->is_loc++;
 		cptr->flags |= FLAGS_LOCAL;
@@ -1303,17 +1312,21 @@ add_con_refuse:
 		 * Check that this socket (client) is allowed to accept
 		 * connections from this IP#.
 		 */
-		for (s = (char *)&cptr->ip, t = (char *)&acptr->ip, len = 4;
-		     len > 0; len--, s++, t++)
-		    {
-			if (!*s)
-				continue;
-			if (*s != *t)
-				break;
-		    }
+		if (cptr != &me)
+		{
+			for (s = (char *)&cptr->ip,
+				t = (char *)&acptr->ip, len = 4;
+					len > 0; len--, s++, t++)
+			{
+				if (!*s)
+					continue;
+				if (*s != *t)
+					break;
+			}
 
-		if (len)
-			goto add_con_refuse;
+			if (len)
+				goto add_con_refuse;
+		}
 
 		lin.flags = ASYNC_CLIENT;
 		lin.value.cptr = acptr;
@@ -2377,7 +2390,7 @@ Reg1	aConfItem	*aconf;
 Reg2	aClient	*cptr;
 int	*lenp;
 {
-	static	struct	sockaddr_in	server;
+	static struct sockaddr_in server;
 	Reg3	struct	hostent	*hp;
 
 	/*
@@ -2386,30 +2399,36 @@ int	*lenp;
 	 */
 	cptr->fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (cptr->fd >= MAXCLIENTS)
-	    {
+	{
 		sendto_ops("No more connections allowed (%s)", cptr->name);
 		return NULL;
-	    }
-	mysk.sin_port = 0;
-	bzero((char *)&server, sizeof(server));
-	server.sin_family = AF_INET;
-	get_sockhost(cptr, aconf->host);
-
+	}
 	if (cptr->fd == -1)
-	    {
+	{
 		report_error("opening stream socket to server %s:%s", cptr);
 		return NULL;
-	    }
+	}
+	get_sockhost(cptr, aconf->host);
+	server.sin_port = 0;
+	server.sin_addr = me.ip;
+	server.sin_family = AF_INET;
+
 	/*
 	** Bind to a local IP# (with unknown port - let unix decide) so
 	** we have some chance of knowing the IP# that gets used for a host
 	** with more than one IP#.
 	*/
-	if (bind(cptr->fd, (struct sockaddr *)&mysk, sizeof(mysk)) == -1)
-	    {
+	/* Bah...the bind isn't needed to connect(), but...it is needed
+           for "virtual host" stuff - comstud
+	*/
+	if (me.ip.s_addr != INADDR_ANY)
+	if (bind(cptr->fd, (struct sockaddr *)&server, sizeof(server)) == -1)
+	{
 		report_error("error binding to local port for %s:%s", cptr);
 		return NULL;
-	    }
+	}
+	bzero((char *)&server, sizeof(server));
+	server.sin_family = AF_INET;
 	/*
 	 * By this point we should know the IP# of the host listed in the
 	 * conf line, whether as a result of the hostname lookup or the ip#
@@ -2418,16 +2437,16 @@ int	*lenp;
 	if (isdigit(*aconf->host) && (aconf->ipnum.s_addr == -1))
 		aconf->ipnum.s_addr = inet_addr(aconf->host);
 	if (aconf->ipnum.s_addr == -1)
-	    {
+	{
 		hp = cptr->hostp;
 		if (!hp)
-		    {
+		{
 			Debug((DEBUG_FATAL, "%s: unknown host", aconf->host));
 			return NULL;
-		    }
+		}
 		bcopy(hp->h_addr, (char *)&aconf->ipnum,
 		      sizeof(struct in_addr));
- 	    }
+	}
 	bcopy((char *)&aconf->ipnum, (char *)&server.sin_addr,
 		sizeof(struct in_addr));
 	bcopy((char *)&aconf->ipnum, (char *)&cptr->ip,
@@ -2635,9 +2654,6 @@ int	len;
 	/*
 	** Setup local socket structure to use for binding to.
 	*/
-	bzero((char *)&mysk, sizeof(mysk));
-	mysk.sin_family = AF_INET;
-
 	if (gethostname(name,len) == -1)
 		return;
 	name[len] = '\0';
@@ -2653,8 +2669,9 @@ int	len;
 	*/
 	if (BadPtr(cname))
 		return;
+	if (me.ip.s_addr != INADDR_ANY)
 	if ((hp = gethostbyname(cname)) || (hp = gethostbyname(name)))
-	    {
+	{
 		char	*hname;
 		int	i = 0;
 
@@ -2676,11 +2693,9 @@ int	len;
 			strncpyzt(name, hp->h_name, len);
 		else
 			strncpyzt(name, tmp, len);
-		bcopy(hp->h_addr, (char *)&mysk.sin_addr,
-			sizeof(struct in_addr));
 		Debug((DEBUG_DEBUG,"local name is %s",
-				get_client_name(&me,TRUE)));
-	    }
+			get_client_name(&me,TRUE)));
+	}
 	return;
 }
 
@@ -2693,7 +2708,7 @@ int	setup_ping()
 	int	on = 1;
 
 	bzero((char *)&from, sizeof(from));
-	from.sin_addr.s_addr = htonl(INADDR_ANY);
+	from.sin_addr = me.ip;
 	from.sin_port = htons(me.port);
 	from.sin_family = AF_INET;
 

@@ -63,7 +63,7 @@ check_max_count()
       {
               max_connection_count = m_clients + m_servers;
               if (max_connection_count % 10 == 0)
-                      sendto_flagops(OPERS,
+                      sendto_flagops(UFLAGS_OPERS,
                               "New highest connections: %d (%d clients)",
                               max_connection_count, max_client_count);
       }
@@ -1383,7 +1383,7 @@ char	*parv[];
 	}
 #ifdef STATS_NOTICE
 	if ((stat != (char) 0) && sptr->user)
-		sendto_flagops(OPERS,"STATS %c requested by %s (%s@%s)", stat,
+		sendto_flagops(UFLAGS_OPERS,"STATS %c requested by %s (%s@%s)", stat,
 			sptr->name, sptr->user->username, sptr->user->host);
 #endif 
 
@@ -2350,10 +2350,10 @@ char    *parv[];
 	}
 	rehashed = 1; /* Forces looping thru clients to check k-lines */
 	if (MyClient(sptr))
-        sendto_flagops(OPERS,"%s added K-Line for [%s@%s]: %s", parv[0], user,
+        sendto_flagops(UFLAGS_OPERS,"%s added K-Line for [%s@%s]: %s", parv[0], user,
 		host, reason && *reason ? reason : "No reason");
 	else
-	sendto_flagops(OPERS,"%s from %s added K-Line for [%s@%s]: %s",
+	sendto_flagops(UFLAGS_OPERS,"%s from %s added K-Line for [%s@%s]: %s",
 		parv[0], sptr->user->server, user, host,
 		reason && *reason ? reason:"No reason");
 #ifdef PUT_KLINES_IN_IRCD_CONF
@@ -2440,7 +2440,7 @@ char    *parv[];
 	{
 		sendto_one(sptr, ":%s NOTICE %s :K-lines were loaded from %s",
 			me.name, parv[0], filename); 
-		sendto_flagops(OPERS, "%s loaded K-lines from %s",
+		sendto_flagops(UFLAGS_OPERS, "%s loaded K-lines from %s",
 			parv[0], filename);
 	}
 	rehashed = 1;
@@ -2475,7 +2475,7 @@ char    *parv[];
 		sendto_one(sptr, ":%s NOTICE %s :There was a problem opening the file", me.name, parv[0]);
 	else
 	{
-		sendto_flagops(OPERS, "%s loaded K-lines from %s",
+		sendto_flagops(UFLAGS_OPERS, "%s loaded K-lines from %s",
 			parv[0], buffer);
 		sendto_one(sptr, ":%s NOTICE %s :K-lines have been loaded",
 			me.name, parv[0]);

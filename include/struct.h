@@ -82,14 +82,14 @@ typedef struct commandlog
 
 
 /* These set of defines are for sendto_flagops */
-#define OPERS 1
-#define CMODE 2
-#define KMODE 3
-#define FMODE 4
-#define BMODE 5
-#define UMODE 6
-#define DMODE 7
-#define LMODE 8
+#define UFLAGS_OPERS 1
+#define UFLAGS_CMODE 2
+#define UFLAGS_KMODE 3
+#define UFLAGS_FMODE 4
+#define UFLAGS_BMODE 5
+#define UFLAGS_UMODE 6
+#define UFLAGS_DMODE 7
+#define UFLAGS_LMODE 8
 /* */
 
 

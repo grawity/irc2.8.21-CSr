@@ -53,8 +53,7 @@ static  char sccsid[] = "@(#)s_auth.c	1.18 4/18/94 (C) 1992 Darren Reed";
 void	start_auth(cptr)
 Reg1	aClient	*cptr;
 {
-	struct	sockaddr_in	sock;
-	int blah;
+	struct	sockaddr_in sock;
 
 	Debug((DEBUG_NOTICE,"start_auth(%x) fd %d status %d",
 		cptr, cptr->fd, cptr->status));
@@ -82,14 +81,20 @@ Reg1	aClient	*cptr;
 
 	set_non_blocking(cptr->authfd, cptr);
 
+	if (me.ip.s_addr != INADDR_ANY)
+	{
+		sock.sin_addr = me.ip;
+		sock.sin_port = 0;
+		sock.sin_family = AF_INET;
+		(void)bind(cptr->authfd,(struct sockaddr *)&sock,sizeof(sock));
+	}
 	bcopy((char *)&cptr->ip, (char *)&sock.sin_addr,
 		sizeof(struct in_addr));
-
 	sock.sin_port = htons(113);
 	sock.sin_family = AF_INET;
 
-	blah = connect(cptr->authfd, (struct sockaddr *)&sock, sizeof(sock));
-	if ((blah==-1) &&
+	if ((connect(cptr->authfd,
+		(struct sockaddr *)&sock, sizeof(sock))==-1) &&
 #ifdef DGUX
                     (errnno != EINPROGRESS) && (errno != EAGAIN))
 #else

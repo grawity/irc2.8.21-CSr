@@ -1,6 +1,6 @@
 ---
 
-This is the README for irc2.8.21+CSr28.  Basically, this is just a list
+This is the README for irc2.8.21+CSr29.  Basically, this is just a list
 of changes...more information can be found in include/comstud.h.
 
 Any questions or comments can be directed to cbehrens@concentric.net
@@ -11,6 +11,22 @@ The newest versions of +CS ircds can be found at:
 
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
+
+New in CSr29:
+
+1) Pfft. A bug I made in r28 doesn't crash on Solaris, when it should.
+   No more crashes on startup I hope
+2) Changed the name of a bunch of defines because "UMODE" conflicts with
+   a define in IRIX system headers.  Just for you, Xney..
+3) Added what people are calling "virtual host."  The ip# that ircd
+   will bind to doesn't have anything to do with the servername in
+   the M: line anymore.   The ip# to bind to will be the unused passwd
+   field of the M: line.  For example:
+   M:irc.concentric.net:206.173.136.204:Concentric Network Corp:6667
+                        ^^^^^^^^^^^^^^^
+                        ip to bind to
+   If this field is left blank, or is a *, INADDR_ANY is used...which
+   will bind to all ips on that machine.
 
 New in CSr28:
 

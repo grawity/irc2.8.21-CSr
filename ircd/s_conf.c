@@ -1049,6 +1049,10 @@ char *filename;
 			if (me.name[0] == '\0' && aconf->host[0])
 				strncpyzt(me.name, aconf->host,
 					  sizeof(me.name));
+			if (aconf->passwd[0] && (aconf->passwd[0] != '*'))
+				me.ip.s_addr = inet_addr(aconf->passwd);
+			else
+				me.ip.s_addr = INADDR_ANY;
 			if (portnum < 0 && aconf->port >= 0)
 				portnum = aconf->port;
 		    }
@@ -1415,7 +1419,7 @@ matched:
 				{
 					sendto_one(cptr, ":%s NOTICE %s :This server is currently limited to %i client%s per user in your class",
 						me.name, cptr->name, tot, tot==1?"":"s"); 
-					sendto_flagops(LMODE, "Rejecting for too many clients: %s [%s@%s]",
+					sendto_flagops(UFLAGS_LMODE, "Rejecting for too many clients: %s [%s@%s]",
 						cptr->name, cptr->user->username, cptr->user->host);	
 					if (reason)
 						*reason = toomany;
@@ -1523,11 +1527,11 @@ char *ip;
         reverse(rev, ip);
 
         /* Start with hostnames of the form "*word" (most frequent) -Sol */
-	if ((tmp = find_matching_conf(DList2, rev)) != NULL)
+	if ((tmp = find_matching_conf(&DList2, rev)) != NULL)
 		goto found_match;
-	if ((tmp = find_matching_conf(DList1, ip)) != NULL)
+	if ((tmp = find_matching_conf(&DList1, ip)) != NULL)
 		goto found_match;
-	if ((tmp = l_find_matching_conf(DList3, ip)) != NULL)
+	if ((tmp = l_find_matching_conf(&DList3, ip)) != NULL)
 		goto found_match;
 
 found_match:
@@ -1551,11 +1555,11 @@ char *ip;
         reverse(rev, ip);
 
         /* Start with hostnames of the form "*word" (most frequent) -Sol */
-	if ((tmp = find_matching_conf(JList2, rev)) != NULL)
+	if ((tmp = find_matching_conf(&JList2, rev)) != NULL)
 		goto found_match;
-	if ((tmp = find_matching_conf(JList1, ip)) != NULL)
+	if ((tmp = find_matching_conf(&JList1, ip)) != NULL)
 		goto found_match;
-	if ((tmp = l_find_matching_conf(JList3, ip)) != NULL)
+	if ((tmp = l_find_matching_conf(&JList3, ip)) != NULL)
 		goto found_match;
 
 found_match:

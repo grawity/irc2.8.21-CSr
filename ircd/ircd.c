@@ -852,23 +852,23 @@ char	*argv[];
 #endif
 	if (!(bootopt & BOOT_INETD))
 	{
-		static	char	star[] = "*";
 		aConfItem	*aconf;
 
 		if ((aconf = find_me()) && portarg <= 0 && aconf->port > 0)
 			portnum = aconf->port;
 		Debug((DEBUG_ERROR, "Port = %d", portnum));
-		if (inetport(&me, star, portnum))
+		if (inetport(&me, NULL, portnum))
 		{
 			fprintf(stderr, "Couldn't bind to port %d\n",
 				portnum);
 			exit(1);
 		}
 	}
-	else if (inetport(&me, "*", 0))
+	else if (inetport(&me, NULL, 0))
 		exit(1);
-
+/* This turns udp off...why is it even here? - Comstud
 	(void)setup_ping();
+*/
 	(void)get_my_name(&me, me.sockhost, sizeof(me.sockhost)-1);
 	if (me.name[0] == '\0')
 		strncpyzt(me.name, me.sockhost, sizeof(me.name));
