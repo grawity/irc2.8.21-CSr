@@ -1,0 +1,187 @@
+Internet Relay Chat Operator Etiquette Guide
+
+May, 1992
+
+Welcome! You've either been selected to be an IRC Operator or you have set
+up your server and thus have taken on the dual task of IRC Server
+Administrator and IRC Operator. Your future days will be filled with hours
+of fun chatting on IRC, and then wondering why everyone you talked to went
+away, because the links had apparently broken. 
+
+2 and a Half years later, December 1994.
+
+Linking:
+========
+
+Currently, there is no policy of any sort in operation on EFnet except for
+Europe (see EBIC documents).  If you want links, find an operator or server
+admin, become friends with them, build a case, run lots of bots to make it
+look like you have lots of users and away you go.  It doesn't matter what
+speed your link is or where you get it (regardless of what people say, they
+don't actually follow their own preeching).
+
+Kills 
+=====
+
+/kill is a special operator command.  The format is as follows:
+	/kill NICKNAME comment.
+Comment can be a phrase of almost any length (within reason) and should be
+used for specifying the reason of the kill.
+Example:
+	/kill jonathan hey, this is fun!
+
+
+/SQUIT server {comment}
+   /squit isolates a specified server from the next closest server, when
+you look at it along the trace path starting from your server. 
+This is usually used in conjunction with CONNECT (explained later) to
+reroute traffic. This will be described in detail in the section
+"routing", preceding CONNECT.  Note, that a primary reason to use squit
+is to isolate your server (to become a leaf) if you want chanop or someone
+else wants chanop and you want to help them.
+
+   Usage (and examples): 
+
+      /squit E
+
+     If the network looks like this initially (and you are on server A)
+
+ 
+          A <---> B <---> C <---> D
+                          ^
+                          |
+                          v
+                  G <---> E <---> F <---> ... (rest of the net)
+                          
+
+    Then after issuing the previous /squit the network would look like this:
+
+          A <---> B <---> C <---> D
+                          
+                          
+                  G <---> E <---> F <---> ...
+
+
+    /squit E {comment}
+
+	It usually helps to give a reason why you are sending a
+	SQUIT for a server. This can be accomplished by sending
+	the command "/squit server This link is making the US route
+	through Finland". The SQUIT will then be sent out, and the 
+	server sending the squit will WALLOP sending the comment
+	so all operators can see it. 
+
+/CONNECT server {portnum server2}
+   /connect is used to establish a link between two servers. These
+connections must be authorized by each server's ircd.conf file, but
+any operator can issue a CONNECT between authorized servers. This
+command is most often used in conjunction with SQUIT to reroute
+traffic. 
+   If only one argument is given, this command causes the server you
+are on to attempt to connect to the server specified. For example,
+"/connect B" (in the previous example) would cause your server (A) to
+connect to B. 
+   Suppose you wanted to reconnect server F to server E? You cannot
+contact server F since it is no longer part of your network. However,
+you can tell server E to connect to it. A remote CONNECT can be issued
+to server E. 
+
+   Examples (assume you are on server A):
+
+   /connect B
+
+   If the network initially looks like this:
+
+         A      B <---> ... (rest of network)
+
+   Then afterwards (if the connection succeeds) the network will look
+   like this:
+
+        A <---> B <---> ... 
+
+
+   In the example where you wanted to reconnect server E to F, the
+   following syntax would be appropriate (note: we are assuming that
+   F's irc socket port is 6667, which is the default)
+
+   /connect F 6667 E
+
+   If the network initially looks like this:
+
+         A <---> B <---> C <---> D
+                         ^
+                         |
+                         v
+                 G <---> E      F <---> ... 
+
+   Then after your CONNECT request the network topology will look like this:
+
+         A <---> B <---> C <---> D
+                         ^
+                         |
+                         v
+                 G <---> E <---> F <---> ... 
+
+    Be careful when connecting servers that you know which command to
+    use! If you simply issued "/connect F" from your server, the
+    network would look like this:
+
+
+    ... <---> F <--->  A <---> B <---> C <---> D
+                                       ^
+                                       |
+                                       v
+                               G <---> E 
+
+    which for various reasons (discussed below) might be very
+    undesirable. 
+
+Routing
+=======
+
+   When and how should you do rerouting? This depends on where your
+server is topologically located and whether you route traffic. If you
+are a leaf node (i.e. only connect to one server at a time) then
+chances are you won't need to do any routing at all.  Your ircd.conf
+file should be written to connect to the best possible servers first
+before trying alternates. At the most, you may decide to squit an
+alternate server and connect to your primary if/when it goes back up.
+This only involves local squits, however.
+
+   Chances are that hub operators will be more familiar with the
+general topology of the network and which servers connect to which
+(which is why most of the manual routing is left to them), so if you
+have any problems, talk to the other operators on operator channels
+(#twilight_zone, #eu-opers etc.) That's what they are there for!
+
+   Don't bother wasting your time with #twilight_zone.  There are many
+operators on many hub servers (including many found in this channel) which
+purport to know something but in fact know nothing.  They will most likely
+ignore you, make fun of you, abuse you, dump your private messages to the
+channel, etc.  In general, many operators (especially true of those on
+#twilight_zone) are not the sort of people you'd want to do this as a
+paid job and won't do anything unless it serves them in some way.
+
+Please let us know if there should be any additions to this guide. Again,
+this is not MANDATORY, this is just a GUIDE. Please conduct yourself as 
+an IRC Operator would...you are looked upon for assistance, both emotional
+and mental. 
+
+Helen Rose		Christopher Davis	Noah Friedman
+<hrose@cs.bu.edu>	<ckd@cs.bu.edu>		<friedman@ai.mit.edu>
+
+January, 1991
+
+
+Updated by
+
+Mauri Haikola
+<mjh@stekt.oulu.fi>
+
+May, 1992
+
+Revised to become more a reflection of the current state of IRC by
+Darren Reed
+<avalon@coombs.anu.edu.au>
+
+December 1994
