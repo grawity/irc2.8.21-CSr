@@ -773,12 +773,21 @@ char	*parv[];
 #ifdef NO_NICK_FLOODS
 	if (MyClient(sptr) && IsRegistered(sptr))
 	{
-		if (!sptr->lastnick || (NOW-sptr->lastnick > 60))
+/* "lastnick" will actually be the first time a person did a /nick
+   if "lastnick" is 0 (has never /nick'd) or if "lastnick" is more
+   than 15 seconds ago, then "lastnick" will be reset to NOW
+   Basically, when someone hits 4 nick changes in 15 seconds, boom.
+*/
+
+		if (!sptr->lastnick || (NOW-sptr->lastnick > 15))
+		{
 			sptr->numnicks = 0;
-		sptr->lastnick = NOW;
+			sptr->lastnick = NOW;
+		}
 		sptr->numnicks++;
 		if (sptr->numnicks > 3)
 		{
+			sptr->lastnick = NOW+15; /* Hurt the person */
 			sendto_flagops(1,"Nick flooding detected by: %s [%s@%s]",
 				sptr->name, sptr->user->username, sptr->user->host);
 			sendto_one(sptr, err_str(ERR_TOOMANYNICKS),

@@ -2383,9 +2383,8 @@ char *filename;
 	fstat(fileno(st), &sb);
 	motd_tm = localtime(&sb.st_mtime);
 	last = NULL;
-	while(!feof(st))
+	while(fgets(buffer, 80, st))
 	{
-		fgets(buffer, 80, st);
 		if ((blah = strchr(buffer, '\n')) != NULL)
 			*blah = (char) 0;
 		if ((blah = strchr(buffer, '\r')) != NULL)
@@ -2441,6 +2440,7 @@ char	*parv[];
 		return 0;
 	}
 	sendto_one(sptr, rpl_str(RPL_MOTDSTART), me.name, parv[0], me.name);
+	if (tm)
 	sendto_one(sptr, ":%s %d %s :- %d/%d/%d %d:%02d", me.name, RPL_MOTD,
 		parv[0], tm->tm_mday, tm->tm_mon+1, 1900+tm->tm_year,
 		tm->tm_hour, tm->tm_min);

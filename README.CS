@@ -1,6 +1,18 @@
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
 
+New in CSr23:
+
+1) Changed the timing of the NO_NICK_FLOODS stuff.  If you change your
+   nick 4 times within 15 seconds, you can't change your nick for 30 seconds.
+2) Commented out the flushing of dns cache when /rehashing.  There seems
+   to be a problem on some OS's where the cache isn't cleared and ircd
+   coredumps soon after the rehash() function ends.
+3) Changed read_motd() to work on all systems.  On AIX the last line
+   of the motd was being read 2 times.
+4) Fixed a small bug where 'motd' wasn't init'd correctly when the
+   server would start.
+
 New in CSr22:
 
 1) Fixed REJECT_BOTS stuff.  This was broken starting with r20 or so.

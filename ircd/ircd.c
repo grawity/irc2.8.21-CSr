@@ -594,7 +594,11 @@ char	*argv[];
 	time_t nextfdlistcheck=0; /*end of priority code */
 #endif
 	NOW = time(NULL);
+#ifdef BETTER_MOTD
+	motd = NULL;
+	motd_tm = NULL;
 	read_motd(MOTD);
+#endif
 #ifdef DBUF_INIT
         dbuf_init(); /* set up some dbuf stuff to control paging */
 #endif

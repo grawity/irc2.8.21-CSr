@@ -623,8 +623,11 @@ int	sig;
 	for (cltmp = NextClass(FirstClass()); cltmp; cltmp = NextClass(cltmp))
 		MaxLinks(cltmp) = -1;
 
+/*  Let's don't do this...somewhere, the cache doesn't get cleared correctly.
+    At least on some OS's.  - Comstud
 	if (sig != 2)
 		flush_cache();
+*/
 
 	clear_conf_list(&KList1, 1);
 	clear_conf_list(&KList2, 1);
