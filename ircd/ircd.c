@@ -23,6 +23,8 @@ static	char sccsid[] = "@(#)ircd.c	2.48 3/9/94 (C) 1988 University of Oulu, \
 Computing Center and Jarkko Oikarinen";
 #endif
 
+#include <sys/time.h>
+#include <sys/resource.h>
 #include "struct.h"
 #include "common.h"
 #include "sys.h"
@@ -34,8 +36,17 @@ Computing Center and Jarkko Oikarinen";
 #include <fcntl.h>
 #include "h.h"
 
+#ifdef CLONE_CHECK
+	aClone *Clones = NULL;
+	char clonekillhost[100];
+#endif
+
 aClient me;			/* That's me */
 aClient *client = &me;		/* Pointer to beginning of Client list */
+#ifdef IDLE_CHECK
+int	idlelimit;
+#endif
+int	rehashed = 1;
 
 void	server_reboot();
 void	restart PROTO((char *));
@@ -256,9 +267,19 @@ time_t	currenttime;
 {
 	Reg1	aClient	*cptr;
 	Reg2	int	killflag;
-	int	ping = 0, i, rflag = 0;
+	int	ping = 0, i, rflag = 0, checkit = 0;
 	time_t	oldest = 0, timeout;
+	static time_t  lastcheck = 0;
+#ifdef IDLE_CHECK
+	register int idleflag;
+#endif
 
+	if (rehashed || (currenttime-lastcheck > KLINE_CHECK))
+	{
+		lastcheck = currenttime;
+		checkit = 1;
+		rehashed = 0;
+	}	
 	for (i = 0; i <= highest_fd; i++)
 	    {
 		if (!(cptr = local[i]) || IsMe(cptr) || IsLog(cptr))
@@ -273,10 +294,16 @@ time_t	currenttime;
 			(void)exit_client(cptr, cptr, &me, "Dead socket");
 			continue;
 		    }
-
-		killflag = IsPerson(cptr) ? find_kill(cptr) : 0;
+#ifdef IDLE_CHECK
+		idleflag = (idlelimit && MyConnect(cptr) && cptr->user &&
+			!IsAnOper(cptr)&&
+			(currenttime-cptr->user->last>idlelimit) &&
+			matches(IDLE_IGNORE, inetntoa((char *)&cptr->ip)));
+#endif 
+		killflag = (checkit && IsPerson(cptr)) ?
+			find_kill(cptr) : 0;
 #ifdef R_LINES_OFTEN
-		rflag = IsPerson(cptr) ? find_restrict(cptr) : 0;
+		rflag = (checkit && IsPerson(cptr)) ? find_restrict(cptr) : 0;
 #endif
 		ping = IsRegistered(cptr) ? get_client_ping(cptr) :
 					    CONNECTTIMEOUT;
@@ -287,7 +314,11 @@ time_t	currenttime;
 		 * Ok, so goto's are ugly and can be avoided here but this code
 		 * is already indented enough so I think its justified. -avalon
 		 */
-		if (!killflag && !rflag && IsRegistered(cptr) &&
+		if (!killflag && !rflag &&
+#ifdef IDLE_CHECK
+			!idleflag &&
+#endif
+			IsRegistered(cptr) &&
 		    (ping >= currenttime - cptr->lasttime))
 			goto ping_timeout;
 		/*
@@ -297,6 +328,9 @@ time_t	currenttime;
 		 * to be active, close this connection too.
 		 */
 		if (killflag || rflag ||
+#ifdef IDLE_CHECK
+			idleflag ||
+#endif
 		    ((currenttime - cptr->lasttime) >= (2 * ping) &&
 		     (cptr->flags & FLAGS_PINGSENT)) ||
 		    (!IsRegistered(cptr) &&
@@ -335,13 +369,26 @@ time_t	currenttime;
 			if (killflag && IsPerson(cptr))
 				sendto_ops("Kill line active for %s",
 					   get_client_name(cptr, FALSE));
-
+#ifdef IDLE_CHECK
+                        if (idleflag && IsPerson(cptr) && IsRegistered(cptr))
+                                sendto_ops("Idle time limit exceeded for %s",
+                                        get_client_name(cptr, FALSE));
+#endif
 #if defined(R_LINES) && defined(R_LINES_OFTEN)
 			if (IsPerson(cptr) && rflag)
 				sendto_ops("Restricting %s, closing link.",
 					   get_client_name(cptr,FALSE));
 #endif
-			(void)exit_client(cptr, cptr, &me, "Ping timeout");
+                        if (killflag)
+                                (void)exit_client(cptr, cptr, &me,
+                                "K-Lined");
+#ifdef IDLE_CHECK
+                        else if (idleflag)
+                                (void)exit_client(cptr, cptr, &me,
+                                "Idle time limit exceeded");
+#endif
+                        else
+                                (void)exit_client(cptr, cptr, &me, "Ping timeout");
 			continue;
 		    }
 		else if (IsRegistered(cptr) &&
@@ -363,12 +410,34 @@ ping_timeout:
 			timeout += ping;
 		if (timeout < oldest || !oldest)
 			oldest = timeout;
-	    }
+#if defined(CLONE_CHECK) && defined(KILL_CLONES)
+        if (*clonekillhost)
+        {
+                if (cptr->user && cptr->user->host &&
+                        !mycmp(cptr->user->host, clonekillhost) &&
+                        ((now - cptr->firsttime) < CLONE_TIME))
+                {
+                        ircstp->is_kill++;
+                        sendto_ops("Clonebot killed: %s [%s@%s]",
+                           cptr->name, cptr->user->username,
+                                cptr->user->host);
+#ifdef REALLY_FUCK_EM_UP
+                        sendto_serv_butone(NULL,
+                                  ":%s KILL %s :%s (CloneBot)",
+                                   me.name, cptr->name, me.name);
+                        cptr->flags |= FLAGS_KILLED;
+#endif /* REALLY_FUCK_EM_UP */
+                        (void)exit_client(cptr, cptr, &me, "CloneBot");
+                        i = 0;
+                        continue;
+                }
+        }
+#endif /* CLONE_CHECK */
+	    } /* must end the for loop */
 	if (!oldest || oldest < currenttime)
 		oldest = currenttime + PINGFREQUENCY;
 	Debug((DEBUG_NOTICE,"Next check_ping() call at: %s, %d %d %d",
 		myctime(oldest), ping, oldest, currenttime));
-
 	return (oldest);
 }
 
@@ -398,7 +467,14 @@ char	*argv[];
 	int	portarg = 0;
 	uid_t	uid, euid;
 	time_t	delay = 0, now;
+        struct rlimit r;
 
+        r.rlim_cur = 1023;
+        r.rlim_max = 1023;
+        setrlimit(RLIMIT_NOFILE, &r);
+#ifdef IDLE_CHECK
+        idlelimit = DEFAULT_IDLELIMIT*60;
+#endif
 	sbrk0 = (char *)sbrk((size_t)0);
 	uid = getuid();
 	euid = geteuid();

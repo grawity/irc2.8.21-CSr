@@ -42,6 +42,11 @@ void	send_umode PROTO((aClient *, aClient *, int, int, char *));
 
 static char buf[BUFSIZE], buf2[BUFSIZE];
 
+#ifdef CLONE_CHECK
+                aClone *clone;
+                extern char clonekillhost[100];
+#endif
+
 /*
 ** m_functions execute protocol messages on this server:
 **
@@ -320,17 +325,24 @@ char	*nick, *username;
 {
 	Reg1	aConfItem *aconf;
         char	*parv[3];
+	char	*temp;
 	short	oldstatus = sptr->status;
 	anUser	*user = sptr->user;
 	int	i;
-
+/* Moved this to make_user
 	user->last = time(NULL);
+ -- CS
+*/
 	parv[0] = sptr->name;
 	parv[1] = parv[2] = NULL;
 
 	if (MyConnect(sptr))
 	    {
-		if ((i = check_client(sptr)))
+		if (sptr->flags & FLAGS_GOTID)
+			temp = sptr->username;
+		else
+			temp = username;
+		if ((i = check_client(sptr, temp)))
 		    {
 			sendto_ops("%s from %s.", i == -3 ?
 						  "Too many connections" :
@@ -349,19 +361,38 @@ char	*nick, *username;
 		if (sptr->flags & FLAGS_DOID && !(sptr->flags & FLAGS_GOTID))
 		    {
 			/* because username may point to user->username */
+                        ircstp->is_ref++;
+			sendto_one(sptr, ":%s NOTICE %s :This server will not allow connections from sites that don't run RFC1413 (pidentd). You may obtain a version for UNIX/VAX/VMX from \"ftp.eskimo.com:/security/pidentd-2.5.1.tar.gz\" via anonymous FTP.", me.name, parv[0]);
+                        sendto_one(sptr, ":%s NOTICE %s : ", me.name, parv[0]);
+			sendto_one(sptr, ":%s NOTICE %s :For Windows, you have two choices. You can obtain WS_IRC+identd from 'ftp.eskimo.com:/security/Windows/wsirc14g.zip' or MIRC from 'ftp.eskimo.com:/security/Windows/mirc30b.zip'. For the Mac, try 'ftp.eskimo.com:/security/Mac/daemon100.sea.hqx'.", me.name, parv[0]);
+                        sendto_one(sptr, ":%s NOTICE %s : ", me.name, parv[0]);
+			sendto_one(sptr, ":%s NOTICE %s :Users may wish to subscribe to a new mailing list 'identd-l'. This list is intended to help users install identd on their Unix, PC, Mac, and other machines.. Send email to majordomo@eskimo.com with the body of the message containing 'subscribe identd-l your@email.address'. Do NOT put anything in the subject line! It will be ignored.", me.name, parv[0]);
+			return exit_client(cptr, sptr, &me, "Install ident");
+
+/*
 			char	temp[USERLEN+1];
 
 			strncpyzt(temp, username, USERLEN+1);
 			*user->username = '~';
 			(void)strncpy(&user->username[1], temp, USERLEN);
 			user->username[USERLEN] = '\0';
-			
+*/			
 		    }
 		else if (sptr->flags & FLAGS_GOTID)
 			strncpyzt(user->username, sptr->username, USERLEN+1);
-		else
-			strncpyzt(user->username, username, USERLEN+1);
+		else /* if (!(sptr->flags & FLAGS_GOTID)) */
+		{
+			char temp[USERLEN+1];
 
+			strncpyzt(temp, username, USERLEN+1);
+			*user->username = '~';
+			(void)strncpy(&user->username[1], temp, USERLEN);
+			user->username[USERLEN] = '\0';
+		}
+/*
+		else
+                        strncpyzt(user->username, username, USERLEN+1);
+*/
 		if (!BadPtr(aconf->passwd) &&
 		    !StrEq(sptr->passwd, aconf->passwd))
 		    {
@@ -374,7 +405,7 @@ char	*nick, *username;
 		/*
 		 * following block for the benefit of time-dependent K:-lines
 		 */
-		if (find_kill(sptr))
+		if ((ConfSendq(aconf) <= 1) || find_kill(sptr))
 		    {
 			ircstp->is_ref++;
 			return exit_client(cptr, sptr, &me, "K-lined");
@@ -388,6 +419,122 @@ char	*nick, *username;
 #endif
 		if (oldstatus == STAT_MASTER && MyConnect(sptr))
 			(void)m_oper(&me, sptr, 1, parv);
+
+#if defined(REJECT_BOTS) || defined(CLONE_CHECK)
+               if (matches(BOT_IP_IGNORE, inetntoa((char *)&cptr->ip)))
+               {
+#endif
+#ifdef REJECT_BOTS
+                        if (!matches("*bot*", nick)||!matches("*Serv*", nick)||
+                                !matches("*help*", nick))
+                        {
+                                ircstp->is_ref++;
+                                sendto_flagops(1,"Rejecting bot: [%s!%s@%s]",
+                                        nick, user->username, user->host);
+                                return exit_client(cptr, sptr, &me, "No bots outside of *eskimo.com allowed");
+                        }
+#endif /* REJECT_BOTS */
+#ifdef CLONE_CHECK
+                update_clones();
+                if ((clone = find_clone(user->host)) == NULL)
+                {
+                        clone = make_clone();
+                        if (clone)
+                                strcpy(clone->hostname, user->host);
+                }
+                if (clone)
+                {
+                        clone->num++;
+                        clone->last = time(NULL);
+                        if (clone->num == NUM_CLONES)
+                                sendto_flagops(1, "CloneBot protection activated against %s", user->host);
+                        if (clone->num >= NUM_CLONES)
+                        {
+				int logfile;
+#ifdef FNAME_CLONELOG
+				if ((logfile = open(FNAME_CLONELOG,
+					O_WRONLY|O_APPEND)) != -1)
+				{
+					(void)irc_sprintf(buf,
+					"%s: Clonebot rejected: %s!%s@%s\n",
+						myctime(time(NULL)), parv[0],
+						sptr->user->username,
+						sptr->sockhost);
+					(void)write(logfile, buf, strlen(buf));
+					(void)close(logfile);
+				}
+#endif
+                                sendto_flagops(1, "Rejecting clonebot: %s [%s@%s]",
+                                        nick, username, user->host);
+#ifdef KILL_CLONES
+                                strcpy(clonekillhost, user->host);
+#endif /* KILL_CLONES */
+                                ircstp->is_ref++;
+                                return exit_client(cptr, sptr, &me, "CloneBot"
+);
+                        }
+                }
+#endif /* CLONE_CHECK */
+#if defined(REJECT_BOTS) || defined(CLONE_CHECK)
+		} /* end of check for ip# */
+#endif
+#if defined(NO_MIXED_CASE) || defined(NO_SPECIAL)
+{
+                register char *tmpstr, c;
+                register int lower, upper, special;
+                char *Myptr, *Myptr2;
+
+                lower = upper = special = 0;
+#ifdef IGNORE_FIRST_CHAR
+		tmpstr = (username[1] == '~' ? &username[2] : &username[1]);
+#else
+                tmpstr = (username[0] == '~' ? &username[1] : username);
+#endif
+                while(*tmpstr)
+                  {
+                    c = *(tmpstr++);
+                    if (islower(c))
+                      lower++;
+                    if (isupper(c))
+                      upper++;
+                    if (!isalnum(c) && !strchr("-_.", c))
+                      special++;
+                  }
+#endif /* NO_MIXED_CASE || NO_SPECIAL */
+#ifdef NO_MIXED_CASE
+                if (lower && upper)
+                  {
+                    sendto_flagops(1,"Invalid username: %s [%s@%s]",
+                               nick, username, user->host);
+                    ircstp->is_ref++;
+                    return exit_client(cptr, sptr, &me, "Invalid username");
+                  }
+#endif /* NO_MIXED_CASE */
+#ifdef NO_SPECIAL
+                if (special)
+                  {
+                    sendto_flagops(1,"Invalid username: %s [%s@%s]",
+                               nick, user->username, user->host);
+                    ircstp->is_ref++;
+                    return exit_client(cptr, sptr, &me, "Invalid username");
+                  }
+#endif /* NO_SPECIAL */
+#if defined(NO_MIXED_CASE) || defined(NO_SPECIAL)
+}
+#endif
+#ifdef REJECT_IPHONE
+                if (!matches("* vc:*", sptr->info))
+                {
+                        ircstp->is_ref++;
+                        sendto_flagops(1, "Rejecting IPhone user: [%s!%s@%s]",
+                                nick, user->username, user->host);
+                        return exit_client(cptr, sptr, &me, "No IPhone users");
+                }
+#endif /* REJECT_IPHONE */
+#ifdef CLIENT_NOTICES
+                sendto_flagops(2,"Client connecting: %s [%s@%s]",
+                                nick, user->username, user->host);
+#endif /* CLIENT_NOTICES */
 	    }
 	else
 		strncpyzt(user->username, username, USERLEN+1);
@@ -746,6 +893,7 @@ int	notice;
 	Reg2	char	*s;
 	aChannel *chptr;
 	char	*nick, *server, *p, *cmd, *host;
+	int resetidle = 0;
 
 	if (notice)
 	    {
@@ -787,6 +935,11 @@ int	notice;
 					   acptr->user->away);
 			sendto_prefix_one(acptr, sptr, ":%s %s %s :%s",
 					  parv[0], cmd, nick, parv[2]);
+#ifndef RESETIDLEONNOTICE
+			if (!notice)
+#endif
+			if (sptr != acptr) /* don't reset if msging self */
+				resetidle = 1;
 			continue;
 		    }
 		/*
@@ -795,10 +948,16 @@ int	notice;
 		if ((chptr = find_channel(nick, NullChn)))
 		    {
 			if (can_send(sptr, chptr) == 0)
+			{
+#ifndef RESETIDLEONNOTICE
+				if (!notice)
+#endif
+					resetidle = 1;
 				sendto_channel_butone(cptr, sptr, chptr,
 						      ":%s %s %s :%s",
 						      parv[0], cmd, nick,
 						      parv[2]);
+			}
 			else if (!notice)
 				sendto_one(sptr, err_str(ERR_CANNOTSENDTOCHAN),
 					   me.name, parv[0], nick);
@@ -834,6 +993,10 @@ int	notice;
 							     MATCH_SERVER,
 					    ":%s %s %s :%s", parv[0],
 					    cmd, nick, parv[2]);
+#ifndef RESETIDLEONNOTICE
+			if (!notice)
+#endif
+				resetidle = 1;
 			continue;
 		    }
 	
@@ -852,6 +1015,10 @@ int	notice;
 			    {
 				sendto_one(acptr,":%s %s %s :%s", parv[0],
 					   cmd, nick, parv[2]);
+#ifndef RESETIDLEONNOTICE
+				if (!notice)
+#endif
+					resetidle = 1;
 				continue;
 			    }
 			*server = '\0';
@@ -872,10 +1039,16 @@ int	notice;
 			if (acptr)
 			    {
 				if (count == 1)
+				{
 					sendto_prefix_one(acptr, sptr,
 							  ":%s %s %s :%s",
 					 		  parv[0], cmd,
 							  nick, parv[2]);
+#ifndef RESETIDLEONNOTICE
+					if (!notice)
+#endif
+						resetidle = 1;
+				}
 				else if (!notice)
 					sendto_one(sptr,
 						   err_str(ERR_TOOMANYTARGETS),
@@ -887,6 +1060,8 @@ int	notice;
 		sendto_one(sptr, err_str(ERR_NOSUCHNICK), me.name,
 			   parv[0], nick);
             }
+    if (resetidle && MyConnect(sptr) && sptr->user)
+	sptr->user->last = time(NULL);	
     return 0;
 }
 
@@ -1239,7 +1414,12 @@ char	*parv[];
 			if (acptr->user && MyConnect(acptr))
 				sendto_one(sptr, rpl_str(RPL_WHOISIDLE),
 					   me.name, parv[0], name,
+#ifdef SIGNON_TIME
+					   time(NULL) - user->last,
+                                           acptr->firsttime);
+#else
 					   time(NULL) - user->last);
+#endif
 		    }
 		if (!found)
 			sendto_one(sptr, err_str(ERR_NOSUCHNICK),
@@ -1445,7 +1625,7 @@ char	*parv[];
 			inpath = cptr->sockhost;
 		if (!BadPtr(path))
 		    {
-			(void)sprintf(buf, "%s%s (%s)",
+			(void)irc_sprintf(buf, "%s%s (%s)",
 				cptr->name, IsOper(sptr) ? "" : "(L)", path);
 			path = buf;
 		    }
@@ -1467,8 +1647,19 @@ char	*parv[];
 		sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
 		return 0;
 	    }
-	sendto_ops("Received KILL message for %s. From %s Path: %s!%s",
+
+#ifdef FK_USERMODES
+	if (strchr(parv[0], '.'))
+		sendto_flagops(4,"Received KILL message for %s. From %s Path: %s!%s",
 		   acptr->name, parv[0], inpath, path);
+	else
+	        sendto_flagops(3,"Received KILL message for %s. From %s Path: %s!%s",
+                        acptr->name, parv[0], inpath, path);
+#else
+                sendto_ops("Received KILL message for %s. From %s Path: %s!%s",
+                        acptr->name, parv[0], inpath, path);
+#endif
+
 #if defined(USE_SYSLOG) && defined(SYSLOG_KILL)
 	if (IsOper(sptr))
 		syslog(LOG_DEBUG,"KILL From %s For %s Path %s!%s",
@@ -1509,7 +1700,7 @@ char	*parv[];
 	** set in any other place)
 	*/
 	if (MyConnect(acptr) && MyConnect(sptr) && IsAnOper(sptr))
-		(void)sprintf(buf2, "Local kill by %s (%s)", sptr->name,
+		(void)irc_sprintf(buf2, "Local kill by %s (%s)", sptr->name,
 			BadPtr(parv[2]) ? sptr->name : parv[2]);
 	else
 	    {
@@ -1524,7 +1715,7 @@ char	*parv[];
 		    }
 		else
 			killer = path;
-		(void)sprintf(buf2, "Killed (%s)", killer);
+		(void)irc_sprintf(buf2, "Killed (%s)", killer);
 	    }
 	return exit_client(cptr, acptr, sptr, buf2);
 }
@@ -1790,7 +1981,7 @@ char	*parv[];
 		sendto_ops("%s (%s@%s) is now operator (%c)", parv[0],
 			   sptr->user->username, sptr->user->host,
 			   IsOper(sptr) ? 'O' : 'o');
-		sptr->flags |= (FLAGS_SERVNOTICE|FLAGS_WALLOP);
+		sptr->flags |= (FLAGS_SERVNOTICE|FLAGS_WALLOP|FLAGS_CMODE|FLAGS_KMODE);
 		send_umode_out(cptr, sptr, old);
  		sendto_one(sptr, rpl_str(RPL_YOUREOPER), me.name, parv[0]);
 #if !defined(CRYPT_OPER_PASSWORD) && (defined(FNAME_OPERLOG) ||\
@@ -1814,21 +2005,17 @@ char	*parv[];
                  * stop NFS hangs...most systems should be able to open a
                  * file in 3 seconds. -avalon (curtesy of wumpus)
                  */
-                (void)alarm(3);
                 if (IsPerson(sptr) &&
                     (logfile = open(FNAME_OPERLOG, O_WRONLY|O_APPEND)) != -1)
 		{
-		  (void)alarm(0);
-                        (void)sprintf(buf, "%s OPER (%s) (%s) by (%s!%s@%s)\n",
+                        (void)irc_sprintf(buf, "%s OPER (%s) (%s) by (%s!%s@%s)\n",
 				      myctime(time(NULL)), name, encr,
 				      parv[0], sptr->user->username,
 				      sptr->sockhost);
-		  (void)alarm(3);
 		  (void)write(logfile, buf, strlen(buf));
-		  (void)alarm(0);
+
 		  (void)close(logfile);
 		}
-                (void)alarm(0);
                 /* Modification by pjg */
 	      }
 #endif
@@ -1841,6 +2028,10 @@ char	*parv[];
 	    {
 		(void)detach_conf(sptr, aconf);
 		sendto_one(sptr,err_str(ERR_PASSWDMISMATCH),me.name, parv[0]);
+#ifdef FAILED_OPER_NOTICE
+                sendto_flagops(1,"Failed OPER attempt: %s (%s@%s) [%s]",
+                     parv[0], sptr->user->username, sptr->sockhost, name);
+#endif
 	    }
 	return 0;
     }
@@ -1905,7 +2096,7 @@ char	*parv[];
 		return 0;
 	    }
 
-	(void)sprintf(buf, rpl_str(RPL_USERHOST), me.name, parv[0]);
+	(void)irc_sprintf(buf, rpl_str(RPL_USERHOST), me.name, parv[0]);
 	len = strlen(buf);
 	*buf2 = '\0';
 
@@ -1915,7 +2106,7 @@ char	*parv[];
 		    {
 			if (*buf2)
 				(void)strcat(buf, " ");
-			(void)sprintf(buf2, "%s%s=%c%s@%s",
+			(void)irc_sprintf(buf2, "%s%s=%c%s@%s",
 				acptr->name,
 				IsAnOper(acptr) ? "*" : "",
 				(acptr->user->away) ? '-' : '+',
@@ -1958,7 +2149,7 @@ char	*parv[];
 		return 0;
 	    }
 
-	(void)sprintf(buf, rpl_str(RPL_ISON), me.name, *parv);
+	(void)irc_sprintf(buf, rpl_str(RPL_ISON), me.name, *parv);
 	len = strlen(buf);
 
 	for (s = strtoken(&p, *++pav, " "); s; s = strtoken(&p, NULL, " "))
@@ -2025,6 +2216,15 @@ static int user_modes[]	     = { FLAGS_OPER, 'o',
 				 FLAGS_INVISIBLE, 'i',
 				 FLAGS_WALLOP, 'w',
 				 FLAGS_SERVNOTICE, 's',
+#ifdef FK_USERMODES
+				 FLAGS_FMODE, 'f',
+#endif
+#ifdef CLIENT_NOTICES
+				 FLAGS_CMODE, 'c',
+#endif
+#ifdef FK_USERMODES
+				 FLAGS_KMODE, 'k',
+#endif
 				 0, 0 };
 
 /*

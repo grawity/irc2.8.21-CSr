@@ -443,6 +443,7 @@ struct	Message *mptr;
 	if (mptr == NULL)
 		return (do_numeric(numeric, cptr, from, i, para));
 	mptr->count++;
+/*
 	if (IsRegisteredUser(cptr) &&
 #ifdef	IDLE_FROM_MSG
 	    mptr->func == m_private)
@@ -450,6 +451,7 @@ struct	Message *mptr;
 	    mptr->func != m_ping && mptr->func != m_pong)
 #endif
 		from->user->last = time(NULL);
+*/
 	return (*mptr->func)(cptr, from, i, para);
     }
 

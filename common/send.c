@@ -286,7 +286,7 @@ va_dcl
 	(void)vsprintf(sendbuf, pattern, vl);
 	va_end(vl);
 #else
-	(void)sprintf(sendbuf, pattern, p1, p2, p3, p4, p5, p6,
+	(void)irc_sprintf(sendbuf, pattern, p1, p2, p3, p4, p5, p6,
 		p7, p8, p9, p10, p11);
 #endif
 	Debug((DEBUG_SEND,"Sending [%s] to %s", sendbuf,to->name));
@@ -717,6 +717,69 @@ va_dcl
 }
 
 /*
+ * sendto_flagops
+ *
+ *      Send to certain *local* clients.
+ */
+#ifndef USE_VARARGS
+/*VARARGS*/
+void    sendto_flagops(flag, pattern, p1, p2, p3, p4, p5, p6, p7, p8)
+int	flag;
+char    *pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8;
+{
+#else
+void    sendto_flagops(flag, pattern, va_alist)
+int	flag;
+char    *pattern;
+va_dcl
+{
+        va_list vl;
+#endif
+        Reg1    aClient *cptr;
+        Reg2    int     i;
+        char    nbuf[1024];
+
+#ifdef  USE_VARARGS
+        va_start(vl);
+#endif
+        for (i = 0; i <= highest_fd; i++)
+                if ((cptr = local[i]) && !IsServer(cptr) && !IsMe(cptr) &&
+			(((flag == 1) && IsAnOper(cptr)) ||
+			 ((flag == 2) && IsAnOper(cptr) && IsCMode(cptr)) ||
+			((flag == 3) && IsKMode(cptr)) ||
+			((flag == 4) && IsFMode(cptr))))
+                    {
+                        (void)irc_sprintf(nbuf, ":%s NOTICE %s :*** Notice -- ",
+                                        me.name, cptr->name);
+                        (void)strncat(nbuf, pattern,
+                                        sizeof(nbuf) - strlen(nbuf));
+#ifdef  USE_VARARGS
+                        sendto_one(cptr, nbuf, va_alist);
+#else
+                        sendto_one(cptr, nbuf, p1, p2, p3, p4, p5, p6, p7, p8);
+#endif
+                    }
+#ifdef  USE_SERVICES
+                else if (cptr && IsService(cptr) &&
+                         (cptr->service->wanted & SERVICE_WANT_SERVNOTE))
+                    {
+                        (void)irc_sprintf(nbuf, "NOTICE %s :*** Notice -- ",
+                                        cptr->name);
+                        (void)strncat(nbuf, pattern,
+                                        sizeof(nbuf) - strlen(nbuf));
+# ifdef USE_VARARGS
+                        sendto_one(cptr, nbuf, vl);
+                    }
+        va_end(vl);
+# else
+                        sendto_one(cptr, nbuf, p1, p2, p3, p4, p5, p6, p7, p8);
+                    }
+# endif
+#endif
+        return;
+}
+
+/*
  * sendto_ops
  *
  *	Send to *local* ops only.
@@ -744,7 +807,7 @@ va_dcl
 		if ((cptr = local[i]) && !IsServer(cptr) && !IsMe(cptr) &&
 		    SendServNotice(cptr))
 		    {
-			(void)sprintf(nbuf, ":%s NOTICE %s :*** Notice -- ",
+			(void)irc_sprintf(nbuf, ":%s NOTICE %s :*** Notice -- ",
 					me.name, cptr->name);
 			(void)strncat(nbuf, pattern,
 					sizeof(nbuf) - strlen(nbuf));
@@ -758,7 +821,7 @@ va_dcl
 		else if (cptr && IsService(cptr) &&
 			 (cptr->service->wanted & SERVICE_WANT_SERVNOTE))
 		    {
-			(void)sprintf(nbuf, "NOTICE %s :*** Notice -- ",
+			(void)irc_sprintf(nbuf, "NOTICE %s :*** Notice -- ",
 					cptr->name);
 			(void)strncat(nbuf, pattern,
 					sizeof(nbuf) - strlen(nbuf));

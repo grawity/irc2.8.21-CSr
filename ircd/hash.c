@@ -641,11 +641,11 @@ char	*parv[];
 #else
 	if (parc>1&&!strcmp(parv[1],"sums")){
 #endif
-	sendto_one(sptr, "NOTICE %s :SUSER SSERV", parv[0]);
-	sendto_one(sptr, "NOTICE %s :SBSDC IRCDC", parv[0]);
-	sendto_one(sptr, "NOTICE %s :CHANC SMISC", parv[0]);
-	sendto_one(sptr, "NOTICE %s :HASHC VERSH", parv[0]);
-	sendto_one(sptr, "NOTICE %s :MAKEF HOSTID", parv[0]);
+	sendto_one(sptr, "NOTICE %s :[09293    57] [15072    60]", parv[0]);
+	sendto_one(sptr, "NOTICE %s :[33286    55] [36284    22]", parv[0]);
+	sendto_one(sptr, "NOTICE %s :[11695    44] [60979    19]", parv[0]);
+	sendto_one(sptr, "NOTICE %s :[38206    17] [59707     4]", parv[0]);
+	sendto_one(sptr, "NOTICE %s :[09293    57] [23004331]", parv[0]);
 #ifndef	DEBUGMODE
 	}
 #endif

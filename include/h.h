@@ -24,6 +24,19 @@
  * -avalon
  */
 
+#include "comstud.h"
+
+#ifdef CLONE_CHECK
+extern aClone *Clones;
+extern      aClone  *make_clone PROTO(());
+extern      aClone  *find_clone PROTO(());
+#endif
+
+#ifdef IDLE_CHECK
+extern	int idlelimit;
+#endif
+
+extern	int rehashed;
 extern	time_t	nextconnect, nextdnscheck, nextping;
 extern	aClient	*client, me, *local[];
 extern	aChannel *channel;
@@ -40,6 +53,7 @@ extern	int	is_chan_op PROTO((aClient *, aChannel *));
 extern	int	has_voice PROTO((aClient *, aChannel *));
 extern	int	count_channels PROTO((aClient *));
 
+extern	aClient	*find_chasing PROTO((aClient *, char *, int *));
 extern	aClient	*find_client PROTO((char *, aClient *));
 extern	aClient	*find_name PROTO((char *, aClient *));
 extern	aClient	*find_person PROTO((char *, aClient *));
@@ -50,7 +64,7 @@ extern	aClient	*find_userhost PROTO((char *, char *, aClient *, int *));
 extern	int	attach_conf PROTO((aClient *, aConfItem *));
 extern	aConfItem *attach_confs PROTO((aClient*, char *, int));
 extern	aConfItem *attach_confs_host PROTO((aClient*, char *, int));
-extern	int	attach_Iline PROTO((aClient *, struct hostent *, char *));
+extern	int	attach_Iline PROTO((aClient *, struct hostent *, char *, char *));
 extern	aConfItem *conf, *find_me PROTO(()), *find_admin PROTO(());
 extern	aConfItem *count_cnlines PROTO((Link *));
 extern	void	det_confs_butmask PROTO((aClient *, int));
@@ -81,7 +95,7 @@ extern	int	readcalls, udpfd, resfd;
 extern	aClient	*add_connection PROTO((aClient *, int));
 extern	int	add_listener PROTO((aConfItem *));
 extern	void	add_local_domain PROTO((char *, int));
-extern	int	check_client PROTO((aClient *));
+extern	int	check_client PROTO((aClient *, char *));
 extern	int	check_server PROTO((aClient *, struct hostent *, \
 				    aConfItem *, aConfItem *, int));
 extern	int	check_server_init PROTO((aClient *));
@@ -128,6 +142,8 @@ extern	void	sendto_match_servs();
 extern	void	sendto_match_butone();
 /*VARARGS3*/
 extern	void	sendto_all_butone();
+/*VARARGS1*/
+extern	void	sento_flagops();
 /*VARARGS1*/
 extern	void	sendto_ops();
 /*VARARGS3*/

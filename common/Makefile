@@ -27,9 +27,9 @@ INCLUDE=../include
 CFLAGS=-gx -I${INCLUDE}
 
 
-OBJS=bsd.o dbuf.o packet.o send.o match.o parse.o support.o inet_addr.o
+OBJS=bsd.o dbuf.o packet.o send.o match.o parse.o support.o inet_addr.o irc_sprintf.o
 
-SRC=bsd.c dbuf.c packet.c parse.c send.c match.c support.c inet_addr.c
+SRC=bsd.c dbuf.c packet.c parse.c send.c match.c support.c inet_addr.c irc_sprint.c
 
 tm: tm.o manew.o tab.o
 	$(CC) -g tab.o tm.o manew.o -o tm

@@ -17,6 +17,14 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifdef TOPIC_INFO
+# define RPL_TOPICWHOTIME 333
+#endif
+
+#ifdef HIGHEST_CONNECTION
+# define RPL_STATSCONN 250
+#endif
+
 /*
  * -- Avalon -- 1 Sep 1992
  *

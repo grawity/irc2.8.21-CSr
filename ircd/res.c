@@ -412,7 +412,7 @@ Reg1	ResRQ	*rptr;
 	Reg2	u_char	*cp;
 
 	cp = (u_char *)&numb->s_addr;
-	(void)sprintf(ipbuf,"%u.%u.%u.%u.in-addr.arpa.",
+	(void)irc_sprintf(ipbuf,"%u.%u.%u.%u.in-addr.arpa.",
 		(u_int)(cp[3]), (u_int)(cp[2]),
 		(u_int)(cp[1]), (u_int)(cp[0]));
 
@@ -642,10 +642,8 @@ char	*lp;
 	struct	sockaddr_in	sin;
 	int	rc, a, len = sizeof(sin), max;
 
-	(void)alarm((unsigned)4);
 	rc = recvfrom(resfd, buf, sizeof(buf), 0, (struct sockaddr *)&sin,
 		      &len);
-	(void)alarm((unsigned)0);
 	if (rc <= sizeof(HEADER))
 		goto getres_err;
 	/*

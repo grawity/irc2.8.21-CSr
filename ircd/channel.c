@@ -86,7 +86,7 @@ Reg1	Link	*lp;
 **	message (NO SUCH NICK) is generated. If the client was found
 **	through the history, chasing will be 1 and otherwise 0.
 */
-static	aClient *find_chasing(sptr, user, chasing)
+aClient *find_chasing(sptr, user, chasing)
 aClient *sptr;
 char	*user;
 Reg1	int	*chasing;
@@ -175,13 +175,26 @@ char	*banid;
 		(void)collapse(banid);
 	for (ban = chptr->banlist; ban; ban = ban->next)
 	    {
+#ifdef BAN_INFO
+		len += strlen(ban->value.ban.banstr);
+#else
 		len += strlen(ban->value.cp);
+#endif
 		if (MyClient(cptr) &&
 		    ((len > MAXBANLENGTH) || (++cnt >= MAXBANS) ||
+#ifdef BAN_INFO
+                     !match(ban->value.ban.banstr, banid) ||
+                     !match(banid, ban->value.ban.banstr)))
+#else
 		     !match(ban->value.cp, banid) ||
 		     !match(banid, ban->value.cp)))
+#endif
 			return -1;
+#ifdef BAN_INFO
+		else if (!mycmp(ban->value.ban.banstr, banid))
+#else
 		else if (!mycmp(ban->value.cp, banid))
+#endif
 			return -1;
 		
 	    }
@@ -189,8 +202,15 @@ char	*banid;
 	bzero((char *)ban, sizeof(Link));
 	ban->flags = CHFL_BAN;
 	ban->next = chptr->banlist;
-	ban->value.cp = (char *)MyMalloc(strlen(banid)+1);
-	(void)strcpy(ban->value.cp, banid);
+#ifdef BAN_INFO
+	ban->value.ban.banstr = (char *)MyMalloc(strlen(banid)+1);
+	(void)strcpy(ban->value.ban.banstr, banid);
+        (void)strcpy(ban->value.ban.who, cptr->name);
+        ban->value.ban.when = time(NULL);
+#else
+        ban->value.cp = (char *)MyMalloc(strlen(banid)+1);
+        (void)strcpy(ban->value.cp, banid);
+#endif
 	chptr->banlist = ban;
 	return 0;
 }
@@ -209,11 +229,19 @@ char	*banid;
 	if (!banid)
 		return -1;
 	for (ban = &(chptr->banlist); *ban; ban = &((*ban)->next))
+#ifdef BAN_INFO
+		if (mycmp(banid, (*ban)->value.ban.banstr)==0)
+#else
 		if (mycmp(banid, (*ban)->value.cp)==0)
+#endif
 		    {
 			tmp = *ban;
 			*ban = tmp->next;
+#ifdef BAN_INFO
+			MyFree(tmp->value.ban.banstr);
+#else
 			MyFree(tmp->value.cp);
+#endif
 			free_link(tmp);
 			break;
 		    }
@@ -228,16 +256,43 @@ aClient *cptr;
 aChannel *chptr;
 {
 	Reg1	Link	*tmp;
+#ifndef IP_BAN_ALL
 	char	*s;
+#else
+	static	char	s[1024];
+	char	*s2;
+#endif
 
 	if (!IsPerson(cptr))
 		return NULL;
 
+#ifdef IP_BAN_ALL
+        strcpy(s, make_nick_user_host(cptr->name, cptr->user->username,
+                cptr->user->host));
+
+        s2 = make_nick_user_host(cptr->name, cptr->user->username,
+                inetntoa((char *)&cptr->ip));
+#else
 	s = make_nick_user_host(cptr->name, cptr->user->username,
 				  cptr->user->host);
+#endif
 
 	for (tmp = chptr->banlist; tmp; tmp = tmp->next)
+#ifdef IP_BAN_ALL
+#ifdef BAN_INFO
+		if ((match(tmp->value.ban.banstr, s) == 0) ||
+			(match(tmp->value.ban.banstr, s2) == 0))
+#else
+                if ((match(tmp->value.cp, s) == 0) ||
+                        (match(tmp->value.cp, s2) == 0))
+#endif /* BAN_INFO */
+#else
+#ifdef BAN_INFO
+		if (match(tmp->value.ban.banstr, s) == 0)
+#else
 		if (match(tmp->value.cp, s) == 0)
+#endif /* BAN_INFO */
+#endif /* IP_BAN_ALL */
 			break;
 	return (tmp);
 }
@@ -295,17 +350,30 @@ aChannel *chptr;
 	sub1_from_channel(chptr);
 }
 
-static	void	change_chan_flag(lp, chptr)
+static	int	change_chan_flag(lp, chptr)
 Link	*lp;
 aChannel *chptr;
 {
 	Reg1	Link *tmp;
 
 	if ((tmp = find_user_link(chptr->members, lp->value.cptr)))
-		if (lp->flags & MODE_ADD)
-			tmp->flags |= lp->flags & MODE_FLAGS;
-		else
-			tmp->flags &= ~lp->flags & MODE_FLAGS;
+                if (lp->flags & MODE_ADD)
+                {
+#ifdef NO_RED_MODES
+                        if (tmp->flags & (lp->flags & MODE_FLAGS))
+                                return 0;
+#endif
+                        tmp->flags |= lp->flags & MODE_FLAGS;
+                }
+                else
+                {
+#ifdef NO_RED_MODES
+                        if (!(tmp->flags & (lp->flags & MODE_FLAGS)))
+                                return 0;
+#endif
+                        tmp->flags &= ~lp->flags & MODE_FLAGS;
+                }
+	return 1;
 }
 
 int	is_chan_op(cptr, chptr)
@@ -387,7 +455,7 @@ aChannel *chptr;
 	    {
 		*mbuf++ = 'l';
 		if (IsMember(cptr, chptr) || IsServer(cptr))
-			(void)sprintf(pbuf, "%d ", chptr->mode.limit);
+			(void)irc_sprintf(pbuf, "%d ", chptr->mode.limit);
 	    }
 	if (*chptr->mode.key)
 	    {
@@ -544,8 +612,15 @@ char	*parv[];
 		if ((IsServer(cptr) && !IsServer(sptr) && !chanop) ||
 		    (mcount < 0))
 		    {
+#ifndef DONT_SEND_FAKES
+#ifdef FK_USERMODES
+			sendto_flagops(4,"Fake: %s MODE %s %s %s",
+                                   parv[0], parv[1], modebuf, parabuf);
+#else
 			sendto_ops("Fake: %s MODE %s %s %s",
 				   parv[0], parv[1], modebuf, parabuf);
+#endif
+#endif
 			ircstp->is_fake++;
 		    }
 		else
@@ -727,7 +802,14 @@ char	*parv[], *mbuf, *pbuf;
 				for (lp = chptr->banlist; lp; lp = lp->next)
 					sendto_one(cptr, rpl_str(RPL_BANLIST),
 					     me.name, cptr->name,
-					     chptr->chname, lp->value.cp);
+						chptr->chname,
+#ifdef BAN_INFO
+						lp->value.cp,
+						lp->value.ban.who,
+						lp->value.ban.when);
+#else
+						lp->value.cp);
+#endif
 				sendto_one(cptr, rpl_str(RPL_ENDOFBANLIST),
 					   me.name, cptr->name, chptr->chname);
 				break;
@@ -925,7 +1007,7 @@ char	*parv[], *mbuf, *pbuf;
 				break;
 			case MODE_LIMIT :
 				c = 'l';
-				(void)sprintf(numeric, "%-15d", nusers);
+				(void)irc_sprintf(numeric, "%-15d", nusers);
 				if ((cp = index(numeric, ' ')))
 					*cp = '\0';
 				cp = numeric;
@@ -969,13 +1051,15 @@ char	*parv[], *mbuf, *pbuf;
 				break;
 			case MODE_CHANOP :
 			case MODE_VOICE :
-				*mbuf++ = c;
-				(void)strcat(pbuf, cp);
-				len += strlen(cp);
-				(void)strcat(pbuf, " ");
-				len++;
-				if (ischop)
-					change_chan_flag(lp, chptr);
+                                /* pass fakes along? nawww */
+                                if (ischop && change_chan_flag(lp, chptr))
+                                {
+                                        *mbuf++ = c;
+                                        (void)strcat(pbuf, cp);
+                                        len += strlen(cp);
+                                        (void)strcat(pbuf, " ");
+                                        len++;
+                                }
 				break;
 			case MODE_BAN :
 				if (ischop && ((whatt & MODE_ADD) &&
@@ -1337,8 +1421,16 @@ char	*parv[];
 						   ":%s MODE %s +o %s",
 						   me.name, name, parv[0]);
 			if (chptr->topic[0] != '\0')
+			{
 				sendto_one(sptr, rpl_str(RPL_TOPIC), me.name,
 					   parv[0], name, chptr->topic);
+#ifdef TOPIC_INFO
+                                sendto_one(sptr, rpl_str(RPL_TOPICWHOTIME),
+                                           me.name, parv[0], name,
+                                           chptr->topic_nick,
+                                           chptr->topic_time);
+#endif
+			}
 			parv[1] = name;
 			(void)m_names(cptr, sptr, 2, parv);
 		    }
@@ -1603,15 +1695,27 @@ char	*parv[];
 			sendto_one(sptr, rpl_str(RPL_NOTOPIC),
 				   me.name, parv[0], chptr->chname);
 			else
+			{
 				sendto_one(sptr, rpl_str(RPL_TOPIC),
 					   me.name, parv[0],
 					   chptr->chname, chptr->topic);
+#ifdef TOPIC_INFO
+                                sendto_one(sptr, rpl_str(RPL_TOPICWHOTIME),
+                                           me.name, parv[0], chptr->chname,
+                                           chptr->topic_nick,
+                                           chptr->topic_time);
+#endif
+			}
 		    } 
 		else if (((chptr->mode.mode & MODE_TOPICLIMIT) == 0 ||
 			  is_chan_op(sptr, chptr)) && topic)
 		    {
 			/* setting a topic */
 			strncpyzt(chptr->topic, topic, sizeof(chptr->topic));
+#ifdef TOPIC_INFO
+                        strcpy(chptr->topic_nick, sptr->name);
+                        chptr->topic_time = time(NULL);
+#endif
 			sendto_match_servs(chptr, cptr,":%s TOPIC %s :%s",
 					   parv[0], chptr->chname,
 					   chptr->topic);

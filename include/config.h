@@ -22,9 +22,12 @@
 
 #include "setup.h"
 
+#include "comstud.h"
+
+
 /* Type of host. These should be made redundant somehow. -avalon */
 
-/*	BSD			Nothing Needed 4.{2,3} BSD, SunOS 3.x, 4.x */
+#define	BSD			Nothing Needed 4.{2,3} BSD, SunOS 3.x, 4.x */
 /*	HPUX			Nothing needed (A.08/A.09) */
 /*	ULTRIX			Nothing needed (4.2) */
 /*	OSF			Nothing needed (1.2) */
@@ -98,11 +101,11 @@
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/scratch/avalon/ircd"	/* dir where all ircd stuff is */
-#define	SPATH	"/scratch/avalon/ircd/bin/ircd"
+#define	DPATH	"/home/irc/irc2.8.21+CSr2/lib"	/* dir where all ircd stuff is */
+#define	SPATH	"/home/irc/irc2.8.21+CSr2/lib/ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
-#define	LPATH	"/tmp/ircd.log" /* Where the debug file lives, if DEBUGMODE */
+#define	LPATH	"ircd.log" /* Where the debug file lives, if DEBUGMODE */
 #define	PPATH	"ircd.pid"	/* file for server pid */
 
 /*
@@ -112,8 +115,9 @@
  * FNAME_USERLOG just logs user connections, FNAME_OPERLOG logs every
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
-#define FNAME_USERLOG "/usr/local/lib/ircd/users" /* */
-#define FNAME_OPERLOG "/usr/local/lib/ircd/opers" /* */
+
+#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr2/logs/users.log" /* */
+#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr2/logs/opers.log" /* */
 
 /* CHROOTDIR
  *
@@ -133,7 +137,7 @@
  * won't work, or simply don't want local users to be summoned, undefine
  * this.
  */
-#define	ENABLE_SUMMON	/* local summon */
+#undef	ENABLE_SUMMON	/* local summon */
 #undef	ENABLE_USERS	/* enables local /users (same as who/finger output) */
 
 /* SHOW_INVISIBLE_LUSERS
@@ -150,7 +154,7 @@
  * mode "i" (i == invisible). Invisibility means people dont showup in
  * WHO or NAMES unless they are on the same channel as you.
  */
-#undef	NO_DEFAULT_INVISIBLE
+#define	NO_DEFAULT_INVISIBLE
 
 /* OPER_KILL
  *
@@ -167,11 +171,11 @@
  * The 'LOCOP_' #defines are for making the respective commands available
  * to 'local' operators.
  */
-#undef	OPER_KILL
-#undef	OPER_REHASH
+#define	OPER_KILL
+#define	OPER_REHASH
 #undef	OPER_RESTART
 #undef	OPER_DIE
-#undef	OPER_REMOTE
+#define	OPER_REMOTE
 #undef	LOCOP_REHASH
 #undef	LOCOP_RESTART
 #undef	LOCOP_DIE
@@ -203,7 +207,7 @@
  * a server is in class 0 (the default class if none is set).
  *
  */
-#define MAXIMUM_LINKS 1
+#define MAXIMUM_LINKS 10
 
 /*
  * If your server is running as a a HUB Server then define this.
@@ -252,7 +256,7 @@
  * The server will then call m4 each time it reads the ircd.conf file,
  * reading m4 output as the server's ircd.conf file.
  */
-#define	M4_PREPROC
+#undef	M4_PREPROC
 
 /*
  * If you wish to have the server send 'vital' messages about server
@@ -262,7 +266,7 @@
  * this option is used unless you tell the system administrator beforehand
  * and obtain their permission to send messages to the system log files.
  */
-#define	USE_SYSLOG
+#undef	USE_SYSLOG
 
 #ifdef	USE_SYSLOG
 /*
@@ -279,7 +283,7 @@
  * If you want to log to a different facility than DAEMON, change
  * this define.
  */
-#define LOG_FACILITY LOG_LOCAL1
+#undef LOG_FACILITY LOG_LOCAL1
 #endif /* USE_SYSLOG */
 
 /*
@@ -314,13 +318,13 @@
 /*
  * Max amount of internal send buffering when socket is stuck (bytes)
  */
-#define MAXSENDQLENGTH 100000    /* Recommended value: 100000 for leaves */
+#define MAXSENDQLENGTH 1500000    /* Recommended value: 100000 for leaves */
                                  /*                    700000 for backbones */
 /*
  *  BUFFERPOOL is the maximum size of the total of all sendq's.
  *  Recommended value is 2 * MAXSENDQLENGTH, for hubs, 5 *.
  */
-#define	BUFFERPOOL     (2 * MAXSENDQLENGTH)
+#define	BUFFERPOOL     (5 * MAXSENDQLENGTH)
 
 /*
  * use these to setup a Unix domain socket to connect clients/servers to.
@@ -349,7 +353,7 @@
  * send to the server without processing before disconnecting the client for
  * flooding it.  Values greater than 8000 make no difference to the server.
  */
-#define	CLIENT_FLOOD	1024
+#define	CLIENT_FLOOD	2024
 
 /* Default server for standard client */
 #define	UPHOST	"coombs.anu.edu.au"
@@ -394,7 +398,7 @@
  * 1 server = 1 connection, 1 user = 1 connection.
  * This should be at *least* 3: 1 listen port, 1 dns port + 1 client
  */
-#define MAXCONNECTIONS	256
+#define MAXCONNECTIONS	35
 
 /*
  * this defines the length of the nickname history.  each time a user changes
@@ -410,7 +414,7 @@
  *	 resident and running - it hardly ever gets swapped to disk! You can
  *	 ignore these recommendations- they only are meant to serve as a guide
  */
-#define NICKNAMEHISTORYLENGTH 800
+#define NICKNAMEHISTORYLENGTH 300
 
 /*
  * Time interval to wait and if no messages have been received, then check for

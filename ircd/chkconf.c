@@ -364,10 +364,10 @@ int	opt;
 					"\tWARNING: missing sendq field\n");
 				(void)fprintf(stderr, "\t\t default: %d\n",
 					MAXSENDQLENGTH);
-				(void)sprintf(maxsendq, "%d", MAXSENDQLENGTH);
+				(void)irc_sprintf(maxsendq, "%d", MAXSENDQLENGTH);
 			    }
 			else
-				(void)sprintf(maxsendq, "%d", atoi(tmp));
+				(void)irc_sprintf(maxsendq, "%d", atoi(tmp));
 			new_class(atoi(aconf->host));
 			aconf->class = get_class(atoi(aconf->host));
 			goto print_confline;
@@ -436,14 +436,14 @@ int	opt;
 
 				len += strlen(aconf->host);
 				newhost = (char *)MyMalloc(len);
-				(void)sprintf(newhost, "*@%s", aconf->host);
+				(void)irc_sprintf(newhost, "*@%s", aconf->host);
 				(void)free(aconf->host);
 				aconf->host = newhost;
 			    }
 
 		if (!aconf->class)
 			aconf->class = get_class(0);
-		(void)sprintf(maxsendq, "%d", aconf->class->class);
+		(void)irc_sprintf(maxsendq, "%d", aconf->class->class);
 
 		if (!aconf->name)
 			aconf->name = nullfield;

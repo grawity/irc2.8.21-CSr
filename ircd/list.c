@@ -165,6 +165,7 @@ aClient *cptr;
 		user->joined = 0;
 		user->channel = NULL;
 		user->invited = NULL;
+		user->last = time(NULL);
 		cptr->user = user;
 	    }
 	return user;

@@ -116,6 +116,82 @@ char	serveropts[] = {
 #ifdef	V28PlusOnly
 '8',
 #endif
+' ',
+'C',
+'S',
+#ifdef BAN_INFO
+'a',
+#endif
+#ifdef REJECT_BOTS
+'b',
+#endif
+#ifdef IP_BAN_ALL
+'B',
+#endif
+#ifdef NO_MIXED_CASE
+# ifdef IGNORE_FIRST_CHAR
+'c',
+# else
+'C',
+# endif
+#endif
+#ifdef OPER_CAN_FLOOD2
+'f',
+#endif
+#ifdef OPER_CAN_FLOOD1
+'F',
+#endif
+#ifdef HIGHEST_CONNECTON
+'h',
+#endif
+#ifdef REJECT_IPHONE
+'i',
+#endif
+#ifdef IDLE_CHECK
+'I',
+#endif
+#ifdef DONT_SHOW_FAKES
+'j',
+#endif
+#ifdef QUOTE_KLINE
+# ifdef NO_LOCAL_KLINE
+'k',
+# else
+'K',
+# endif
+#endif
+#ifdef FK_USERMODES
+'m',
+#endif
+#ifdef CLIENT_NOTICES
+'n',
+#endif
+#ifdef FAILED_OPER_NOTICE
+'o',
+#endif
+#ifdef CLONE_CHECK
+# ifdef CLONE_KILL
+'P',
+# else
+'p',
+# endif
+#endif
+#ifdef NO_REDUNDANT_MODES
+'r',
+#endif
+#ifdef NO_SPECIAL
+'s',
+#endif
+#ifdef SIGNON_TIME
+'S',
+#endif
+#ifdef TOPIC_INFO
+'t',
+#endif
+#ifdef USERNAMES_IN_TRACE
+'u',
+#endif
+
 '\0'};
 
 #include "numeric.h"
@@ -190,7 +266,7 @@ va_dcl
 	if ((debuglevel >= 0) && (level <= debuglevel))
 	    {
 #ifndef	USE_VARARGS
-		(void)sprintf(debugbuf, form,
+		(void)irc_sprintf(debugbuf, form,
 				p1, p2, p3, p4, p5, p6, p7, p8, p9, p10);
 #else
 		(void)vsprintf(debugbuf, form, vl);

@@ -214,11 +214,11 @@ int	port;
 	 * easy conversion of "*" 0.0.0.0 or 134.* to 134.0.0.0 :-)
 	 */
 	(void)sscanf(name, "%d.%d.%d.%d", &ad[0], &ad[1], &ad[2], &ad[3]);
-	(void)sprintf(ipname, "%d.%d.%d.%d", ad[0], ad[1], ad[2], ad[3]);
+	(void)irc_sprintf(ipname, "%d.%d.%d.%d", ad[0], ad[1], ad[2], ad[3]);
 
 	if (cptr != &me)
 	    {
-		(void)sprintf(cptr->sockhost, "%-.42s.%.u",
+		(void)irc_sprintf(cptr->sockhost, "%-.42s.%.u",
 			name, (unsigned int)port);
 		(void)strcpy(cptr->name, me.name);
 	    }
@@ -274,7 +274,7 @@ int	port;
 	    {
 		char	buf[1024];
 
-		(void)sprintf(buf, rpl_str(RPL_MYPORTIS), me.name, "*",
+		(void)irc_sprintf(buf, rpl_str(RPL_MYPORTIS), me.name, "*",
 			ntohs(server.sin_port));
 		(void)write(0, buf, strlen(buf));
 	    }
@@ -359,7 +359,7 @@ int	port;
 
 	un.sun_family = AF_UNIX;
 	(void)mkdir(path, 0755);
-	(void)sprintf(unixpath, "%s/%d", path, port);
+	(void)irc_sprintf(unixpath, "%s/%d", path, port);
 	(void)unlink(unixpath);
 	strncpyzt(un.sun_path, unixpath, sizeof(un.sun_path));
 	(void)strcpy(cptr->name, me.name);
@@ -415,7 +415,7 @@ void	close_listeners()
 #ifdef	UNIXPORT
 			if (IsUnixSocket(cptr))
 			    {
-				(void)sprintf(unixpath, "%s/%d", aconf->host,
+				(void)irc_sprintf(unixpath, "%s/%d", aconf->host,
 					aconf->port);
 				(void)unlink(unixpath);
 			    }
@@ -504,8 +504,10 @@ void	init_sys()
 	if (((bootopt & BOOT_CONSOLE) || isatty(0)) &&
 	    !(bootopt & (BOOT_INETD|BOOT_OPER)))
 	    {
+#ifndef COMSTUD_DEBUG
 		if (fork())
 			exit(0);
+#endif
 #ifdef TIOCNOTTY
 		if ((fd = open("/dev/tty", O_RDWR)) >= 0)
 		    {
@@ -536,7 +538,7 @@ void	write_pidfile()
 	if ((fd = open(IRCD_PIDFILE, O_CREAT|O_WRONLY, 0600))>=0)
 	    {
 		bzero(buff, sizeof(buff));
-		(void)sprintf(buff,"%5d\n", (int)getpid());
+		(void)irc_sprintf(buff,"%5d\n", (int)getpid());
 		if (write(fd, buff, strlen(buff)) == -1)
 			Debug((DEBUG_NOTICE,"Error writing to pid file %s",
 			      IRCD_PIDFILE));
@@ -603,8 +605,9 @@ Reg2	char	*sockn;
  * -1 = Access denied
  * -2 = Bad socket.
  */
-int	check_client(cptr)
+int	check_client(cptr, username)
 Reg1	aClient	*cptr;
+char	*username;
 {
 	static	char	sockname[HOSTLEN+1];
 	Reg2	struct	hostent *hp = NULL;
@@ -638,7 +641,7 @@ Reg1	aClient	*cptr;
 		    }
 	    }
 
-	if ((i = attach_Iline(cptr, hp, sockname)))
+	if ((i = attach_Iline(cptr, hp, sockname, username)))
 	    {
 		Debug((DEBUG_DNS,"ch_cl: access denied: %s[%s]",
 			cptr->name, sockname));
@@ -800,7 +803,7 @@ check_serverback:
 			add_local_domain(fullname, HOSTLEN-strlen(fullname));
 			Debug((DEBUG_DNS, "sv_cl: gethostbyaddr: %s->%s",
 				sockname, fullname));
-			(void)sprintf(abuff, "%s@%s",
+			(void)irc_sprintf(abuff, "%s@%s",
 				cptr->username, fullname);
 			if (!c_conf)
 				c_conf = find_conf_host(lp, abuff, CFLAG);
@@ -821,7 +824,7 @@ check_serverback:
 	 */
 	if (IsUnknown(cptr) && (!c_conf || !n_conf))
 	    {
-		(void)sprintf(abuff, "%s@%s", cptr->username, sockname);
+		(void)irc_sprintf(abuff, "%s@%s", cptr->username, sockname);
 		if (!c_conf)
 			c_conf = find_conf_host(lp, abuff, CFLAG);
 		if (!n_conf)
@@ -1107,7 +1110,7 @@ aClient	*cptr;
 	else if (opt > 0)
 	    {
 		for (*readbuf = '\0'; opt > 0; opt--, s+= 3)
-			(void)sprintf(s, "%02.2x:", *t++);
+			(void)irc_sprintf(s, "%02.2x:", *t++);
 		*s = '\0';
 		sendto_ops("Connection %s using IP opts: (%s)",
 			   get_client_name(cptr, TRUE), readbuf);
@@ -1329,9 +1332,23 @@ fd_set	*rfd;
 		errno = 0;
 		length = recv(cptr->fd, readbuf, sizeof(readbuf), 0);
 
+#ifdef OPER_CAN_FLOOD1
+	if (!IsAnOper(cptr))
+	{
+#else 
+# ifdef OPER_CAN_FLOOD2
+	if (!IsOper(cptr))
+	{
+# endif
+#endif
 		cptr->lasttime = now;
 		if (cptr->lasttime > cptr->since)
 			cptr->since = cptr->lasttime;
+#if defined(OPER_CAN_FLOOD1) || defined(OPER_CAN_FLOOD2)
+	}
+	else
+		cptr->since=cptr->lasttime = now;
+#endif
 		cptr->flags &= ~(FLAGS_PINGSENT|FLAGS_NONL);
 		/*
 		 * If not ready, fake it so it isnt closed
@@ -1365,6 +1382,13 @@ fd_set	*rfd;
 			return exit_client(cptr, cptr, cptr, "dbuf_put fail");
 
 		if (IsPerson(cptr) &&
+#ifdef OPER_CAN_FLOOD1
+				!IsAnOper(cptr) &&
+#else
+# ifdef OPER_CAN_FLOOD2
+				!IsOper(cptr) &&
+# endif
+#endif
 		    DBufLength(&cptr->recvQ) > CLIENT_FLOOD)
 			return exit_client(cptr, cptr, cptr, "Excess Flood");
 
@@ -1780,11 +1804,9 @@ struct	hostent	*hp;
 	set_non_blocking(cptr->fd, cptr);
 	set_sock_opts(cptr->fd, cptr);
 	(void)signal(SIGALRM, dummy);
-	(void)alarm(4);
 	if (connect(cptr->fd, svp, len) < 0 && errno != EINPROGRESS)
 	    {
 		errtmp = errno; /* other system calls may eat errno */
-		(void)alarm(0);
 		report_error("Connect to host %s failed: %s",cptr);
                 if (by && IsPerson(by) && !MyClient(by))
                   sendto_one(by,
@@ -1798,7 +1820,6 @@ struct	hostent	*hp;
 			errno = ETIMEDOUT;
 		return -1;
 	    }
-	(void)alarm(0);
 
         /* Attach config entries to client here rather than in
          * completed_connection. This to avoid null pointer references
@@ -2043,15 +2064,13 @@ char	*namebuf, *linebuf, *chname;
 		return;
 	    }
 
-	(void)sprintf(line,"/dev/%s", linebuf);
-	(void)alarm(5);
+	(void)irc_sprintf(line,"/dev/%s", linebuf);
 #ifdef	O_NOCTTY
 	if ((fd = open(line, O_WRONLY | O_NDELAY | O_NOCTTY)) == -1)
 #else
 	if ((fd = open(line, O_WRONLY | O_NDELAY)) == -1)
 #endif
 	    {
-		(void)alarm(0);
 		sendto_one(who,
 			   "NOTICE %s :%s seems to have disabled summoning...",
 			   who->name, namebuf);
@@ -2060,50 +2079,38 @@ char	*namebuf, *linebuf, *chname;
 #if !defined(O_NOCTTY) && defined(TIOCNOTTY)
 	(void) ioctl(fd, TIOCNOTTY, NULL);
 #endif
-	(void)alarm(0);
-	(void)sprintf(line,"\n\r\007Message from IRC_Daemon@%s at %d:%02d\n\r",
+	(void)irc_sprintf(line,"\n\r\007Message from IRC_Daemon@%s at %d:%02d\n\r",
 			me.name, tp->tm_hour, tp->tm_min);
 	if (write(fd, line, strlen(line)) != strlen(line))
 	    {
-		(void)alarm(0);
 		(void)close(fd);
 		sendto_one(who, wrerr, who->name);
 		return;
 	    }
-	(void)alarm(0);
 	(void)strcpy(line, "ircd: You are being summoned to Internet Relay \
 Chat on\n\r");
-	(void)alarm(5);
 	if (write(fd, line, strlen(line)) != strlen(line))
 	    {
-		(void)alarm(0);
 		(void)close(fd);
 		sendto_one(who, wrerr, who->name);
 		return;
 	    }
-	(void)alarm(0);
-	(void)sprintf(line, "ircd: Channel %s, by %s@%s (%s) %s\n\r",
+	(void)irc_sprintf(line, "ircd: Channel %s, by %s@%s (%s) %s\n\r",
 		chname, who->user->username, who->user->host, who->name, who->info);
-	(void)alarm(5);
 	if (write(fd, line, strlen(line)) != strlen(line))
 	    {
-		(void)alarm(0);
 		(void)close(fd);
 		sendto_one(who, wrerr, who->name);
 		return;
 	    }
-	(void)alarm(0);
 	(void)strcpy(line,"ircd: Respond with irc\n\r");
-	(void)alarm(5);
 	if (write(fd, line, strlen(line)) != strlen(line))
 	    {
-		(void)alarm(0);
 		(void)close(fd);
 		sendto_one(who, wrerr, who->name);
 		return;
 	    }
 	(void)close(fd);
-	(void)alarm(0);
 	sendto_one(who, rpl_str(RPL_SUMMONING), me.name, who->name, namebuf);
 	return;
 }

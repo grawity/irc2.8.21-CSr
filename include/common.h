@@ -54,6 +54,7 @@ void	free();
 #include MALLOCH
 #endif
 
+extern	int	irc_sprintf();
 extern	int	matches PROTO((char *, char *));
 extern	int	mycmp PROTO((char *, char *));
 extern	int	myncmp PROTO((char *, char *, int));

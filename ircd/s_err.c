@@ -144,7 +144,11 @@ static	Numeric	numeric_replies[] = {
 /* 314 */	RPL_WHOWASUSER, "%s %s %s * :%s",
 /* 315 */	RPL_ENDOFWHO, "%s :End of /WHO list.",
 /* 316 */	RPL_WHOISCHANOP, (char *)NULL,
+#ifdef SIGNON_TIME
+/* 317 */     RPL_WHOISIDLE, "%s %ld %ld :seconds idle, signon time",
+#else
 /* 317 */	RPL_WHOISIDLE, "%s %ld :seconds idle",
+#endif
 /* 318 */	RPL_ENDOFWHOIS, "%s :End of /WHOIS list.",
 /* 319 */	RPL_WHOISCHANNELS, "%s :%s",
 		0, (char *)NULL,
@@ -156,9 +160,14 @@ static	Numeric	numeric_replies[] = {
 		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
 /* 331 */	RPL_NOTOPIC, "%s :No topic is set.",
 /* 332 */	RPL_TOPIC, "%s :%s",
+#ifdef TOPIC_INFO
+/* 333 */       RPL_TOPICWHOTIME, "%s %s %lu",
+#else
+		0, (char *)NULL,
+#endif
 		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
 		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
-		0, (char *)NULL, 0, (char *)NULL,
+		0, (char *)NULL,
 /* 341 */	RPL_INVITING, "%s %s",
 /* 342 */	RPL_SUMMONING, "%s :User summoned to irc",
 		0, (char *)NULL, 0, (char *)NULL,
@@ -176,7 +185,11 @@ static	Numeric	numeric_replies[] = {
 /* 364 */	RPL_LINKS, "%s %s :%d %s",
 /* 365 */	RPL_ENDOFLINKS, "%s :End of /LINKS list.",
 /* 366 */	RPL_ENDOFNAMES, "%s :End of /NAMES list.",
+#ifdef BAN_INFO
+/* 367 */       RPL_BANLIST, "%s %s %s %lu",
+#else
 /* 367 */	RPL_BANLIST, "%s %s",
+#endif
 /* 368 */	RPL_ENDOFBANLIST, "%s :End of Channel Ban List",
 /* 369 */	RPL_ENDOFWHOWAS, "%s :End of WHOWAS",
 		0, (char *)NULL,
@@ -245,7 +258,13 @@ static	Numeric	numeric_replies[] = {
 /* 244 */	RPL_STATSHLINE, "%c %s * %s %d %d", 
 /* 245 */	RPL_STATSSLINE, "%c %s * %s %d %d", 
 		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
-		0, (char *)NULL, 0, (char *)NULL,
+		0, (char *)NULL,
+#ifdef HIGHEST_CONNECTION
+/* 250 */       RPL_STATSCONN,
+                    ":Highest connection count: %d (%d clients)",
+#else
+		0, (char *)NULL, 
+#endif
 /* 251 */	RPL_LUSERCLIENT,
 		":There are %d users and %d invisible on %d servers",
 /* 252 */	RPL_LUSEROP, "%d :operator(s) online",
@@ -269,14 +288,14 @@ int	numeric;
 
 	num -= numeric_errors[0].num_val;
 	if (num < 0 || num > ERR_USERSDONTMATCH)
-		(void)sprintf(numbuff,
+		(void)irc_sprintf(numbuff,
 			":%%s %d %%s :INTERNAL ERROR: BAD NUMERIC! %d",
 			numeric, num);
 	else
 	    {
 		nptr = &numeric_errors[num];
 		if (!nptr->num_form || !nptr->num_val)
-			(void)sprintf(numbuff,
+			(void)irc_sprintf(numbuff,
 				":%%s %d %%s :NO ERROR FOR NUMERIC ERROR %d",
 				numeric, num);
 		else
@@ -296,7 +315,7 @@ int	numeric;
 		num -= (num > 300) ? 300 : 100;
 
 	if (num < 0 || num > 200)
-		(void)sprintf(numbuff,
+		(void)irc_sprintf(numbuff,
 			":%%s %d %%s :INTERNAL REPLY ERROR: BAD NUMERIC! %d",
 			numeric, num);
 	else
@@ -308,7 +327,7 @@ int	numeric;
 		Debug((DEBUG_NUM, "rpl_str: numeric %d num %d nptr %x %d %x",
 			numeric, num, nptr, nptr->num_val, nptr->num_form));
 		if (!nptr->num_form || !nptr->num_val)
-			(void)sprintf(numbuff,
+			(void)irc_sprintf(numbuff,
 				":%%s %d %%s :NO REPLY FOR NUMERIC ERROR %d",
 				numeric, num);
 		else

@@ -97,10 +97,11 @@ int	mask;
 /*
  * find the first (best) I line to attach.
  */
-int	attach_Iline(cptr, hp, sockhost)
+int	attach_Iline(cptr, hp, sockhost, username)
 aClient *cptr;
 Reg2	struct	hostent	*hp;
 char	*sockhost;
+char	*username;
 {
 	Reg1	aConfItem	*aconf;
 	Reg3	char	*hname;
@@ -126,9 +127,9 @@ char	*sockhost;
 						 HOSTLEN - strlen(fullname));
 				Debug((DEBUG_DNS, "a_il: %s->%s",
 				      sockhost, fullname));
-				if (index(aconf->name, '@'))
+				if (index(aconf->name, '@') && *username)
 				    {
-					(void)strcpy(uhost, cptr->username);
+					(void)strcpy(uhost, username);
 					(void)strcat(uhost, "@");
 				    }
 				else
@@ -139,9 +140,9 @@ char	*sockhost;
 					goto attach_iline;
 			    }
 
-		if (index(aconf->host, '@'))
-		    {
-			strncpyzt(uhost, cptr->username, sizeof(uhost));
+		if (index(aconf->host, '@') && *username)
+		    {	
+			strncpyzt(uhost, username, sizeof(uhost));
 			(void)strcat(uhost, "@");
 		    }
 		else
@@ -370,7 +371,7 @@ int	statmask;
 	Reg1	aConfItem *tmp;
 	char	userhost[USERLEN+HOSTLEN+3];
 
-	(void)sprintf(userhost, "%s@%s", user, host);
+	(void)irc_sprintf(userhost, "%s@%s", user, host);
 
 	for (tmp = conf; tmp; tmp = tmp->next)
 	    {
@@ -634,6 +635,7 @@ int	sig;
 			if (!tmp2->clients)
 				free_conf(tmp2);
 		    }
+	rehashed = 1;
 	return ret;
 }
 
@@ -925,7 +927,7 @@ int	opt;
 
 				len += strlen(aconf->host);
 				newhost = (char *)MyMalloc(len);
-				(void)sprintf(newhost, "*@%s", aconf->host);
+				(void)irc_sprintf(newhost, "*@%s", aconf->host);
 				MyFree(aconf->host);
 				aconf->host = newhost;
 			    }
@@ -1139,7 +1141,7 @@ aClient	*cptr;
 			if ((s = (char *)index(temprpl, '\n')))
 			      *s = '\0';
 			if (strlen(temprpl) + strlen(reply) < sizeof(reply)-2)
-				(void)sprintf(rplhold, "%s %s", rplhold,
+				(void)irc_sprintf(rplhold, "%s %s", rplhold,
 					temprpl);
 			else
 			    {
@@ -1221,7 +1223,7 @@ char	*interval, *reply;
 		    ? (perm_min <= now && now <= perm_max)
 		    : (perm_min <= now || now <= perm_max))
 		    {
-			(void)sprintf(reply,
+			(void)irc_sprintf(reply,
 				":%%s %%d %%s :%s %d:%02d to %d:%02d.",
 				"You are not allowed to connect from",
 				perm_min_hours, perm_min_minutes,
@@ -1232,7 +1234,7 @@ char	*interval, *reply;
 		    ? (perm_min <= now + 5 && now + 5 <= perm_max)
 		    : (perm_min <= now + 5 || now + 5 <= perm_max))
 		    {
-			(void)sprintf(reply, ":%%s %%d %%s :%d minute%s%s",
+			(void)irc_sprintf(reply, ":%%s %%d %%s :%d minute%s%s",
 				perm_min-now,(perm_min-now)>1?"s ":" ",
 				"and you will be denied for further access");
 			return(ERR_YOUWILLBEBANNED);

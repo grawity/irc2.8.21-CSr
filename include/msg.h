@@ -21,6 +21,8 @@
 #ifndef	__msg_include__
 #define __msg_include__
 
+#include "comstud.h"
+
 #define MSG_PRIVATE  "PRIVMSG"	/* PRIV */
 #define MSG_WHO      "WHO"	/* WHO  -> WHOC */
 #define MSG_WHOIS    "WHOIS"	/* WHOI */
@@ -63,6 +65,9 @@
 #define MSG_SERVICE  "SERVICE"	/* SERV -> SRVI */
 #define MSG_USERHOST "USERHOST"	/* USER -> USRH */
 #define MSG_ISON     "ISON"	/* ISON */
+#ifdef IDLE_CHECK
+#define MSG_IDLE     "IDLE"     /* IDLE */
+#endif
 #define MSG_NOTE     "NOTE"	/* NOTE */
 #define MSG_SQUERY   "SQUERY"	/* SQUE */
 #define MSG_SERVLIST "SERVLIST"	/* SERV -> SLIS */
@@ -73,9 +78,17 @@
 #define	MSG_DIE	     "DIE"
 #define	MSG_HASH     "HSAH"	/* HASH */
 #define	MSG_DNS      "DNS"	/* DNS  -> DNSS */
-
+#ifdef QUOTE_KLINE
+#define MSG_KLINE    "KLINE"    /* KLINE */
+#endif
 #define MAXPARA    15 
 
+#ifdef IDLE_CHECK
+extern int m_idle();
+#endif
+#ifdef QUOTE_KLINE
+extern int m_kline();
+#endif
 extern int m_private(), m_topic(), m_join(), m_part(), m_mode();
 extern int m_ping(), m_pong(), m_wallops(), m_kick();
 extern int m_nick(), m_error(), m_notice();
@@ -148,6 +161,12 @@ struct Message msgtab[] = {
   { MSG_INFO,    m_info,     0, MAXPARA, 1 ,0L },
   { MSG_MOTD,    m_motd,     0, MAXPARA, 1 ,0L },
   { MSG_CLOSE,   m_close,    0, MAXPARA, 1 ,0L },
+#ifdef IDLE_CHECK
+  { MSG_IDLE,    m_idle,     0, MAXPARA, 1 ,0L },
+#endif 
+#ifdef QUOTE_KLINE
+  { MSG_KLINE,   m_kline,    0, MAXPARA, 1 ,0L },
+#endif
 #if defined(NPATH) && !defined(CLIENT_COMPILE)
   { MSG_NOTE,    m_note,     0, 1, 1 ,0L },
 #endif

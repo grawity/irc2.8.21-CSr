@@ -87,7 +87,6 @@ Reg1	aClient	*cptr;
 	sock.sin_port = htons(113);
 	sock.sin_family = AF_INET;
 
-	(void)alarm((unsigned)4);
 	if (connect(cptr->authfd, (struct sockaddr *)&sock,
 		    sizeof(sock)) == -1 && errno != EINPROGRESS)
 	    {
@@ -95,14 +94,12 @@ Reg1	aClient	*cptr;
 		/*
 		 * No error report from this...
 		 */
-		(void)alarm((unsigned)0);
 		(void)close(cptr->authfd);
 		cptr->authfd = -1;
 		if (!DoingDNS(cptr))
 			SetAccess(cptr);
 		return;
 	    }
-	(void)alarm((unsigned)0);
 	cptr->flags |= (FLAGS_WRAUTH|FLAGS_AUTH);
 	if (cptr->authfd > highest_fd)
 		highest_fd = cptr->authfd;
@@ -138,7 +135,7 @@ aClient	*cptr;
 		goto authsenderr;
 	    }
 
-	(void)sprintf(authbuf, "%u , %u\r\n",
+	(void)irc_sprintf(authbuf, "%u , %u\r\n",
 		(unsigned int)ntohs(them.sin_port),
 		(unsigned int)ntohs(us.sin_port));
 

@@ -156,7 +156,7 @@ long value;
 {
  static char buf[BUF_LEN]; 
   
- sprintf(buf, "%d", value);
+ irc_sprintf(buf, "%d", value);
  return buf;
 }
 
@@ -174,7 +174,7 @@ long seconds;
  seconds -= h*3600;
  m = seconds / 60;
  seconds -= m*60;
- sprintf(buf, "%3dd:%2dh:%2dm", d, h, m);
+ irc_sprintf(buf, "%3dd:%2dh:%2dm", d, h, m);
  c = buf; 
  while (*c) {
               if (*c == ' ') *c = '0';
@@ -578,7 +578,7 @@ static void init_messages()
  FromNameList = (aMsgClient **) MyMalloc(allocate);
  WildCardList = (aMsgClient **) MyMalloc(allocate); 
  note_save_filename_tmp = MyMalloc(strlen(NPATH)+6);
- sprintf(note_save_filename_tmp,"%s.tmp",NPATH);
+ irc_sprintf(note_save_filename_tmp,"%s.tmp",NPATH);
  time(&clock);old_clock = clock;
  fp = fopen(NPATH,"r");
  if (!fp) return;
@@ -1141,7 +1141,7 @@ void save_messages()
         }       
        if (clock > msgclient->timeout) {
            display_flags(msgclient->flags, dibuf, 'q');
-           sprintf(mbuf,"Expired: /Note User -%d %s %s!%s@%s %s", 
+           irc_sprintf(mbuf,"Expired: /Note User -%d %s %s!%s@%s %s", 
                    (int)((msgclient->timeout - msgclient->time)/3600),
                    dibuf, msgclient->tonick, msgclient->toname, 
                    msgclient->tohost, Message(msgclient));
@@ -1388,7 +1388,7 @@ aChannel *sptr_chn;
       if (msgclient->flags & FLAGS_DISPLAY_SERVER_DEST_REGISTER)
           spy_server = sptr->user->server;
       if (spy_channel || spy_server)
-          sprintf(ebuf,"%s%s%s%s%s", spy_channel ? " " : "",
+          irc_sprintf(ebuf,"%s%s%s%s%s", spy_channel ? " " : "",
                   spy_channel ? spy_channel : "",
                   spy_server ? " (" : "",
                   spy_server ? spy_server : "",
@@ -1398,7 +1398,7 @@ aChannel *sptr_chn;
             while (*message && *message != ' ') message++;
             if (*message) message++;
 	}
-      sprintf(buf,"%s@%s",UserName(sptr),sptr->user->host);
+      irc_sprintf(buf,"%s@%s",UserName(sptr),sptr->user->host);
       switch (mode) {
         case 'm' :
         case 'l' :
@@ -1499,7 +1499,7 @@ aChannel *sptr_chn;
            *repeat = 1; break;
 	 }
         time(&clock); 
-        sprintf(mbuf,"Search for %s!%s@%s (%s): %s!%s@%s (%s)",
+        irc_sprintf(mbuf,"Search for %s!%s@%s (%s): %s!%s@%s (%s)",
                 msgclient->tonick,msgclient->toname,msgclient->tohost,
                 *message ? message : "*", nick,
                 UserName(sptr),sptr->user->host,sptr->info);
@@ -1548,7 +1548,7 @@ while (send && qptr != sptr &&
         time(&clock);
         if (!right_tonick && secret && clock-msgclient->time < 3600*24*7)
 	   { *repeat = 1; send = 0; break; }
-        sprintf(buf,"%s (%s@%s) has received note queued %s before delivery.",
+        irc_sprintf(buf,"%s (%s@%s) has received note queued %s before delivery.",
                 nick, UserName(sptr), sptr->user->host,
                 mytime(msgclient->time));
         if (msgclient->flags & FLAGS_DISPLAY_IF_RECEIVED && 
@@ -2123,7 +2123,7 @@ char *arg, *value;
              sendto_one(sptr,"NOTICE %s :#?# No request(s) found",sptr->name);
                 else {
                      if (IsOperHere(sptr) || Key(sptr)) {
-                         sprintf(buf,"%s%d %s%d %s%d %s (%s%d %s%d %s%d %s%d)",
+                         irc_sprintf(buf,"%s%d %s%d %s%d %s (%s%d %s%d %s%d %s%d)",
                                  "Nicks:",nicks,"Names:",names,
                                  "Hosts:",hosts,"W.cards",
                                  "Nicks:",tonick_wildcards,
@@ -2132,7 +2132,7 @@ char *arg, *value;
                                  "All:",all_wildcards);
                          sendto_one(sptr,"NOTICE %s :### %s",sptr->name,buf);
 		      }
-                      sprintf(buf,"%s %s%d / %s%d",
+                      irc_sprintf(buf,"%s %s%d / %s%d",
                               "Server generated",
                               "G-notice: ",flag_notice,
                               "H-header: ",flag_destination);
@@ -2156,7 +2156,7 @@ char *arg, *value;
 	    }
   } else {
       t = number_fromname();
-      sprintf(buf,"%s%d /%s%d /%s%d /%s%d /%s%d /%s%d /%s%d",
+      irc_sprintf(buf,"%s%d /%s%d /%s%d /%s%d /%s%d /%s%d /%s%d",
               "QUEUE:",t,
               "MSM:",note_msm,
               "MSW:",note_msw,
@@ -2334,7 +2334,7 @@ char *passwd, *flag_s, *timeout_s, *name, *message;
      if (flags & FLAGS_DISPLAY_IF_DEST_REGISTER) update_spymsg(msgclient);
   }
  display_flags(flags, dibuf, '-');
- sprintf(buf, "%s %s %s!%s@%s for %s",
+ irc_sprintf(buf, "%s %s %s!%s@%s for %s",
          join ? "Joined..." : "Queued...",dibuf, 
          tonick, toname, tohost, relative_time(timeout*3600));
  if (!silent) {
@@ -2363,7 +2363,7 @@ char *passwd, *flag_s, *timeout_s, *name, *message;
      return;
   }
  time (&clock);
- sprintf(buf, "[News:%s] ", tonick); msg_len = MSG_LEN-strlen(buf)-1;
+ irc_sprintf(buf, "[News:%s] ", tonick); msg_len = MSG_LEN-strlen(buf)-1;
  strncat(buf, message, msg_len); strcat(flag_s, "-RS");
  while (fromname_index && t <= fromname_index) {
         msgclient = FromNameList[t];
@@ -2389,7 +2389,7 @@ char *passwd, *flag_s, *timeout_s, *name, *message;
             && !matches(tohost, msgclient->fromhost)
             && !(msgclient->flags & FLAGS_KEY_TO_OPEN_OPER_LOCKS)) {
             c = wild_fromnick(msgclient->fromnick, msgclient);            
-            sprintf(anyname, "%s!%s@%s", 
+            irc_sprintf(anyname, "%s!%s@%s", 
                     c ? c : msgclient->fromnick, msgclient->fromname, 
                     local_host(msgclient->fromhost));
             ret = msg_send(sptr, 1, passwd, flag_s, 
@@ -2494,7 +2494,7 @@ char *arg, *passwd, *flag_s, *id_s, *name, *time_s;
 	      } else 
                  if (!count) {
                     found++;
-                    sprintf(buf,"for %s", 
+                    irc_sprintf(buf,"for %s", 
                            relative_time(msgclient->timeout-clock));
                     sendto_one(sptr,"NOTICE %s :#%d %s %s (%s@%s) %s: %s",
                               sptr->name, msgclient->id, dibuf,
@@ -2681,23 +2681,23 @@ char *option, **flags, **msg, **timeout;
         *waitfor_message = "[Waiting]";
  
  if (MyEq(option,"SEND")) {
-     sprintf(flag_s,"+D%s", *flags);
+     irc_sprintf(flag_s,"+D%s", *flags);
      if (!*timeout) *timeout = deft; 
   } else
  if (MyEq(option,"NEWS")) {
-     sprintf(flag_s,"+RS%s", *flags);
+     irc_sprintf(flag_s,"+RS%s", *flags);
      if (!*timeout) *timeout = deft; 
   } else
  if (MyEq(option,"WAITFOR")) { 
-     sprintf(flag_s,"+YD%s", *flags); 
+     irc_sprintf(flag_s,"+YD%s", *flags); 
      if (!*msg) *msg = waitfor_message; 
   } else 
- if (MyEq(option,"SPY")) sprintf(flag_s,"+RX%s", *flags); else
- if (MyEq(option,"FIND")) sprintf(flag_s,"+FR%s", *flags); else
- if (MyEq(option,"KEY")) sprintf(flag_s,"+KR%s", *flags); else
- if (MyEq(option,"WALL")) sprintf(flag_s,"+BR%s", *flags); else
- if (MyEq(option,"WALLOPS")) sprintf(flag_s,"+BRW%s", *flags); else
- if (MyEq(option,"DENY")) sprintf(flag_s,"+RZ%s", *flags); else
+ if (MyEq(option,"SPY")) irc_sprintf(flag_s,"+RX%s", *flags); else
+ if (MyEq(option,"FIND")) irc_sprintf(flag_s,"+FR%s", *flags); else
+ if (MyEq(option,"KEY")) irc_sprintf(flag_s,"+KR%s", *flags); else
+ if (MyEq(option,"WALL")) irc_sprintf(flag_s,"+BR%s", *flags); else
+ if (MyEq(option,"WALLOPS")) irc_sprintf(flag_s,"+BRW%s", *flags); else
+ if (MyEq(option,"DENY")) irc_sprintf(flag_s,"+RZ%s", *flags); else
   return 0;
  *flags = flag_s;
  return 1;
@@ -2730,7 +2730,7 @@ aClient *sptr;
                        "NOTICE %s :### Note wall to %s!%s@%s deactivated.", 
                        sptr->name, msgclient->tonick, msgclient->toname, 
                        msgclient->tohost);
-            sprintf(buf,"%s (%s@%s) has deactivated your Note Wall...",
+            irc_sprintf(buf,"%s (%s@%s) has deactivated your Note Wall...",
                     sptr->name,UserName(sptr),sptr->user->host);
             c = wild_fromnick(msgclient->fromnick, msgclient);
             gflags |= FLAGS_WASOPER;

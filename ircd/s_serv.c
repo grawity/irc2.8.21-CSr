@@ -25,6 +25,7 @@
 static  char sccsid[] = "@(#)s_serv.c	2.55 2/7/94 (C) 1988 University of Oulu, \
 Computing Center and Jarkko Oikarinen";
 #endif
+#include <string.h> 
 
 #include "struct.h"
 #include "common.h"
@@ -41,6 +42,10 @@ Computing Center and Jarkko Oikarinen";
 #include "h.h"
 
 static	char	buf[BUFSIZE];
+
+#ifdef HIGHEST_CONNECTION
+int     max_connection_count = 1, max_client_count = 1;
+#endif
 
 /*
 ** m_functions execute protocol messages on this server:
@@ -98,6 +103,43 @@ static	char	buf[BUFSIZE];
 **		note:	it is guaranteed that parv[0]..parv[parc-1] are all
 **			non-NULL pointers.
 */
+
+#ifdef IDLE_CHECK
+
+int     m_idle(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int     parc;
+char    *parv[];
+{
+        int temp;
+
+	if (!MyClient(sptr) || !IsAnOper(sptr))
+        {
+                sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
+                return 0;
+        }
+        if (!parv[1] || !*parv[1])
+        {
+                sendto_one(sptr, ":%s NOTICE %s :The current idle limit is set at %i minutes",
+                        me.name, parv[0], idlelimit/60);
+                return 0;
+        }
+      temp = atoi(parv[1]);
+      if (temp && (temp < 10))
+      {
+              sendto_one(sptr, ":%s NOTICE %s :Hello???  Try a number > 10.",
+                      me.name, parv[0]);
+              return 0;
+      }
+      idlelimit = temp*60;
+      sendto_ops("%s has changed the idle time limit to %i minute(s).",
+              parv[0], idlelimit/60);
+      sendto_one(sptr, ":%s NOTICE %s :The idle limit is now set to %i minute(s)",
+              me.name, parv[0], idlelimit/60);
+      return 0;
+}
+
+#endif
 
 /*
 ** m_version
@@ -870,7 +912,7 @@ char	*parv[];
 		    {
 			if (StrEq(namebuf,user))
 			    {
-				(void)sprintf(ttyname,"/dev/%s",linetmp);
+				(void)irc_sprintf(ttyname,"/dev/%s",linetmp);
 				if (stat(ttyname,&stb) == -1)
 				    {
 					sendto_one(sptr,
@@ -1093,6 +1135,10 @@ char	*parv[];
 		now = time(NULL) - me.since;
 		sendto_one(sptr, rpl_str(RPL_STATSUPTIME), me.name, parv[0],
 			   now/86400, (now/3600)%24, (now/60)%60, now%60);
+#ifdef HIGHEST_CONNECTION
+                sendto_one(sptr, rpl_str(RPL_STATSCONN), me.name, parv[0],
+                           max_connection_count, max_client_count);
+#endif 
 		break;
 	    }
 	case 'X' : case 'x' :
@@ -1313,6 +1359,20 @@ char	*parv[];
 			   me.name, parv[0], count_channels(sptr));
 	sendto_one(sptr, rpl_str(RPL_LUSERME),
 		   me.name, parv[0], m_client, m_server);
+#ifdef HIGHEST_CONNECTION
+	sendto_one(sptr, rpl_str(RPL_STATSCONN), me.name, parv[0],
+                          max_connection_count, max_client_count);
+	if (m_client > max_client_count)
+		max_client_count = m_client;
+	if ((m_client + m_server) > max_connection_count)
+	{
+		max_connection_count = m_client + m_server;
+		if (max_connection_count % 10 == 0)
+			sendto_flagops(1,
+				"New highest connections: %d (%d clients)",
+				max_connection_count, max_client_count);
+        }
+#endif  
 	return 0;
     }
 
@@ -1534,6 +1594,213 @@ char	*parv[];
 			   me.name, parv[0], me.name);
 	return 0;
     }
+
+#ifdef QUOTE_KLINE
+
+int numchar(string, c)
+char *string;
+char c;
+{
+        int num = 0;
+        while (*string)
+        {
+                if (tolower(*string) == tolower(c))
+                        num++;
+                string++;
+        }
+        return num;
+}
+
+char *right(string, num)
+char *string;
+int num;
+{
+        if (strlen(string) < num)
+                return string;
+        return (string+strlen(string)-num);
+}
+
+char *my_stristr(s1, s2)
+     char *s1;
+     char *s2;
+{
+  char n1[1024], n2[1024];
+  char *temp, *ptr1, *ptr2;
+
+  ptr1 = n1;
+  ptr2 = n2;
+  if (!s1 || !s2)
+    return NULL;
+  while (*s1)
+    *(ptr1++) = toupper(*(s1++));
+  while (*s2)
+    *(ptr2++) = toupper(*(s2++));
+  *ptr1 = '\0';
+  *ptr2 = '\0';
+  temp = strstr(n1, n2);
+  if (temp)
+    return (s1 + (temp-n1));
+  return NULL;
+}
+
+char *cluster(hostname)
+char *hostname;
+{
+        static char result[1024];
+        char        temphost[255];
+        char        *host;
+
+        if (!hostname)
+                return (char *) 0;
+        host = temphost;
+        strcpy(result, "");
+        if (strchr(hostname, '@'))
+        {
+            strcpy(result, hostname);
+            *strchr(result, '@') = '\0';
+            strcat(result, "@");
+            if (!(hostname = strchr(hostname, '@')))
+                return (char *) 0;
+            hostname++;
+        }
+        strcpy(host, hostname);
+
+        if (isdigit(*host))
+        {
+                int i;
+                char *tmp;
+                tmp = host;
+                for (i=0;i<2;i++)
+                        tmp = strchr(tmp, '.')+1;
+                *tmp = '\0';
+                strcat(result, host);
+                strcat(result, "*.*");
+        }
+        else
+        {
+                char    *tmp;
+                int     num;
+
+                num = 1;
+                tmp = right(host, 3);
+                if (mycmp(tmp, "com") &&
+                        mycmp(tmp, "edu") &&
+                        (my_stristr(host, "com") ||
+                                my_stristr(host, "edu")))
+                        num = 2;
+                while (host && *host && (numchar(host, '.') > num))
+                {
+                        if ((host = strchr(host, '.')) != NULL)
+                                host++;
+                        else
+                                return (char *) NULL;
+                }
+                strcat(result, "*");
+                if (mycmp(host, temphost))
+                        strcat(result, ".");
+                strcat(result, host);
+        }
+        return result;
+}
+
+int     m_kline(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int     parc;
+char    *parv[];
+{
+        int out;
+	char buffer[1024];
+        char *user, *host;
+        aClient *acptr;
+        char tempuser[30];
+        char temphost[512];
+
+        if (!MyClient(sptr) ||
+#ifdef NO_LOCAL_KLINE
+		!IsOper(sptr))
+#else
+		!IsAnOper(sptr))
+#endif
+            {
+                sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
+                return 0;
+            }
+        if (!parv[1] || !*parv[1])
+        {
+                sendto_one(sptr, ":%s NOTICE %s :Not enough parameters",
+                        me.name, parv[0]);
+                return 0;
+        }
+        if (strchr(parv[1], '@'))
+        {
+                user = parv[1];
+                host = strchr(parv[1], '@');
+                *(host++) = '\0';
+                if (!*host)
+                        host = "*";
+                if (*user != '*')
+                        strcpy(tempuser, "*");
+                else
+                        strcpy(tempuser, "");
+                strcat(tempuser, user);
+                if (*host != '*')
+                        strcpy(temphost, "*");
+                else
+                        strcpy(temphost, "");
+                strcat(temphost, host);
+                user = tempuser;
+		if (*user == '~')
+			user++;
+                host = temphost;
+        }
+        else
+        {
+                if (!(acptr = find_chasing(sptr, parv[1], NULL)))
+                        return 0;
+                strcpy(tempuser, "*");
+                strcat(tempuser, acptr->user->username);
+                user = tempuser;
+		if (*user == '~')
+			user++;
+                host = cluster(acptr->user->host);
+        }
+        if (!matches(user, "akjhfkahfasfjd") &&
+                !matches(host, "ldksjflksdjfklsjf"))
+        {
+                sendto_one(sptr, ":%s NOTICE %s :Can't K-Line *@*", me.name,
+                        parv[0]);
+                return 0;
+        }
+        if ((out = open(configfile, O_WRONLY|O_APPEND))==-1)
+        {
+                sendto_one(sptr, ":%s NOTICE %s :Problem opening server configfile", me.name, parv[0]);
+                return 0;
+        }
+        if (parv[2] && *parv[2])
+	{
+                irc_sprintf(buffer, "# %s@%s: %s\n",
+                        user, host, parv[2]);
+                if (write(out, buffer, strlen(buffer)) <= 0)
+		{
+			sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);
+			close(out);
+			return 0;
+		}
+	}
+        irc_sprintf(buffer, "K:%s::%s\n", host, user);
+	if (write(out, buffer, strlen(buffer)) <= 0)
+	{
+		sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);
+		close(out);
+		return 0;
+	}
+        close(out);
+        sendto_ops("%s added K-Line for [%s@%s]", parv[0], user, host);
+        sendto_one(sptr, ":%s NOTICE %s :Added K-Line [%s@%s] to server configfile", me.name, parv[0], user, host);
+        return rehash(cptr, sptr, 0);
+}
+
+#endif /* QUOTE_KLINE */
 
 #if defined(OPER_REHASH) || defined(LOCOP_REHASH)
 /*
@@ -1804,9 +2071,7 @@ char	*parv[];
 	 * stop NFS hangs...most systems should be able to open a file in
 	 * 3 seconds. -avalon (curtesy of wumpus)
 	 */
-	(void)alarm(3);
 	fd = open(MOTD, O_RDONLY);
-	(void)alarm(0);
 	if (fd == -1)
 	    {
 		sendto_one(sptr, err_str(ERR_NOMOTD), me.name, parv[0]);

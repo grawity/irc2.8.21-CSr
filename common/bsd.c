@@ -97,7 +97,6 @@ char	*str;
 #ifdef	DEBUGMODE
 	writecalls++;
 #endif
-	(void)alarm(WRITEWAITDELAY);
 #ifdef VMS
 	retval = netwrite(cptr->fd, str, len);
 #else
@@ -125,7 +124,6 @@ char	*str;
 	    }
 
 #endif
-	(void )alarm(0);
 #ifdef DEBUGMODE
 	if (retval < 0) {
 		writeb[0]++;

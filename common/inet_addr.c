@@ -52,9 +52,11 @@
  * -
  * --Copyright--
  */
-
 #include "sys.h"
+/*
 #include "common.h"
+*/
+#include "setup.h"
 #include <netinet/in.h>
 #include "nameser.h"
 #include "resolv.h"

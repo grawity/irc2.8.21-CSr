@@ -49,6 +49,9 @@ typedef	struct	Server	aServer;
 typedef	struct	SLink	Link;
 typedef	struct	SMode	Mode;
 
+typedef struct  CloneItem aClone;
+
+
 #ifndef VMSP
 #include "class.h"
 #include "dbuf.h"	/* THIS REALLY SHOULDN'T BE HERE!!! --msa */
@@ -85,8 +88,14 @@ typedef	struct	SMode	Mode;
 ** it has worked on all machines I have needed it. The type
 ** should be size_t but...  --msa
 */
-#ifndef offsetof
-#define	offsetof(t,m) (int)((&((t *)0L)->m))
+
+/* added the ifndef linux  -- Comstud
+*/
+
+#ifndef linux
+# ifndef offsetof
+# define offsetof(t,m) (int)((&((t *)0L)->m))
+# endif
 #endif
 
 #define	elementsof(x) (sizeof(x)/sizeof(x[0]))
@@ -157,9 +166,12 @@ typedef	struct	SMode	Mode;
 #define	FLAGS_GOTID	0x20000	/* successful ident lookup achieved */
 #define	FLAGS_DOID	0x40000	/* I-lines say must use ident return */
 #define	FLAGS_NONL	0x80000 /* No \n in buffer */
+#define FLAGS_FMODE	0x100000 /* +f usermode */
+#define FLAGS_CMODE	0x200000 /* +c usermode */
+#define FLAGS_KMODE	0x400000 /* +k usermode */
 
 #define	SEND_UMODES	(FLAGS_INVISIBLE|FLAGS_OPER|FLAGS_WALLOP)
-#define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE)
+#define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE)
 #define	FLAGS_ID	(FLAGS_DOID|FLAGS_GOTID)
 
 /*
@@ -169,6 +181,9 @@ typedef	struct	SMode	Mode;
 #define	IsLocOp(x)		((x)->flags & FLAGS_LOCOP)
 #define	IsInvisible(x)		((x)->flags & FLAGS_INVISIBLE)
 #define	IsAnOper(x)		((x)->flags & (FLAGS_OPER|FLAGS_LOCOP))
+#define IsFMode(x)		((x)->flags & FLAGS_FMODE)
+#define IsCMode(x)		((x)->flags & FLAGS_CMODE)
+#define IsKMode(x)		((x)->flags & FLAGS_KMODE)
 #define	IsPerson(x)		((x)->user && IsClient(x))
 #define	IsPrivileged(x)		(IsAnOper(x) || IsServer(x))
 #define	SendWallops(x)		((x)->flags & FLAGS_WALLOP)
@@ -217,6 +232,14 @@ typedef	struct	SMode	Mode;
 #define	DUMMY_TERM	0
 #define	CURSES_TERM	1
 #define	TERMCAP_TERM	2
+
+struct  CloneItem       {
+        char    hostname[HOSTLEN+1];
+        int     num;
+        long    last;
+        struct CloneItem *prev;
+        struct CloneItem *next;
+};
 
 struct	ConfItem	{
 	unsigned int	status;	/* If CONF_ILLEGAL, delete when no clients */
@@ -416,6 +439,13 @@ struct	SLink	{
 		aChannel *chptr;
 		aConfItem *aconf;
 		char	*cp;
+#ifdef BAN_INFO
+                struct {
+                  char *banstr;
+                  char who[NICKLEN+1];
+                  time_t when;
+                } ban;
+#endif
 	} value;
 	int	flags;
 };
@@ -427,6 +457,10 @@ struct Channel	{
 	int	hashv;		/* raw hash value */
 	Mode	mode;
 	char	topic[TOPICLEN+1];
+#ifdef TOPIC_INFO
+	char	topic_nick[NICKLEN+1];
+	time_t	topic_time; 
+#endif
 	int	users;
 	Link	*members;
 	Link	*invites;

@@ -94,7 +94,7 @@ time_t	clock;
 	if (minswest < 0)
 		minswest = -minswest;
 
-	(void)sprintf(buf, "%s %s %d 19%02d -- %02d:%02d %c%02d:%02d",
+	(void)irc_sprintf(buf, "%s %s %d 19%02d -- %02d:%02d %c%02d:%02d",
 		weekdays[lt->tm_wday], months[lt->tm_mon],lt->tm_mday,
 		lt->tm_year, lt->tm_hour, lt->tm_min,
 		plus, minswest/60, minswest%60);
@@ -203,16 +203,16 @@ int	showip;
 		if (IsUnixSocket(sptr))
 		    {
 			if (showip)
-				(void) sprintf(nbuf, "%s[%s]",
+				(void) irc_sprintf(nbuf, "%s[%s]",
 					sptr->name, sptr->sockhost);
 			else
-				(void) sprintf(nbuf, "%s[%s]",
+				(void) irc_sprintf(nbuf, "%s[%s]",
 					sptr->name, me.sockhost);
 		    }
 		else
 		    {
 			if (showip)
-				(void)sprintf(nbuf, "%s[%s@%s.%u]",
+				(void)irc_sprintf(nbuf, "%s[%s@%s.%u]",
 					sptr->name,
 					(!(sptr->flags & FLAGS_GOTID)) ? "" :
 					sptr->username,
@@ -221,8 +221,19 @@ int	showip;
 			else
 			    {
 				if (mycmp(sptr->name, sptr->sockhost))
-					(void)sprintf(nbuf, "%s[%s]",
-						sptr->name, sptr->sockhost);
+#ifdef USERNAMES_IN_TRACE
+					(void)irc_sprintf(nbuf, "%s[%s%s%s]",
+						sptr->name,
+					sptr->user && *(sptr->user->username) ?
+					sptr->user->username : "",
+					sptr->user && *(sptr->user->username) ?
+						"@" : "",
+							sptr->sockhost);
+#else
+					(void)irc_sprintf(nbuf, "%s[%s]",
+						sptr->name,
+						sptr->sockhost);
+#endif
 				else
 					return sptr->name;
 			    }
@@ -242,9 +253,9 @@ aClient	*cptr;
 	if (!cptr->hostp)
 		return get_client_name(cptr, FALSE);
 	if (IsUnixSocket(cptr))
-		(void) sprintf(nbuf, "%s[%s]", cptr->name, me.name);
+		(void) irc_sprintf(nbuf, "%s[%s]", cptr->name, me.name);
 	else
-		(void)sprintf(nbuf, "%s[%-.*s@%-.*s]",
+		(void)irc_sprintf(nbuf, "%s[%-.*s@%-.*s]",
 			cptr->name, USERLEN,
 			(!(cptr->flags & FLAGS_GOTID)) ? "" : cptr->username,
 			HOSTLEN, cptr->hostp->h_name);
@@ -338,6 +349,12 @@ char	*comment;	/* Reason for the exit */
 	if (MyConnect(sptr))
 	    {
 		sptr->flags |= FLAGS_CLOSING;
+#ifdef CLIENT_NOTICES
+                if (IsPerson(sptr))
+                	sendto_flagops(2, "Client exiting: %s [%s@%s]",
+				sptr->name, sptr->user->username,
+				sptr->user->host);
+#endif
 #ifdef FNAME_USERLOG
 		on_for = time(NULL) - sptr->firsttime;
 # if defined(USE_SYSLOG) && defined(SYSLOG_USERS)
@@ -360,24 +377,19 @@ char	*comment;	/* Reason for the exit */
 		 * stop NFS hangs...most systems should be able to open a
 		 * file in 3 seconds. -avalon (curtesy of wumpus)
 		 */
-		(void)alarm(3);
 		if (IsPerson(sptr) &&
 		    (logfile = open(FNAME_USERLOG, O_WRONLY|O_APPEND)) != -1)
 		    {
-			(void)alarm(0);
-			(void)sprintf(linebuf,
+			(void)irc_sprintf(linebuf,
 				"%s (%3d:%02d:%02d): %s@%s [%s]\n",
 				myctime(sptr->firsttime),
 				on_for / 3600, (on_for % 3600)/60,
 				on_for % 60,
 				sptr->user->username, sptr->user->host,
 				sptr->username);
-			(void)alarm(3);
 			(void)write(logfile, linebuf, strlen(linebuf));
-			(void)alarm(0);
 			(void)close(logfile);
 		    }
-		(void)alarm(0);
 		/* Modification by stealth@caen.engin.umich.edu */
 	    }
 # endif
