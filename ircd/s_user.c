@@ -396,7 +396,7 @@ char	*nick, *username;
 		else
 			strncpyzt(user->host, sptr->sockhost, HOSTLEN+1);
 		aconf = sptr->confs->value.aconf;
-		if (sptr->flags & FLAGS_DOID && !(sptr->flags & FLAGS_GOTID))
+		if ((sptr->flags & FLAGS_DOID) && !(sptr->flags & FLAGS_GOTID))
 		    {
 			char    temp[USERLEN+1];
 
@@ -1360,6 +1360,7 @@ char	*parv[];
 
 		found = 0;
 		(void)collapse(nick);
+/*
 #ifdef DOG3
 		if (wilds = (index(nick, '?') || index(nick, '*')))
 			if (lifesux && !IsAnOper(sptr))
@@ -1368,11 +1369,15 @@ char	*parv[];
 				return 0;
 			}
 #else
+*/
 		wilds = (index(nick, '?') || index(nick, '*'));
+/*
 #endif
+*/
 		/* No longer sending replies to remote clients
                    when wildcards are given */
-		if (!MyConnect(sptr) && wilds)
+		/* Or local ones...something is broked! */
+		if (wilds)
 			continue;
 		for (acptr = client; (acptr = next_client(acptr, nick));
 		     acptr = acptr->next)

@@ -50,6 +50,7 @@ int dog3loadcfreq = DEFAULT_LOADCFREQ;
 int dog3loadrecv = DEFAULT_LOADRECV;
 
 time_t check_fdlists();
+void send_high_sendq();
 
 #endif /* DOG3 */
 
@@ -855,6 +856,11 @@ done_check:
 		if (lifesux)
 			(void)read_message(1,&serv_fdlist);
 				/* read servs more often */
+#ifdef DOG3
+		/* screw it...send what you can to high sendq'd
+			servers - CS */
+		send_high_sendq(&serv_fdlist);
+#endif
 {
 		static time_t lasttime=0;
 		if ((lasttime + (lifesux +1) * 2)< (now = time(NULL)))
@@ -1013,6 +1019,24 @@ static	void	setup_signals()
 }
 
 #ifdef DOG3
+
+void send_high_sendq(listp)
+fdlist *listp;
+{
+	int i, j;
+	aClient *cptr;
+
+	for (i=listp->entry[j=1];j<=listp->last_entry;
+		i=listp->entry[++j])
+	{
+                if (!(cptr = local[i]) || IsMe(cptr) || IsConnecting(cptr))
+                        continue;
+		if (DBufLength(&cptr->sendQ) > 10240)
+			send_queued(cptr);
+	}
+} 
+
+
 time_t check_fdlists(now)
 time_t now;
 {

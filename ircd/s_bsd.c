@@ -76,6 +76,10 @@ Computing Center and Jarkko Oikarinen";
 #define IN_LOOPBACKNET	0x7f
 #endif
 
+#if defined(MAXBUFFERS) && !defined(SEQUENT)
+int rcvbufmax = 0, sndbufmax = 0;
+#endif
+
 aClient	*local[MAXCONNECTIONS];
 int	highest_fd = 0, readcalls = 0, udpfd = -1, resfd = -1;
 static	struct	sockaddr_in	mysk;
@@ -90,7 +94,20 @@ static	struct	sockaddr *connect_unix PROTO((aConfItem *, aClient *, int *));
 static	void	add_unixconnection PROTO((aClient *, int));
 static	char	unixpath[256];
 #endif
-static	char	readbuf[8192];
+
+#if defined(MAXBUFFERS) && !defined(SEQUENT)
+static	char	*readbuf;
+#else
+
+#ifdef SEQUENT
+# ifdef READBUFSIZE
+#  undef READBUFSIZE
+# endif
+#define READBUFSIZE 8192
+#endif
+
+static	char	readbuf[READBUFSIZE];
+#endif
 
 /*
  * Try and find the correct name to use with getrlimit() for setting the max.
@@ -1094,7 +1111,23 @@ aClient	*cptr;
 		report_error("setsockopt(SO_USELOOPBACK) %s:%s", cptr);
 #endif
 #ifdef	SO_RCVBUF
-	opt = 8192;
+#ifdef MAXBUFFERS
+	if (rcvbufmax==0) {
+		int optlen;
+		optlen = sizeof(rcvbufmax);
+		getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char *) &rcvbufmax,
+			&optlen);
+		while((rcvbufmax < 65535) && (setsockopt(fd, SOL_SOCKET, SO_RCVBUF,
+			(char *) &rcvbufmax, optlen) >= 0))
+			rcvbufmax++;
+		getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (char *) &rcvbufmax,
+			&optlen);
+		readbuf = (char *)MyMalloc(rcvbufmax * sizeof(char));
+	}
+	opt = rcvbufmax;
+#else
+	opt = READBUFSIZE;
+#endif
 	if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &opt, sizeof(opt)) < 0)
 		report_error("setsockopt(SO_RCVBUF) %s:%s", cptr);
 #endif
@@ -1105,16 +1138,36 @@ aClient	*cptr;
  */
 	opt = 8192;
 # else
-	opt = 8192;
+#ifdef MAXBUFFERS
+	if (sndbufmax==0) {
+		int optlen;
+		optlen = sizeof(sndbufmax);
+		getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (char *) &sndbufmax,
+			&optlen);
+		while((sndbufmax < 65535) && (setsockopt(fd, SOL_SOCKET, SO_SNDBUF,
+			(char *) &sndbufmax, optlen) >= 0)) sndbufmax++;
+		getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (char *) &sndbufmax,
+			&optlen);
+	}
+	opt = sndbufmax;
+#else
+	opt = READBUFSIZE;
+#endif
 # endif
 	if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &opt, sizeof(opt)) < 0)
 		report_error("setsockopt(SO_SNDBUF) %s:%s", cptr);
 #endif
 #if defined(IP_OPTIONS) && defined(IPPROTO_IP)
 	{
-	char	*s = readbuf, *t = readbuf + sizeof(readbuf) / 2;
+	char	*s = readbuf, *t;
 
+#ifndef MAXBUFFERS
+	t = readbuf + sizeof(readbuf) / 2;
 	opt = sizeof(readbuf) / 8;
+#else
+	t = readbuf + (rcvbufmax*sizeof(char))/2;
+	opt = (rcvbufmax*sizeof(char))/8;
+#endif
 	if (getsockopt(fd, IPPROTO_IP, IP_OPTIONS, t, &opt) < 0)
 		report_error("getsockopt(IP_OPTIONS) %s:%s", cptr);
 	else if (opt > 0)
@@ -1340,7 +1393,11 @@ fd_set	*rfd;
 	    !(IsPerson(cptr) && DBufLength(&cptr->recvQ) > 6090))
 	    {
 		errno = 0;
+#ifndef MAXBUFFERS
 		length = recv(cptr->fd, readbuf, sizeof(readbuf), 0);
+#else
+		length = recv(cptr->fd, readbuf, rcvbufmax*sizeof(char), 0);
+#endif
 
 #ifdef OPER_CAN_FLOOD1
 	if (!IsAnOper(cptr))
@@ -1413,7 +1470,11 @@ fd_set	*rfd;
 			if (IsService(cptr) || IsServer(cptr))
 			    {
 				dolen = dbuf_get(&cptr->recvQ, readbuf,
+#ifndef MAXBUFFERS
 						 sizeof(readbuf));
+#else
+						rcvbufmax*sizeof(char));
+#endif
 				if (dolen <= 0)
 					break;
 				if ((done = dopacket(cptr, readbuf, dolen)))
@@ -1421,7 +1482,11 @@ fd_set	*rfd;
 				break;
 			    }
 			dolen = dbuf_getmsg(&cptr->recvQ, readbuf,
+#ifndef MAXBUFFERS
 					    sizeof(readbuf));
+#else
+					rcvbufmax*sizeof(char));
+#endif
 			/*
 			** Devious looking...whats it do ? well..if a client
 			** sends a *long* message without any CR or LF, then
@@ -2309,7 +2374,11 @@ static	void	polludp()
 	 */
 	if (!mlen)
 	    {
+#ifndef MAXBUFFERS
 		mlen = sizeof(readbuf) - strlen(me.name) - strlen(PATCHLEVEL);
+#else
+		mlen = rcvbufmax*sizeof(char) - strlen(me.name) - strlen(PATCHLEVEL);
+#endif
 		mlen -= 6;
 		if (mlen < 0)
 			mlen = 0;

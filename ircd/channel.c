@@ -367,9 +367,10 @@ aChannel *chptr;
 	sub1_from_channel(chptr);
 }
 
-static	int	change_chan_flag(lp, chptr)
+static	int	change_chan_flag(lp, chptr, mine)
 Link	*lp;
 aChannel *chptr;
+int mine;
 {
 	Reg1	Link *tmp;
 
@@ -377,7 +378,7 @@ aChannel *chptr;
                 if (lp->flags & MODE_ADD)
                 {
 #ifdef NO_RED_MODES
-                        if (tmp->flags & (lp->flags & MODE_FLAGS))
+                        if (mine && tmp->flags & (lp->flags & MODE_FLAGS))
                                 return 0;
 #endif
                         tmp->flags |= lp->flags & MODE_FLAGS;
@@ -385,7 +386,7 @@ aChannel *chptr;
                 else
                 {
 #ifdef NO_RED_MODES
-                        if (!(tmp->flags & (lp->flags & MODE_FLAGS)))
+                        if (mine && !(tmp->flags & (lp->flags & MODE_FLAGS)))
                                 return 0;
 #endif
                         tmp->flags &= ~lp->flags & MODE_FLAGS;
@@ -1073,7 +1074,8 @@ char	*parv[], *mbuf, *pbuf;
 			case MODE_CHANOP :
 			case MODE_VOICE :
                                 /* pass fakes along? nawww */
-                                if (ischop && change_chan_flag(lp, chptr))
+                                if (ischop && change_chan_flag(lp, chptr,
+					MyClient(sptr)))
                                 {
                                         *mbuf++ = c;
                                         (void)strcat(pbuf, cp);
@@ -1974,9 +1976,15 @@ char	*parv[];
 			if (IsInvisible(c2ptr) && !IsMember(sptr,chptr))
 				continue;
 		        if (lp->flags & CHFL_CHANOP)
+			{
+				idx++;
 				(void)strcat(buf, "@");
+			}
 			else if (lp->flags & CHFL_VOICE)
+			{
 				(void)strcat(buf, "+");
+				idx++;
+			}
 			(void)strncat(buf, c2ptr->name, NICKLEN);
 			idx += strlen(c2ptr->name) + 1;
 			flag = 1;

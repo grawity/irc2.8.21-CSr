@@ -1,6 +1,20 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/* MAXBUFFERS       - make send/receive socket buffers the maximum
+                      size they can be...#undef this if you notice
+                      your ircd using way too much mem...
+*/
+
+#define MAXBUFFERS
+
+#ifndef MAXBUFFERS
+
+/* This is the buffer size to use if MAXBUFFER isn't used: */
+
+#define READBUFSIZE 32767
+#endif
+
 /* DOG3             - define this if you want to use 'leet
                       dog3 super stuff
 */
@@ -178,7 +192,7 @@
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr13/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr14/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -262,7 +276,7 @@
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr13/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr14/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

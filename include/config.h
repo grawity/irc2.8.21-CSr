@@ -107,8 +107,8 @@
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/home/irc/irc2.8.21+CSr13/lib"	/* dir where all ircd stuff is */
-#define	SPATH	"/home/irc/irc2.8.21+CSr13/lib/ircd"
+#define	DPATH	"/home/irc/irc2.8.21+CSr14/lib"	/* dir where all ircd stuff is */
+#define	SPATH	"/home/irc/irc2.8.21+CSr14/lib/ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
 #define	LPATH	"ircd.log" /* Where the debug file lives, if DEBUGMODE */
@@ -122,8 +122,8 @@
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
 
-#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr13/logs/users.log" /* */
-#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr13/logs/opers.log" /* */
+#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr14/logs/users.log" /* */
+#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr14/logs/opers.log" /* */
 
 /* CHROOTDIR
  *
@@ -404,7 +404,7 @@
  * 1 server = 1 connection, 1 user = 1 connection.
  * This should be at *least* 3: 1 listen port, 1 dns port + 1 client
  */
-#define MAXCONNECTIONS	35
+#define MAXCONNECTIONS	255
 
 /*
  * this defines the length of the nickname history.  each time a user changes
