@@ -55,7 +55,7 @@ static	int	set_mode PROTO((aClient *, aClient *, aChannel *, int,\
 			        char **, char *,char *));
 static	void	sub1_from_channel PROTO((aChannel *));
 
-void	clean_channelname PROTO((char *));
+static void	clean_channelname PROTO((unsigned char *));
 void	del_invite PROTO((aClient *, aChannel *));
 
 #ifdef ORATIMING
@@ -731,7 +731,13 @@ char	*parv[];
  	 	return 0;
 	    }
 
+#if 0
+	/*
+	   causes parv[1] to be truncated for a remote mode, etc.
+        bad.
+	*/
 	clean_channelname(parv[1]);
+#endif
 	if (check_channelmask(sptr, cptr, parv[1]))
 		return 0;
 
@@ -1329,15 +1335,17 @@ char	*key;
 ** Remove bells and commas from channel name
 */
 
-void	clean_channelname(cn)
-Reg1	char *cn;
+static void	clean_channelname(unsigned char *cn)
 {
-	for (; *cn; cn++)
-		if (*cn == '\007' || *cn == ' ' || *cn == ',')
-		    {
+	for (;*cn;cn++)
+	{
+		if ((*cn == '\007') || (*cn == ' ') || 
+					(*cn == ',') || ((*cn > 127) && (*cn <= 160)))
+		{
 			*cn = '\0';
 			return;
-		    }
+		}
+	}
 }
 
 /*
@@ -1549,7 +1557,8 @@ char	*parv[];
 	for (i = 0, name = strtoken(&p, parv[1], ","); name;
 	     name = strtoken(&p, NULL, ","))
 	{
-		clean_channelname(name);
+		if (!IsServer(cptr))		/* has to be true for TS servers */
+			clean_channelname(name);
 		if (check_channelmask(sptr, cptr, name)==-1)
 			continue;
 		if (*name == '&' && !MyConnect(sptr))
@@ -2028,7 +2037,8 @@ char	*parv[];
 			   me.name, parv[0], parv[1]);
 		return 0;
 	    }
-	clean_channelname(parv[2]);
+	if (!IsServer(cptr))
+		clean_channelname(parv[2]);
 	if (check_channelmask(sptr, cptr, parv[2]))
 		return 0;
 	if (!(chptr = find_channel(parv[2], NullChn)))
@@ -2192,7 +2202,8 @@ char	*parv[];
 			parv[1] = ++s;
 			(void)m_names(cptr, sptr, parc, parv);
 		    }
-		clean_channelname(para);
+		if (!IsServer(cptr))
+			clean_channelname(para);
 		ch2ptr = find_channel(para, (aChannel *)NULL);
 	}
 

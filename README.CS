@@ -14,6 +14,12 @@ The newest versions of +CS ircds can be found at:
 NOTE: Please change values in comstud.h to your liking...
       The default values are probably less than ideal for you! 
 
+
+New in CSr31pl3:
+
+1) match hybrid for chars disallowed in channel name for /join.
+
+
 New in CSr31pl2:
 
 1) Added FLOOD_WAIT and FLOOD_MAX #defines to comstud.h to rate limit

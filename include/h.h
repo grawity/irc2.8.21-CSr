@@ -144,7 +144,6 @@ extern	aChannel *find_channel PROTO((char *, aChannel *));
 extern	void	remove_user_from_channel PROTO((aClient *, aChannel *));
 extern	void	del_invite PROTO((aClient *, aChannel *));
 extern	void	send_user_joins PROTO((aClient *, aClient *));
-extern	void	clean_channelname PROTO((char *));
 extern	int	can_send PROTO((aClient *, aChannel *));
 extern	int	is_chan_op PROTO((aClient *, aChannel *));
 extern	int	has_voice PROTO((aClient *, aChannel *));
