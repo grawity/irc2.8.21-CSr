@@ -347,6 +347,12 @@ char	*comment;	/* Reason for the exit */
 
 	if (MyConnect(sptr))
 	    {
+		if (IsClient(sptr))
+			m_clients--;
+		if (IsInvisible(sptr))
+			m_invis--;
+		if (IsServer(sptr))
+			m_servers--;
 #ifdef DOG3
 		if(IsServer(sptr))
 			delfrom_fdlist(sptr->fd,&serv_fdlist);

@@ -962,13 +962,25 @@ va_dcl
 #ifdef  USE_VARARGS
         va_start(vl);
 #endif
+#ifndef FK_USERMODES
+	if ((flag == 3) || (flag == 4) || (flag == 6))
+	{
+#ifndef USE_VARARGS
+		sendto_ops(pattern, p1, p2, p3, p4, p5, p6, p7, p8);
+#else
+		sendto_ops(pattern, va_alist);
+#endif /* USE_VARARGS */
+		return;
+	}
+#endif /* FK_USERMODES */
         for (i = 0; i <= highest_fd; i++)
                 if ((cptr = local[i]) && !IsServer(cptr) && !IsMe(cptr) &&
 			(((flag == 1) && IsAnOper(cptr)) ||
 			 ((flag == 2) && IsAnOper(cptr) && IsCMode(cptr)) ||
 			((flag == 3) && IsKMode(cptr)) ||
 			((flag == 4) && IsFMode(cptr)) ||
-			((flag == 5) && IsRMode(cptr))))
+			((flag == 5) && IsRMode(cptr)) ||
+			((flag == 6) && IsUMode(cptr))))
                     {
                         (void)irc_sprintf(nbuf, ":%s NOTICE %s :*** Notice -- ",
                                         me.name, cptr->name);

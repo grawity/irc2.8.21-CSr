@@ -49,9 +49,7 @@ typedef struct dbuf
 	u_int	length;	/* Current number of bytes stored */
 	u_int	offset;	/* Offset to the first byte */
 	struct	dbufbuf *head;	/* First data buffer, if length > 0 */
-#ifdef DBUF_TAIL
         struct  dbufbuf *tail; /* last data buffer, if length > 0 */
-#endif 
     } dbuf;
 #else
 typedef struct dbuf
@@ -59,9 +57,7 @@ typedef struct dbuf
         uint   length; /* Current number of bytes stored */
         uint   offset; /* Offset to the first byte */
         struct  dbufbuf *head;  /* First data buffer, if length > 0 */
-#ifdef DBUF_TAIL
         struct  dbufbuf *tail; /* last data buffer, if length > 0 */
-#endif
     } dbuf;
 #endif
 /*

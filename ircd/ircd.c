@@ -35,17 +35,12 @@ Computing Center and Jarkko Oikarinen";
 #include <signal.h>
 #include <fcntl.h>
 #include "h.h"
-
-#if defined(USE_DICH_CONF) || defined(B_LINES) || defined(E_LINES)
 #include "dich_conf.h"
-#endif
 
-#ifdef USE_DICH_CONF
 /* Lists to do K: line matching -Sol */
 aConfList       KList1 = { 0, NULL };   /* ordered */
 aConfList       KList2 = { 0, NULL };   /* ordered, reversed */
 aConfList       KList3 = { 0, NULL };   /* what we can't sort */
-#endif /* USE_DICH_CONF */
 
 #ifdef B_LINES
 /* Lists to do B: line matching -Sol */
@@ -59,6 +54,15 @@ aConfList       EList1 = { 0, NULL };   /* ordered */
 aConfList       EList2 = { 0, NULL };   /* ordered, reversed */
 aConfList       EList3 = { 0, NULL };   /* what we can't sort */
 #endif /* E_LINES */
+
+int	s_count = 1;    /* All servers */
+int	c_count = 0;    /* All clients */
+int	ch_count = 0;   /* All channels */
+int	i_count = 0;    /* All invisible users */
+int	o_count = 0;    /* All operators */
+int	m_clients = 0;  /* My clients */
+int	m_servers = 0;  /* My servers */
+int	m_invis = 0;    /* My invisible users */
 
 #ifdef DOG3
 
@@ -302,6 +306,9 @@ time_t	currenttime;
 	return (next);
 }
 
+/* These can be removed when we know static lusers works */
+extern int s_ct, c_ct, i_ct, o_ct, m_cs, m_ss, m_is; 
+
 static	time_t	check_pings(currenttime)
 time_t	currenttime;
 {
@@ -313,10 +320,44 @@ time_t	currenttime;
 
 	if (rehashed || (currenttime-lastcheck > KLINE_CHECK))
 	{
+		int ch_ct;
+
 		lastcheck = currenttime;
 		checkit = 1;
 		rehashed = 0;
-	}	
+/* Can be removed when we know static lusers works */
+		compute_lusers(NULL);
+		ch_ct = count_channels();
+		if (ch_ct != ch_count)
+			sendto_ops("Channel count updated, was off by %i",
+				ch_count-ch_ct);
+		if (s_ct != s_count)
+			sendto_ops("Server count updated, was off by %i",
+				s_count-s_ct);
+		if (c_ct != c_count)
+			sendto_ops("Client count updated, was off by %i",
+				c_count-c_ct);
+		if (i_ct != i_count)
+			sendto_ops("Invis count updated, was off by %i",
+				i_count-i_ct);
+		if (o_ct != o_ct)
+			sendto_ops("Oper count updated, was off by %i",
+				o_count-o_ct);
+		if (m_cs != m_clients)
+			sendto_ops("My clients updated, was off by %i",
+				m_clients-m_cs);
+		if (m_ss != m_servers)
+			sendto_ops("My servers updated, was off by %i",
+				m_servers-m_ss);
+		ch_count = ch_ct;
+		s_count = s_ct;
+		c_count = c_ct;
+		i_count = i_ct;
+		o_count = o_ct;
+		m_clients = m_cs;
+		m_servers = m_ss;
+		m_invis = m_is;
+	}
 	for (i = 0; i <= highest_fd; i++)
 	    {
 		if (!(cptr = local[i]) || IsMe(cptr) || IsLog(cptr))

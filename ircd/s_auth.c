@@ -88,7 +88,12 @@ Reg1	aClient	*cptr;
 	sock.sin_family = AF_INET;
 
 	if (connect(cptr->authfd, (struct sockaddr *)&sock,
+#ifdef DGUX
+                    sizeof(sock)) == -1 && (errno != EINPROGRESS) && 
+			(errno != EAGAIN))
+#else
 		    sizeof(sock)) == -1 && errno != EINPROGRESS)
+#endif
 	    {
 		ircstp->is_abad++;
 		/*

@@ -41,9 +41,7 @@ Computing Center and Jarkko Oikarinen";
 #include <utmp.h>
 #include "h.h"
 
-#if defined(USE_DICH_CONF) || defined(B_LINES) || defined(E_LINES)
 #include "dich_conf.h"
-#endif
 
 #ifdef DOG3
 extern time_t check_fdlists();
@@ -54,6 +52,76 @@ static	char	buf[BUFSIZE];
 #ifdef HIGHEST_CONNECTION
 int     max_connection_count = 1, max_client_count = 1;
 #endif
+
+#ifdef HIGHEST_CONNECTION
+void
+check_max_count()
+{
+      if (m_clients > max_client_count)
+              max_client_count = m_clients;
+      if ((m_clients + m_servers) > max_connection_count)
+      {
+              max_connection_count = m_clients + m_servers;
+              if (max_connection_count % 10 == 0)
+                      sendto_flagops(1,
+                              "New highest connections: %d (%d clients)",
+                              max_connection_count, max_client_count);
+      }
+}
+#endif /* HIGHEST_CONNECTION */
+
+/* These can be static once we take check out of ircd.c */
+int s_ct, c_ct, u_ct, i_ct;
+int o_ct, m_cs, m_is, m_ss;
+
+void
+compute_lusers(mask)
+char *mask;
+{
+	aClient *acptr;
+
+	c_ct = i_ct = s_ct = o_ct = 0;
+	m_cs = m_is = m_ss = u_ct = 0;
+
+	for (acptr = client; acptr; acptr = acptr->next)
+	{
+		if (mask)
+		{
+			if (!IsServer(acptr) && acptr->user)
+			{
+				if (match(mask, acptr->user->server))
+					continue;
+			}
+			else if (match(mask, acptr->name))
+				continue;
+		}
+		switch (acptr->status)
+		{
+		case STAT_SERVER:
+			if (MyConnect(acptr))
+				m_ss++;
+		case STAT_ME:
+			s_ct++;
+			break;
+		case STAT_CLIENT:
+			c_ct++;
+			if (MyConnect(acptr))
+				m_cs++;
+			if (IsOper(acptr))
+				o_ct++;
+			if (IsInvisible(acptr))
+			{
+				i_ct++;
+				if (MyConnect(acptr))
+					m_is++;
+			}
+			break;
+		default:
+			u_ct++;
+			break;
+		}
+	}
+}
 
 extern 	ts_val	timedelta;
 
@@ -135,7 +203,7 @@ char    *parv[];
 		return 0;
 	}
 	temp = atoi(parv[1]);
-	if (temp && (temp <= 0))
+	if (temp <= 0)
 	{
 		sendto_one(sptr, ":%s NOTICE %s :Hello???  Try a number > 0.",
 			me.name, parv[0]);
@@ -168,7 +236,7 @@ char    *parv[];
                 return 0;
         }
         temp = atoi(parv[1]);
-        if (temp && (temp < 0))
+        if (temp < 0)
         {
                 sendto_one(sptr, ":%s NOTICE %s :Hello???  Try a number >= 0.",
                         me.name, parv[0]);
@@ -558,6 +626,7 @@ char	*parv[];
 		strncpyzt(acptr->info, info, sizeof(acptr->info));
 		strncpyzt(acptr->serv->up, parv[0], sizeof(acptr->serv->up));
 		SetServer(acptr);
+		s_count++;
 		add_client_to_list(acptr);
 		(void)add_to_client_hash_table(acptr->name, acptr);
 		/*
@@ -657,7 +726,9 @@ Reg1	aClient	*cptr;
 	inpath = get_client_name(cptr,TRUE); /* "refresh" inpath with host */
 	split = mycmp(cptr->name, cptr->sockhost);
 	host = cptr->name;
-
+#ifdef HIGHEST_CONNECTION
+	check_max_count();
+#endif
 	if (!(aconf = find_conf(cptr->confs, host, CONF_NOCONNECT_SERVER)))
 	    {
 		ircstp->is_ref++;
@@ -763,6 +834,8 @@ Reg1	aClient	*cptr;
 	**	code is more neat this way...  --msa
 	*/
 	SetServer(cptr);
+	m_servers++;
+	s_count++;
 #ifdef DOG3
 	/* adds to fdlist */
 	addto_fdlist(cptr->fd,&serv_fdlist);
@@ -1297,13 +1370,9 @@ char	*parv[];
 		report_configured_links(sptr, CONF_CLIENT);
 		break;
 	case 'K' : case 'k' :
-#ifdef USE_DICH_CONF
 		report_conf_links(sptr, &KList1, RPL_STATSKLINE, 'K');
                 report_conf_links(sptr, &KList2, RPL_STATSKLINE, 'K');
                 report_conf_links(sptr, &KList3, RPL_STATSKLINE, 'K');
-#else
-		report_configured_links(sptr, CONF_KILL);
-#endif
 		break;
 	case 'M' : case 'm' :
 		for (mptr = msgtab; mptr->cmd; mptr++)
@@ -1473,8 +1542,6 @@ aClient *cptr, *sptr;
 int	parc;
 char	*parv[];
     {
-	int	s_count = 0, c_count = 0, u_count = 0, i_count = 0;
-	int	o_count = 0, m_client = 0, m_server = 0;
 	aClient *acptr;
 
 	if (check_registered_user(sptr))
@@ -1484,108 +1551,51 @@ char	*parv[];
 		if(hunt_server(cptr, sptr, ":%s LUSERS %s :%s", 2, parc, parv)
 				!= HUNTED_ISME)
 			return 0;
-#if defined(DOG3) && defined(RESTRICT)
-	/* this is to reduce load while connecting */
-	if (lifesux && !IsAnOper(sptr))
+	if (parc > 1)
 	{
-		sendto_one(sptr,rpl_str(RPL_LOAD2HI),me.name,parv[0]);
-		return 0;
+		(void)collapse(parv[1]);
+		compute_lusers(parv[1]);
 	}
-#endif
-
-	(void)collapse(parv[1]);
-	for (acptr = client; acptr; acptr = acptr->next)
-	    {
-		if (parc>1)
-			if (!IsServer(acptr) && acptr->user)
-			    {
-				if (match(parv[1], acptr->user->server))
-					continue;
-			    }
-			else
-	      			if (match(parv[1], acptr->name))
-					continue;
-
-		switch (acptr->status)
-		{
-		case STAT_SERVER:
-			if (MyConnect(acptr))
-				m_server++;
-		case STAT_ME:
-			s_count++;
-			break;
-		case STAT_CLIENT:
-			if (IsOper(acptr))
-	        		o_count++;
-#ifdef	SHOW_INVISIBLE_LUSERS
-			if (MyConnect(acptr))
-		  		m_client++;
-			if (!IsInvisible(acptr))
-				c_count++;
-			else
-				i_count++;
-#else
-			if (MyConnect(acptr))
-			    {
-				if (IsInvisible(acptr))
-				    {
-					if (IsAnOper(sptr))
-						m_client++;
-				    }
-				else
-					m_client++;
-			    }
-	 		if (!IsInvisible(acptr))
-				c_count++;
-			else
-				i_count++;
-#endif
-			break;
-		default:
-			u_count++;
-			break;
-	 	}
-	     }
+	else
+	{
+		s_ct = s_count;
+		c_ct = c_count;
+		i_ct = i_count;
+		o_ct = o_count;
+		m_cs = m_clients;
+		m_ss = m_servers;
+		u_ct = 0;
+	}
+		
 #ifndef	SHOW_INVISIBLE_LUSERS
-	if (IsAnOper(sptr) && i_count)
+	if (IsAnOper(sptr) && i_ct)
 #endif
 	sendto_one(sptr, rpl_str(RPL_LUSERCLIENT), me.name, parv[0],
-		   c_count, i_count, s_count);
+		   c_ct-i_ct, i_ct, s_ct);
 #ifndef	SHOW_INVISIBLE_LUSERS
 	else
 		sendto_one(sptr,
 			":%s %d %s :There are %d users on %d servers", me.name,
-			    RPL_LUSERCLIENT, parv[0], c_count, s_count);
+			    RPL_LUSERCLIENT, parv[0], c_ct-i_ct, s_ct);
 #endif
-	if (o_count)
+	if (o_ct)
 		sendto_one(sptr, rpl_str(RPL_LUSEROP),
-			   me.name, parv[0], o_count);
-	if (u_count > 0)
+			   me.name, parv[0], o_ct);
+	if (u_ct > 0)
 		sendto_one(sptr, rpl_str(RPL_LUSERUNKNOWN),
-			   me.name, parv[0], u_count);
-	if ((c_count = count_channels(sptr))>0)
+			   me.name, parv[0], u_ct);
+	if (ch_count > 0)
 		sendto_one(sptr, rpl_str(RPL_LUSERCHANNELS),
-			   me.name, parv[0], count_channels(sptr));
+			   me.name, parv[0], ch_count);
 	sendto_one(sptr, rpl_str(RPL_LUSERME),
-		   me.name, parv[0], m_client, m_server);
+		   me.name, parv[0], m_cs, m_ss);
 #ifdef HIGHEST_CONNECTION
 	sendto_one(sptr, rpl_str(RPL_STATSCONN), me.name, parv[0],
                           max_connection_count, max_client_count);
-	if (m_client > max_client_count)
-		max_client_count = m_client;
-	if ((m_client + m_server) > max_connection_count)
-	{
-		max_connection_count = m_client + m_server;
-		if (max_connection_count % 10 == 0)
-			sendto_flagops(1,
-				"New highest connections: %d (%d clients)",
-				max_connection_count, max_client_count);
-        }
-#endif  
+#endif
 	return 0;
-    }
-
-  
+}
+ 
 /***********************************************************************
  * m_connect() - Added by Jto 11 Feb 1989
  ***********************************************************************/
@@ -1986,7 +1996,6 @@ char    *parv[];
                         parv[0]);
                 return 0;
         }
-#ifdef USE_DICH_CONF
 	aconf = make_conf();
 	aconf->status = CONF_KILL;
 	DupString(aconf->host, host);
@@ -2014,10 +2023,10 @@ char    *parv[];
 		}
 		MyFree(host);
 	}
-	rehashed = 1;
-        sendto_ops("%s added K-Line for [%s@%s]", parv[0], user, host);
+	rehashed = 1; /* Forces looping thru clients to check k-lines */
+        sendto_flagops(1,"%s added K-Line for [%s@%s]: %s", parv[0], user, host,
+		parv[2] && *parv[2] ? parv[2] : "No reason");
         sendto_one(sptr, ":%s NOTICE %s :Added K-Line [%s@%s] to server configfile", me.name, parv[0], user, host);
-#endif /* USE_DICH_CONF */
         if ((out = open(configfile, O_WRONLY|O_APPEND))==-1)
         {
                 sendto_one(sptr, ":%s NOTICE %s :Problem opening server configfile", me.name, parv[0]);
@@ -2037,19 +2046,9 @@ char    *parv[];
 		(parv[2] && *parv[2]) ? "" : "",
 		(parv[2] && *parv[2]) ? parv[2] : "", user);
 	if (write(out, buffer, strlen(buffer)) <= 0)
-	{
 		sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);
-		close(out);
-		return 0;
-	}
         close(out);
-#ifdef USE_DICH_CONF
 	return 0;
-#else
-        sendto_ops("%s added K-Line for [%s@%s]", parv[0], user, host);
-        sendto_one(sptr, ":%s NOTICE %s :Added K-Line [%s@%s] to server configfile", me.name, parv[0], user, host);
-        return rehash(cptr, sptr, 0);
-#endif
 }
 
 #endif /* QUOTE_KLINE */

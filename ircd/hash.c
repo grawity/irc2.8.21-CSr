@@ -26,24 +26,21 @@ static char sccsid[] = "@(#)hash.c	2.10 7/3/93 (C) 1991 Darren Reed";
 #include "hash.h"
 #include "h.h"
 
-#ifdef DOUGH_HASH
 #define MAX_INITIAL  4096
 #define MAX_INITIAL_MASK (MAX_INITIAL-1)
+
+#define CH_MAX_INITIAL  1024
+#define CH_MAX_INITIAL_MASK (CH_MAX_INITIAL-1)
 
 #define BITS_PER_COL 3
 #define BITS_PER_COL_MASK 0x7
 #define MAX_SUB     (1<<BITS_PER_COL)
+
 #define MAX_NEW (MAX_INITIAL*MAX_SUB)
-#endif
+#define CH_MAX_NEW (CH_MAX_INITIAL*MAX_SUB)
 
-
-int CHANNELHASHSIZE = DEFAULT_CHANNELHASHSIZE;
-
-#ifdef DOUGH_HASH
 int     HASHSIZE = MAX_NEW;
-#else
-int     HASHSIZE = DEFAULT_HASHSIZE
-#endif
+int	CHANNELHASHSIZE = CH_MAX_NEW;
 
 #ifdef	DEBUGMODE
 
@@ -54,12 +51,8 @@ static	int	chhits, chmiss;
 
 #else
 
-#ifdef DOUGH_HASH
 static  aHashEntry      clientTable[MAX_NEW];
-#else
-static	aHashEntry	clientTable[DEFAULT_HASHSIZE];
-#endif
-static	aHashEntry	channelTable[DEFAULT_CHANNELHASHSIZE];
+static	aHashEntry	channelTable[CH_MAX_NEW];
 
 #endif
 
@@ -98,7 +91,6 @@ static	int	hash_mult[] = { 173, 179, 181, 191, 193, 197,
  * is moved to the top of the chain.
  */
 
-#ifdef DOUGH_HASH
 unsigned int hash_nick_name(nname)
 char *nname;
 {
@@ -119,32 +111,6 @@ char *nname;
 	return ret;
 }
 
-#else
-
-/*
- * hash_nick_name
- *
- * this function must be *quick*.  Thus there should be no multiplication
- * or division or modulus in the inner loop.  subtraction and other bit
- * operations allowed.
- */
-int	hash_nick_name(nname)
-char	*nname;
-{
-	Reg1	u_char	*name = (u_char *)nname;
-	Reg2	u_char	ch;
-	Reg4	int	hash = 1, *tab;
-
-	for (tab = hash_mult; (ch = *name); name++, tab++)
-		hash += tolower(ch) + *tab + hash;
-	if (hash < 0)
-		hash = -hash;
-	hash %= HASHSIZE;
-	return (hash);
-}
-
-#endif
-
 /*
  * hash_channel_name
  *
@@ -153,20 +119,24 @@ char	*nname;
  * is little or no point hashing on a full channel name which maybe 255 chars
  * long.
  */
-int	hash_channel_name(hname)
-char	*hname;
+unsigned int hash_channel_name(name)
+char *name;
 {
-	Reg1	u_char	*name = (u_char *)hname;
-	Reg2	u_char	ch;
-	Reg3	int	i = 30;
-	Reg4	int	hash = 5, *tab;
+        register char *hname = name;
+        register unsigned int hash = 0;
+        register int hash2 = 0;
+        register char lower;
+        register int i = 30;
 
-	for (tab = hash_mult; (ch = *name) && --i; name++, tab++)
-		hash += tolower(ch) + *tab + hash + i + i;
-	if (hash < 0)
-		hash = -hash;
-	hash %= CHANNELHASHSIZE;
-	return (hash);
+        while(*hname && --i)
+        {
+                lower = tolower(*hname);
+                hash = (hash << 1) + lower;
+                hash2 = (hash2 >> 1) + lower;
+                hname++;
+        }
+        return ((hash & CH_MAX_INITIAL_MASK) << BITS_PER_COL) +
+                (hash2 & BITS_PER_COL_MASK);
 }
 
 /*

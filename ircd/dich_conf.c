@@ -1,6 +1,6 @@
 /************************************************************************
  *   IRC - Internet Relay Chat, ircd/dich_conf.c
- *   Copyright (C) 1995 Philippe Levan
+ *   Copyright (C) 1995-1996 Philippe Levan
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -49,34 +49,39 @@
 #include "h.h"
 #include "dich_conf.h"
 
-#ifndef SYSV
+#if !defined(SYSV) && !defined(SOL20)
 #define memmove(x,y,N) bcopy(y,x,N)
 #endif
 
-void report_conf_links(sptr, List, numeric, c)
-aClient *sptr;
-aConfList *List;
-int	numeric;
-char	c;
+/*
+ * This function is used for /stats commands if you use dich_conf.
+ * Thank you to Chris Behrens for this addition -Sol
+ */
+void
+report_conf_links(sptr, List, numeric, c)
+aClient		*sptr;
+aConfList	*List;
+int		numeric;
+char		*c;
 {
-	register aConfItem *tmp;
-	register int current;
-	char *host, *pass, *name;
-	static	char	null[] = "<NULL>";
-	int port;
+	register aConfItem	*tmp;
+	register int		current;
+	char			*host, *pass, *name;
+	static char		null[] = "<NULL>";
+	int			port;
 
 	if (!List || !List->conf_list)
 		return;
 
 	for (current = 0; current < List->length; current++)
 	{
-		aConfEntry *ptr = &List->conf_list[current];
+		aConfEntry	*ptr = &List->conf_list[current];
 
-		for(;ptr;ptr=ptr->next)
+		for(; ptr; ptr = ptr->next)
 		{
 			if (ptr->sub)
 				report_conf_links(sptr, ptr->sub, numeric, c);
-			if (!(tmp=ptr->conf))
+			if (!(tmp = ptr->conf))
 				continue;
 			host = BadPtr(tmp->host) ? null : tmp->host;
 			pass = BadPtr(tmp->passwd) ? null : tmp->passwd;
@@ -87,18 +92,23 @@ char	c;
 					sptr->name, c, host, pass,
 					name, port, get_conf_class(tmp));
 			else
-				sendto_one(sptr, rpl_str(numeric), me.name,
+			        sendto_one(sptr, rpl_str(numeric), me.name,
 					sptr->name, c, host, name, port,
 					get_conf_class(tmp));
 		}
-	} 
+	}
 }
 
+/*
+ * The following function reverses string s2 into string s1 (space for
+ * s1 must have been pre-allocated.
+ * Thanks to Diane Bruce. -Sol
+ */
 void reverse(s1, s2)
 char *s1;
 char *s2;
 {
-	char *start_point;
+	char	*start_point;
 
 	start_point = s2;
 
@@ -133,19 +143,19 @@ char	*my_string;
 		return 0;	/* reject strings with '?' as non-sortable
 				   whoever uses '?' patterns anyway ? -Sol */
 
-	for (p=my_string;*p && (*p == '*');p++);
+	for (p = my_string; *p == '*'; p++);
 	if (!*p)
 		return 0;	/* only wildcards, not good -Sol */
 
-	for (;*p && *p != '*';p++);
+	for (; *p && *p != '*'; p++);
 	if (!*p)
 		return -1; /* string of the form *word : needs reversal -Sol */
 
 	rev = (char *) MyMalloc(strlen(my_string)+1);
 	reverse(rev, my_string);
 
-	for (p=rev;*p && (*p == '*');p++);
-	for (;*p && *p != '*';p++);
+	for (p = rev; *p == '*'; p++);
+	for (; *p && *p != '*'; p++);
 	if (!*p)
 	{
 		MyFree(rev);
@@ -221,6 +231,7 @@ aConfItem	*my_conf;
 	return tmp;
 }
 
+/*
 char		*
 rev_name_field(my_conf)
 aConfItem	*my_conf;
@@ -236,11 +247,11 @@ aConfItem	*my_conf;
 	else
 		ptr = my_conf->host;
 	tmp = (char *) MyMalloc(strlen(ptr)+1);
-	strcpy(tmp, ptr);
-	reverse(tmp);
+	reverse(tmp, ptr);
 
 	return tmp;
 }
+*/
 
 /*
  * In order not to realloc memory space each time we add an entry, we do it
@@ -260,7 +271,6 @@ aConfList	*my_list;
 		aConfEntry	*new;
 
 		new = (aConfEntry *) MyMalloc((length+100)*sizeof(aConfEntry));
-		memcpy(new, base, length*sizeof(aConfEntry));
 		if (base)
 		{
 			memcpy(new, base, length*sizeof(aConfEntry));
@@ -425,8 +435,9 @@ char		*(*cmp_field)();
  * As the name says : this clears a configuration list. -Sol
  */
 void
-clear_conf_list(my_list)
+clear_conf_list(my_list, clear_conf)
 aConfList	*my_list;
+int		clear_conf;
 {
 	if (!my_list)
 		return;
@@ -437,37 +448,34 @@ aConfList	*my_list;
 
 		/* Loop through all patterns to free conf-entries
 		   with the same pattern -Sol */
-                for (current = 0; current < my_list->length; current++)
-                {
-                        aConfEntry      *ptr = &my_list->conf_list[current];
+		for (current = 0; current < my_list->length; current++)
+		{
+			aConfEntry	*ptr = &my_list->conf_list[current];
 
-                        if (ptr->sub)
-                        {
-                                clear_conf_list(ptr->sub);
-                                MyFree(ptr->sub);
-                        }
-			if (ptr->conf)
+			if (ptr->sub)
+			{
+				clear_conf_list(ptr->sub, clear_conf);
+				MyFree(ptr->sub);
+			}
+			if (clear_conf && ptr->conf)
 				free_conf(ptr->conf);
-                        while (ptr->next)
-                        {
-                                aConfEntry      *tmp = ptr->next->next;
+			while (ptr->next)
+			{
+				aConfEntry	*tmp = ptr->next->next;
 
-                                if (ptr->next->pattern)
-                                        MyFree(ptr->next->pattern);
-				if (ptr->next->sub)
-				{
-					clear_conf_list(ptr->next->sub);
-					MyFree(ptr->next->sub);
-				}
-				if (ptr->next->conf)
+				if (ptr->next->pattern)
+					MyFree(ptr->next->pattern);
+				if (clear_conf && ptr->next->conf)
 					free_conf(ptr->next->conf);
-                               	MyFree(ptr->next);
-                                ptr->next = tmp;
-                        }
-                        if (ptr->pattern)
-                                MyFree(ptr->pattern);
-                }
-                MyFree(my_list->conf_list);
+				/* No need to check ptr->next->sub because
+				   a next never has a sub. -Sol */
+				MyFree(ptr->next);
+				ptr->next = tmp;
+			}
+			if (ptr->pattern)
+				MyFree(ptr->pattern);
+		}
+		MyFree(my_list->conf_list);
 	}
 
 	my_list->length = 0;
@@ -553,9 +561,10 @@ char		*tomatch;
 }
 
 /*
- * This simply adds a configuration line at the end of the list.
- * Of course, it makes no sense to use addto_conf_list() and
- * l_addto_conf_list() on the same list unless you want to garble it. -Sol
+ * Builds a list for non-sortable entries.
+ * It doesn't respect at all the semantics of the date structure but only
+ * uses it as a storage.
+ * Rewritten by Chris Behrens. -Sol
  */
 void
 l_addto_conf_list(my_list, my_conf, cmp_field)
@@ -564,69 +573,56 @@ aConfItem	*my_conf;
 char		*(*cmp_field)();
 {
 	char		*field = cmp_field(my_conf);
-	unsigned int	length = my_list->length;
 	aConfEntry	*base;
 
-	(void) grow_list(my_list);
-	base = my_list->conf_list;
+	base = (aConfEntry *) MyMalloc(sizeof(aConfEntry));
 
-	base[length].pattern = field;
-	base[length].conf = my_conf;
-	base[length].next = NULL;
-	base[length].sub = NULL;
-	my_list->length++;
+	base->pattern = field;
+	base->conf = my_conf;
+	base->next = my_list->conf_list;
+	base->sub = NULL;
+	my_list->conf_list = base;
+	if (!my_list->length)
+		my_list->length++;
 }
 
 /*
  * This looks for the first match in the list if my_list and tomatch are both
  * not NULL, otherwise it will return the next match.
  * NULL means there are no (more) matches.
- * This should be used only on lists created with l_addto_conf_list() since
- * it won't test the "next" attribute of aConfEntry, therefore missing entries
- * if there were chained entries. -Sol
+ * This will always ignore sub fields, hence should be used with lists built
+ * by l_addto_conf_list() only.
+ * Modified to be used with Chris Behrens's version of l_addto_conf_list().
+ * -Sol
  */
 aConfItem	*
 l_find_matching_conf(my_list, tomatch)
 aConfList	*my_list;
 char		*tomatch;
 {
-	static	aConfEntry	*base;
-	static	unsigned int	current;
-	static	unsigned int	length;
-	static	char		*name;
+	static	aConfEntry	*base = NULL;
+	static	char		*name = NULL;
 
 	if (my_list && tomatch)
+	{
 		if (!my_list->length)
 		{
-			current = -1;
+			base = NULL;
 			return NULL;
 		}
-
-	if (!my_list || !tomatch)
-	{
-		if (current == -1)
-			return NULL;
-		current++;
-	}
-	else
-	{
 		base = my_list->conf_list;
-		current = 0;
-		length = my_list->length;
 		name = tomatch;
 	}
-
-	while (current < length)
+	else if (!base || !name)
 	{
-		if (!base[current].pattern)
-			return base[current].conf;	/* Let's say NULL
-							   matches all -Sol */
-		else
-			if (!matches(base[current].pattern, name))
-				return base[current].conf;
-		current++;
+		base = NULL;
+		return NULL;
 	}
+	else
+		base = base->next;
 
-	current = -1;
-	return NULL;
+        while (base && matches(base->pattern, name))
+                base = base->next;
+
+        return base ? base->conf : NULL;
 }

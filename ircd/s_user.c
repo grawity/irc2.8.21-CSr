@@ -57,8 +57,8 @@ static int user_modes[]	     = { FLAGS_OPER, 'o',
 				 FLAGS_SERVNOTICE, 's',
 #ifdef FK_USERMODES
 				 FLAGS_FMODE, 'f',
-#endif
 				 FLAGS_UMODE, 'u',
+#endif
 #ifdef CLIENT_NOTICES
 				 FLAGS_CMODE, 'c',
 #endif
@@ -388,6 +388,7 @@ char	*nick, *username;
 	parv[0] = sptr->name;
 	parv[1] = parv[2] = NULL;
 
+	
 	if (MyConnect(sptr))
 	    {
 		if (!strcmp(user->host, "null"))
@@ -406,7 +407,7 @@ char	*nick, *username;
 		strncpyzt(user->username, temp, USERLEN+1);
 		if ((i = check_client(sptr, temp)))
 		    {
-			sendto_ops("%s from %s.", i == -3 ?
+			sendto_flagops(6,"%s from %s.", i == -3 ?
 						  "Too many connections" :
 			 			  "Unauthorized connection",
 				   get_client_host(sptr));
@@ -622,8 +623,13 @@ char	*nick, *username;
 	else
 		strncpyzt(user->username, username, USERLEN+1);
 	SetClient(sptr);
+	c_count++;
 	if (MyConnect(sptr))
 	    {
+		m_clients++;
+#ifdef HIGHEST_CONNECTION
+		check_max_count();
+#endif
 		sendto_one(sptr, rpl_str(RPL_WELCOME), me.name, nick, nick);
 		/* This is a duplicate of the NOTICE but see below...*/
 		sendto_one(sptr, rpl_str(RPL_YOURHOST), me.name, nick,
@@ -790,7 +796,7 @@ char	*parv[];
 		** there is no danger of the server being disconnected.
 		** Ultimate way to jupiter a nick ? >;-). -avalon
 		*/
-		sendto_ops("Nick collision on %s(%s <- %s)",
+		sendto_flagops(4,"Nick collision on %s(%s <- %s)",
 			   sptr->name, acptr->from->name,
 			   get_client_name(cptr, FALSE));
 		ircstp->is_kill++;
@@ -886,7 +892,7 @@ char	*parv[];
 		if (!doests || !newts || !acptr->tsinfo
 		    || (newts == acptr->tsinfo))
 		    {
-		       sendto_ops("Nick collision on %s(%s <- %s)(both killed)",
+		       sendto_flagops(4,"Nick collision on %s(%s <- %s)(both killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 			ircstp->is_kill++;
@@ -910,11 +916,11 @@ char	*parv[];
 		else
 		    {
 			if (sameuser)
-		      sendto_ops("Nick collision on %s(%s <- %s)(older killed)",
+		      sendto_flagops(4,"Nick collision on %s(%s <- %s)(older killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 			else
-		      sendto_ops("Nick collision on %s(%s <- %s)(newer killed)",
+		      sendto_flagops(4,"Nick collision on %s(%s <- %s)(newer killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 
@@ -942,7 +948,7 @@ char	*parv[];
 		   mycmp(acptr->user->host, acptr->user->host) == 0;
 	if (!doests || !newts || !acptr->tsinfo || (newts == acptr->tsinfo))
 	    {
-	sendto_ops("Nick change collision from %s to %s(%s <- %s)(both killed)",
+	sendto_flagops(4,"Nick change collision from %s to %s(%s <- %s)(both killed)",
 			   sptr->name, acptr->name, acptr->from->name,
 			   get_client_name(cptr, FALSE));
 		ircstp->is_kill++;
@@ -966,11 +972,11 @@ char	*parv[];
 		 (!sameuser && newts > acptr->tsinfo))
 	    {
 		if (sameuser)
-    sendto_ops("Nick change collision from %s to %s(%s <- %s)(older killed)",
+    sendto_flagops(4,"Nick change collision from %s to %s(%s <- %s)(older killed)",
 			   sptr->name, acptr->name, acptr->from->name,
 			   get_client_name(cptr, FALSE));
 		else
-    sendto_ops("Nick change collision from %s to %s(%s <- %s)(newer killed)",
+    sendto_flagops(4,"Nick change collision from %s to %s(%s <- %s)(newer killed)",
 			   sptr->name, acptr->name, acptr->from->name,
 			   get_client_name(cptr, FALSE));
 		ircstp->is_kill++;
@@ -987,11 +993,11 @@ char	*parv[];
 	else
 	    {
 		if (sameuser)
-		    sendto_ops("Nick collision on %s(%s <- %s)(older killed)",
+		    sendto_flagops(4,"Nick collision on %s(%s <- %s)(older killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 		else
-		    sendto_ops("Nick collision on %s(%s <- %s)(newer killed)",
+		    sendto_flagops(4,"Nick collision on %s(%s <- %s)(newer killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 
@@ -1038,6 +1044,10 @@ nickkilldone:
 				for (s = user_modes; (flag = *s); s += 2)
 					if (*m == *(s+1))
 					    {
+						if (flag == FLAGS_INVISIBLE)
+							i_count++;
+						if (flag == FLAGS_OPER)
+							o_count++;
 						sptr->flags |= flag&SEND_UMODES;
 						break;
 					    }
@@ -1747,6 +1757,8 @@ char	*nick, *username, *host, *server, *realname;
 	    }
 #ifndef	NO_DEFAULT_INVISIBLE
 	sptr->flags |= FLAGS_INVISIBLE;
+	i_count++;
+	m_invis++;
 #endif
 	sptr->flags |= (UFLAGS & atoi(host));
 	strncpyzt(user->host, host, sizeof(user->host));
@@ -1912,17 +1924,12 @@ char	*parv[];
 		return 0;
 	    }
 
-#ifdef FK_USERMODES
 	if (strchr(parv[0], '.'))
 		sendto_flagops(4,"Received KILL message for %s. From %s Path: %s!%s",
 		   acptr->name, parv[0], inpath, path);
 	else
 	        sendto_flagops(3,"Received KILL message for %s. From %s Path: %s!%s",
                         acptr->name, parv[0], inpath, path);
-#else
-                sendto_ops("Received KILL message for %s. From %s Path: %s!%s",
-                        acptr->name, parv[0], inpath, path);
-#endif
 
 #if defined(USE_SYSLOG) && defined(SYSLOG_KILL)
 	if (IsOper(sptr))
@@ -2240,7 +2247,10 @@ char	*parv[];
 #endif
 			SetLocOp(sptr);
 		else
+		{
 			SetOper(sptr);
+			o_count++;
+		}
 		*--s =  '@';
 		sendto_ops("%s (%s@%s) is now operator (%c)", parv[0],
 			   sptr->user->username, sptr->user->host,
@@ -2618,6 +2628,22 @@ char	*parv[];
 	if ((setflags & (FLAGS_OPER|FLAGS_LOCOP)) && !IsAnOper(sptr) &&
 	    MyConnect(sptr))
 		det_confs_butmask(sptr, CONF_CLIENT & ~CONF_OPS);
+	if (!(setflags & FLAGS_OPER) && IsOper(sptr))
+		o_count++;
+	if ((setflags & FLAGS_OPER) && !IsOper(sptr))
+		o_count--;
+	if (!(setflags & FLAGS_INVISIBLE) && IsInvisible(sptr))
+	{
+		if (MyConnect(sptr))
+			m_invis++;
+		i_count++;
+	}
+	if ((setflags & FLAGS_INVISIBLE) && !IsInvisible(sptr))
+	{
+		if (MyConnect(sptr))
+			m_invis--;
+		i_count--;
+	}
 #ifdef	USE_SERVICES
 	if (IsOper(sptr) && !(setflags & FLAGS_OPER))
 		check_services_butone(SERVICE_WANT_OPER, sptr,

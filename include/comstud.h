@@ -2,20 +2,11 @@
 #define COMSTUD_H
 
 /* RESTRICT         - define this if using dog3 stuff, and wish to
-                      disallow /LUSERS, /LIST and other CPU
-                      intensive commands when in HIGH TRAFFIC MODE
+                      disallow /LIST and other CPU intensive commands
+                      when in HIGH TRAFFIC MODE
 */
 
 #undef RESTRICT
-
-/* USE_DICH_CONF    - define this to try a new code for K: line matching
-                    - Note: This is a lot cleaner than Roy's kline
-                      patches...as far as CPU usage...someone want to
-                      test it? =)
-                    - Also, this was written by Philippe Levan, not me =)
-*/
-
-#define USE_DICH_CONF
 
 /* B_LINES          - Define this if you wish to ignore ip#'s or hosts
                       from being tested for bots or clonebots...
@@ -56,19 +47,6 @@ they are increased!
 */
 
 #define DOG3
-
-/* DOUGH_HASH	    - define this if you want to use no_nick's
-		      hashing routines...(suggested)
-*/
-
-#define DOUGH_HASH
-
-
-/* DBUF_TAIL        - define this if you'd like to use improved
-                      performance dealing with dbufs...
-*/
-
-#undef DBUF_TAIL
 
 /* DBUF_INIT        - define this if you want to pre-allocate
                       4 megs of dbufs...this should help in
@@ -121,7 +99,7 @@ they are increased!
 
 #define TOPIC_INFO
 
-/* SIGNON_TIME      - define this if you want to see when i user
+/* SIGNON_TIME      - define this if you want to see when a user
                       signed into irc when doing /whois
 */
 
@@ -136,7 +114,7 @@ they are increased!
 /* NO_RED_MODES    - define this if you don't want redundant modes
                      i.e., if someone is opped they can't be opped
                      /mode +ooo nick nick nick results in
-                      /mode * +o nick
+                     /mode * +o nick
 */
 
 #define NO_RED_MODES
@@ -221,7 +199,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr19/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr20/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -296,7 +274,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr19/lib/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr20/lib/logs/clones.log"
 
 /*  THE REST OF THIS STUFF IS TO CONFIGURE CLONE CHECKING */
 

@@ -253,7 +253,7 @@ int	port;
 	    }
 	else if (cptr->fd >= MAXCLIENTS)
 	    {
-		sendto_ops("No more connections allowed (%s)", cptr->name);
+		sendto_flagops(6,"No more connections allowed (%s)", cptr->name);
 		(void)close(cptr->fd);
 		return -1;
 	    }
@@ -371,7 +371,7 @@ int	port;
 	    }
 	else if (cptr->fd >= MAXCLIENTS)
 	    {
-		sendto_ops("No more connections allowed (%s)", cptr->name);
+		sendto_flagops(6,"No more connections allowed (%s)", cptr->name);
 		(void)close(cptr->fd);
 		return -1;
 	    }
@@ -1894,7 +1894,12 @@ struct	hostent	*hp;
 	set_non_blocking(cptr->fd, cptr);
 	set_sock_opts(cptr->fd, cptr);
 	(void)signal(SIGALRM, dummy);
-	if (connect(cptr->fd, svp, len) < 0 && errno != EINPROGRESS)
+	if (connect(cptr->fd, svp, len) < 0 &&
+#ifdef DGUX
+		(errno != EINPROGRESS) && (errno != EAGAIN))
+#else
+		(errno != EINPROGRESS))
+#endif
 	    {
 		errtmp = errno; /* other system calls may eat errno */
 		report_error("Connect to host %s failed: %s",cptr);

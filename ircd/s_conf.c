@@ -73,9 +73,7 @@ Computing Center and Jarkko Oikarinen";
 
 #include "comstud.h"
 
-#if defined(USE_DICH_CONF) || defined(B_LINES) || defined(E_LINES)
 #include "dich_conf.h"
-#endif /* USE_DICH_CONF || B_LINES || E_LINES */
 
 static	int	check_time_interval PROTO((char *, char *));
 static	int	lookup_confhost PROTO((aConfItem *));
@@ -628,20 +626,18 @@ int	sig;
 	if (sig != 2)
 		flush_cache();
 
-#ifdef USE_DICH_CONF
-	clear_conf_list(&KList1);
-	clear_conf_list(&KList2);
-	clear_conf_list(&KList3);
-#endif /* USE_DICH_CONF */
+	clear_conf_list(&KList1, 1);
+	clear_conf_list(&KList2, 1);
+	clear_conf_list(&KList3, 1);
 #ifdef B_LINES
-	clear_conf_list(&BList1);
-	clear_conf_list(&BList2);
-	clear_conf_list(&BList3);
+	clear_conf_list(&BList1, 1);
+	clear_conf_list(&BList2, 1);
+	clear_conf_list(&BList3, 1);
 #endif /* B_LINES */
 #ifdef E_LINES
-	clear_conf_list(&EList1);
-	clear_conf_list(&EList2);
-	clear_conf_list(&EList3);
+	clear_conf_list(&EList1, 1);
+	clear_conf_list(&EList2, 1);
+	clear_conf_list(&EList3, 1);
 #endif /* E_LINES */
 	(void) initconf(0);
 	close_listeners();
@@ -993,7 +989,6 @@ int	opt;
 				portnum = aconf->port;
 		    }
 
-#ifdef USE_DICH_CONF
 		if ((aconf->status & CONF_KILL) && aconf->host)
 		{
 			char	*host = host_field(aconf);
@@ -1014,7 +1009,6 @@ int	opt;
 
 			MyFree(host);
 		}
-#endif /* USE_DICH_CONF */
 #ifdef B_LINES
 		if (aconf->host && (aconf->status & CONF_BOT_IGNORE))
 		{
@@ -1145,10 +1139,8 @@ aClient	*cptr;
 {
 	char	reply[256], *host, *name;
 	aConfItem *tmp;
-#ifdef USE_DICH_CONF
 	char		*rev;
 	aConfList	*list;
-#endif /* USE_DICH_CONF */
 
 #ifdef E_LINES
 	if (find_eline(cptr))
@@ -1167,7 +1159,6 @@ aClient	*cptr;
 
 	reply[0] = '\0';
 
-#ifdef USE_DICH_CONF
 	rev = (char *) MyMalloc(strlen(host)+1);
 	reverse(rev, host);
 
@@ -1224,34 +1215,6 @@ aClient	*cptr;
 
 matched:
 	MyFree(rev);
-
-# ifdef DICH_CONF_DEBUG
-	if (reply[0] || tmp)
-		sendto_ops("%s matched line : K:%s:%s:%s:%d:%d",
-			   get_client_name(cptr, FALSE),
-			   tmp->host ? tmp->host : "",
-			   tmp->passwd ? tmp->passwd : "",
-			   tmp->name ? tmp->name : "",
-			   tmp->port, get_conf_class(tmp));
-# endif /* DICH_CONF_DEBUG */
-
-#endif /* USE_DICH_CONF */
-
-#if !defined(USE_DICH_CONF) || defined(DICH_CONF_DEBUG)
-	for (tmp = conf; tmp; tmp = tmp->next)
- 		if ((tmp->status == CONF_KILL) && tmp->host && tmp->name &&
-		    (match(tmp->host, host) == 0) &&
- 		    (!name || match(tmp->name, name) == 0) &&
-		    (!tmp->port || (tmp->port == cptr->acpt->port)))
-		{
- 			if (BadPtr(tmp->passwd))
-				break;
-			if (is_comment(tmp->passwd))
-				break;
-			if (check_time_interval(tmp->passwd, reply))
-	 			break;
-		}
-#endif /* !USE_DICH_CONF || DICH_CONF_DEBUG */
 	if (reply[0])
 		sendto_one(cptr, reply,
 			   me.name, ERR_YOUREBANNEDCREEP, cptr->name);

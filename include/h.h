@@ -26,15 +26,21 @@
 
 #include "comstud.h"
 
+#ifdef HIGHEST_CONNECTION
+extern        void    check_max_count();
+#endif /* HIGHEST_CONNECTION */
+
+extern        int     s_count, c_count, ch_count, u_count, i_count;
+extern        int     o_count, m_clients, m_servers, m_invis;
+extern        void    compute_lusers();
+ 
 #if defined(USE_DICH_CONF) || defined(B_LINES) || defined(E_LINES)
 #include "dich_conf.h"
 #endif
 
-#ifdef USE_DICH_CONF
 extern aConfList       KList1;   /* ordered */
 extern aConfList       KList2;   /* ordered, reversed */
 extern aConfList       KList3;   /* what we can't sort */
-#endif /* USE_DICH_CONF */
 
 #ifdef B_LINES
 extern aConfList       BList1;   /* ordered */
@@ -81,7 +87,7 @@ extern	void	clean_channelname PROTO((char *));
 extern	int	can_send PROTO((aClient *, aChannel *));
 extern	int	is_chan_op PROTO((aClient *, aChannel *));
 extern	int	has_voice PROTO((aClient *, aChannel *));
-extern	int	count_channels PROTO((aClient *));
+extern	int	count_channels PROTO(());
 
 extern	aClient	*find_chasing PROTO((aClient *, char *, int *));
 extern	aClient	*find_client PROTO((char *, aClient *));

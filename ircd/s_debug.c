@@ -138,14 +138,8 @@ char	serveropts[] = {
 #ifdef IDENTD_ONLY
 'd',
 #endif
-#ifdef DBUF_TAIL
-'D',
-#endif
 #ifdef HIGHEST_CONNECTON
 'h',
-#endif
-#ifdef DOUGH_HASH
-'H',
 #endif
 #ifdef REJECT_IPHONE
 'i',

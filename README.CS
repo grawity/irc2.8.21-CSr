@@ -1,6 +1,29 @@
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
 
+New in CSr20:
+
+1) Removed an #ifdef from dbuf.c which causes some problems on some OS's
+2) Fixed, and commented out a function in dich_conf() that isn't used
+3) Fixed EAGAIN problem on connect() on DG/UX, thanks to
+      Greg Moeller <gkm@moe.magic.mb.ca>
+   For DGUX, add #define DGUX to config.h or comstud.h
+4) Added orabidoo's TS patch to stop wrong deop's.
+5) Patched TS to show deoppings to come from local server, not remote
+      asamonte@calpoly.edu helped me with this one...
+6) m_lusers (/LUSERS) now uses pre-computed info.  This should save
+   hella CPU on heavily cliented servers
+   PS, my channel counting counts secret channels...the old version
+   of ircd did not...who knows why, but you can get the real # of
+   channels via /stats z anyway.
+7) Optimized the linear list for K: lines in DICH_CONF (the non-sortable ones)
+8) Removed DICH_CONF & DOUGH_HASH defines...made them part of stock +CS
+   Also, did the same thing for DBUF_TAIL
+9) Applied DOUGH_HASH routines to channel hashing too...
+10) Kline comment is now displayed to other real ops when the k-line is done
+11) Moved rest of nick collisions into +f
+12) Moved "Too many", "Unauth" and so forth messages into +u 
+
 New in CSr19:
 
 1) Oops, fixed how klining with no reason will core the server =(

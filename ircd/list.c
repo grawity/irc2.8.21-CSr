@@ -236,6 +236,16 @@ aClient	*cptr;
 void	remove_client_from_list(cptr)
 Reg1	aClient	*cptr;
 {
+	if (IsServer(cptr))
+		s_count--;
+	if (IsClient(cptr))
+	{
+		if (IsInvisible(cptr))
+			i_count--;
+		c_count--;
+		if (IsOper(cptr))
+			o_count--;
+	}
 	checklist();
 	if (cptr->prev)
 		cptr->prev->next = cptr->next;

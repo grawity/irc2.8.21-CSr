@@ -1377,6 +1377,7 @@ int	flag;
 		chptr->nextch = channel;
 		channel = chptr;
 		(void)add_to_channel_hash_table(chname, chptr);
+		ch_count++;
 	    }
 	return chptr;
     }
@@ -1484,6 +1485,7 @@ Reg1	aChannel *chptr;
 			chptr->nextch->prevch = chptr->prevch;
 		(void)del_from_channel_hash_table(chptr->chname, chptr);
 		MyFree((char *)chptr);
+		ch_count--;
 	    }
 }
 
@@ -1835,21 +1837,12 @@ char	*parv[];
 	return (0);
 }
 
-int	count_channels(sptr)
-aClient	*sptr;
+int	count_channels()
 {
-Reg1	aChannel	*chptr;
+	Reg1	aChannel	*chptr;
 	Reg2	int	count = 0;
 
 	for (chptr = channel; chptr; chptr = chptr->nextch)
-#ifdef	SHOW_INVISIBLE_LUSERS
-		if (SecretChannel(chptr))
-		    {
-			if (IsAnOper(sptr))
-				count++;
-		    }
-		else
-#endif
 			count++;
 	return (count);
 }
@@ -2298,11 +2291,13 @@ aClient	*cptr, *user;
 	return;
 }
 
-static	void sjoin_sendit(cptr, sptr, chptr, from)
+static	void sjoin_sendit(cptr, sptr, chptr, from, modebuf, parabuf)
 aClient *cptr;
 aClient *sptr;
 aChannel *chptr;
 char	*from;
+char	*modebuf;
+char	*parabuf;
 {
 	sendto_channel_butserv(chptr, sptr, ":%s MODE %s %s %s", from,
 				chptr->chname, modebuf, parabuf);
@@ -2338,10 +2333,15 @@ char	*parv[];
 	static	Mode mode, *oldmode;
 	Link	*l;
 	int	args = 0, haveops = 0, keepourmodes = 1, keepnewmodes = 1,
-		doesop = 0, what = 0, pargs = 0, *ip, fl, people = 0;
+		doesop = 0, mewhat = 0, pargs = 0, *ip, fl, people = 0, isnew,
+		mpargs = 0, opargs = 0, othwhat = 0;
 	Reg1	char *s, *s0;
 	static	char numeric[16], sjbuf[BUFSIZE];
 	char	*mbuf = modebuf, *t = sjbuf, *p;
+	char	othmodebuf[MODEBUFLEN], othparabuf[MODEBUFLEN];
+	char	memodebuf[MODEBUFLEN],	meparabuf[MODEBUFLEN];
+	char	*ombuf = othmodebuf;
+	char	*mmbuf = memodebuf;
 
 	static	int	flags[] = {
 				MODE_PRIVATE,    'p', MODE_SECRET,     's',
@@ -2349,6 +2349,7 @@ char	*parv[];
 				MODE_TOPICLIMIT, 't', MODE_INVITEONLY, 'i',
 				0x0, 0x0 };
 
+	
 	if (check_registered(sptr) || IsClient(sptr) || parc < 5)
 		return 0;
 	if (!IsChannelName(parv[2]) ||
@@ -2356,7 +2357,8 @@ char	*parv[];
 		return 0;
 	newts = atol(parv[1]);
 	bzero((char *)&mode, sizeof(mode));
-
+	*ombuf = *mmbuf = (char) 0;
+	meparabuf[0] = othparabuf[0] = (char) 0;
 	s = parv[3];
 	while (*s)
 		switch(*(s++))
@@ -2393,6 +2395,7 @@ char	*parv[];
 
 	*parabuf = '\0';
 
+	isnew = ChannelExists(parv[2]) ? 0 : 1;
 	chptr = get_channel(sptr, parv[2], CREATE);
 	oldts = chptr->channelts;
 	doesop = (parv[4+args][0] == '@' || parv[4+args][1] == '@');
@@ -2406,17 +2409,11 @@ char	*parv[];
 
 	oldmode = &chptr->mode;
 
-	if (newts == 0)
-		if (haveops || !doesop)
-			tstosend = oldts;
-		else
-			chptr->channelts = tstosend = 0;
-	else if (oldts == 0)
-		if (doesop || !haveops)
-			chptr->channelts = tstosend = newts;
-		else
-			tstosend = 0;
-	else if (newts == oldts)
+	if (isnew)
+		chptr->channelts = tstosend = newts;
+	else if (newts == 0 || oldts == 0)
+		chptr->channelts = tstosend = 0;
+  	else if (newts == oldts)
 		tstosend = oldts;
 	else if (newts < oldts)
 	    {
@@ -2455,132 +2452,142 @@ char	*parv[];
 
 	for (ip = flags; *ip; ip += 2)
 		if ((*ip & mode.mode) && !(*ip & oldmode->mode))
-		    {
-			if (what != 1)
-			    {
-				*mbuf++ = '+';
-				what = 1;
-			    }
-			*mbuf++ = *(ip+1);
-		    }
+		{
+			if (othwhat != 1)
+			{
+				*ombuf++ = '+';
+				othwhat = 1;
+		    	}
+			*ombuf++ = *(ip+1);
+		}
 	for (ip = flags; *ip; ip += 2)
 		if ((*ip & oldmode->mode) && !(*ip & mode.mode))
-		    {
-			if (what != -1)
-			    {
-				*mbuf++ = '-';
-				what = -1;
-			    }
-			*mbuf++ = *(ip+1);
-		    }
+		{
+			if (mewhat != -1)
+			{
+				*mmbuf++ = '-';
+				mewhat = -1;
+			}
+			*mmbuf++ = *(ip+1);
+		}
 	if (oldmode->limit && !mode.limit)
-	    {
-		if (what != -1)
-		    {
-			*mbuf++ = '-';
-			what = -1;
-		    }
-		*mbuf++ = 'l';
-	    }
+	{
+		if (mewhat != -1)
+		{
+			*mmbuf++ = '-';
+			mewhat = -1;
+		}
+		*mmbuf++ = 'l';
+	}
 	if (oldmode->key[0] && !mode.key[0])
-	    {
-		if (what != -1)
-		    {
-			*mbuf++ = '-';
-			what = -1;
-		    }
-		*mbuf++ = 'k';
-                strcat(parabuf, oldmode->key);
-                strcat(parabuf, " ");
-                pargs++;
-	    }
+	{
+		if (mewhat != -1)
+		{
+			*mmbuf++ = '-';
+			mewhat = -1;
+		}
+		*mmbuf++ = 'k';
+		strcat(meparabuf, oldmode->key);
+		strcat(meparabuf, " ");
+                mpargs++;
+	}
 	if (mode.limit && oldmode->limit != mode.limit)
 	    {
-		if (what != 1)
+		if (othwhat != 1)
 		    {
-			*mbuf++ = '+';
-			what = 1;
+			*ombuf++ = '+';
+			othwhat = 1;
 		    }
-		*mbuf++ = 'l';
+		*ombuf++ = 'l';
 		(void)sprintf(numeric, "%-15d", mode.limit);
 		if ((s = index(numeric, ' ')))
 			*s = '\0';
-		strcat(parabuf, numeric);
-		strcat(parabuf, " ");
-		pargs++;
+		strcat(othparabuf, numeric);
+		strcat(othparabuf, " ");
+		opargs++;
 	    }
 	if (mode.key[0] && strcmp(oldmode->key, mode.key))
 	    {
-		if (what != 1)
+		if (othwhat != 1)
 		    {
-			*mbuf++ = '+';
-			what = 1;
+			*ombuf++ = '+';
+			othwhat = 1;
 		    }
-		*mbuf++ = 'k';
-		strcat(parabuf, mode.key);
-		strcat(parabuf, " ");
-		pargs++;
+		*ombuf++ = 'k';
+		strcat(othparabuf, mode.key);
+		strcat(othparabuf, " ");
+		opargs++;
 	    }
 
 	chptr->mode = mode;
 
 	if (!keepourmodes)
-	    {
-	    	what = 0;
+	{
+	    	mewhat = 0;
 		for (l = chptr->members; l && l->value.cptr; l = l->next)
-		    {
+		{
 			if (l->flags & MODE_CHANOP)
-			    {
-				if (what != -1)
-				    {
-					*mbuf++ = '-';
-					what = -1;
-				    }
-				*mbuf++ = 'o';
-				strcat(parabuf, l->value.cptr->name);
-				strcat(parabuf, " ");
-				pargs++;
-				if (pargs >= (MAXMODEPARAMS-2))
-				    {
-					*mbuf = '\0';
+			{
+				if (mewhat != -1)
+				{
+					*mmbuf++ = '-';
+					mewhat = -1;
+				}
+				*mmbuf++ = 'o';
+				strcat(meparabuf, l->value.cptr->name);
+				strcat(meparabuf, " ");
+				mpargs++;
+				if (mpargs >= (MAXMODEPARAMS-2))
+				{
+					*mmbuf = '\0';
 					sjoin_sendit(cptr, sptr, chptr,
-						    parv[0]);
-					mbuf = modebuf;
-					*mbuf = parabuf[0] = '\0';
-					pargs = what = 0;
-				    }
+						me.name,
+						memodebuf, meparabuf);
+					mmbuf = memodebuf;
+					*mmbuf = meparabuf[0] = '\0';
+					mpargs = mewhat = 0;
+				}
 				l->flags &= ~MODE_CHANOP;
-			    }
+			}
 			if (l->flags & MODE_VOICE)
-			    {
-				if (what != -1)
-				    {
-					*mbuf++ = '-';
-					what = -1;
-				    }
-				*mbuf++ = 'v';
-				strcat(parabuf, l->value.cptr->name);
-				strcat(parabuf, " ");
-				pargs++;
-				if (pargs >= (MAXMODEPARAMS-2))
-				    {
-					*mbuf = '\0';
+			{
+				if (mewhat != -1)
+				{
+					*mmbuf++ = '-';
+					mewhat = -1;
+				}
+				*mmbuf++ = 'v';
+				strcat(meparabuf, l->value.cptr->name);
+				strcat(meparabuf, " ");
+				mpargs++;
+				if (mpargs >= (MAXMODEPARAMS-2))
+				{
+					*mmbuf = '\0';
 					sjoin_sendit(cptr, sptr, chptr,
-						    parv[0]);
-					mbuf = modebuf;
-					*mbuf = parabuf[0] = '\0';
-					pargs = what = 0;
-				    }
+						    me.name, memodebuf,
+							meparabuf);
+					mmbuf = memodebuf;
+					*mmbuf = meparabuf[0] = '\0';
+					mpargs = mewhat = 0;
+				}
 				l->flags &= ~MODE_VOICE;
 			    }
-		    }
-	    }
-	if (mbuf != modebuf)
-	    {
-	    	*mbuf = '\0';
-		sjoin_sendit(cptr, sptr, chptr, parv[0]);
-	    }
+		    } /* for() */
+	} /* if (!keepourmodes) */
 
+        if (mmbuf != memodebuf)
+            {
+                *mmbuf = '\0';
+                sjoin_sendit(cptr, sptr, chptr, me.name, memodebuf,
+			meparabuf);
+            }
+	if (ombuf != othmodebuf)
+            {
+                *ombuf = '\0';
+                sjoin_sendit(cptr, sptr, chptr, parv[0], othmodebuf,
+                       othparabuf);
+            }
+ 
 	*modebuf = *parabuf = '\0';
 	if (parv[3][0] != '0' && keepnewmodes)
 		channel_modes(sptr, modebuf, parabuf, chptr);
@@ -2642,7 +2649,8 @@ char	*parv[];
 			if (pargs >= (MAXMODEPARAMS-2))
 			    {
 				*mbuf = '\0';
-				sjoin_sendit(cptr, sptr, chptr, parv[0]);
+				sjoin_sendit(cptr, sptr, chptr, parv[0],
+					modebuf, parabuf);
 				mbuf = modebuf;
 				*mbuf++ = '+';
 				parabuf[0] = '\0';
@@ -2658,7 +2666,8 @@ char	*parv[];
 			if (pargs >= (MAXMODEPARAMS-2))
 			    {
 				*mbuf = '\0';
-				sjoin_sendit(cptr, sptr, chptr, parv[0]);
+				sjoin_sendit(cptr, sptr, chptr, parv[0],
+					modebuf, parabuf);
 				mbuf = modebuf;
 				*mbuf++ = '+';
 				parabuf[0] = '\0';
@@ -2669,7 +2678,7 @@ char	*parv[];
 
 	*mbuf = '\0';
 	if (pargs)
-		sjoin_sendit(cptr, sptr, chptr, parv[0]);
+		sjoin_sendit(cptr, sptr, chptr, parv[0], modebuf, parabuf);
 	if (people)
 	    {
 		if (t[-1] == ' ')
