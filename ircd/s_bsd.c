@@ -1139,19 +1139,9 @@ aClient	*cptr;
 	opt = 8192;
 # else
 #ifdef MAXBUFFERS
-	if (sndbufmax==0) {
-		int optlen;
-		optlen = sizeof(sndbufmax);
-		getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (char *) &sndbufmax,
-			&optlen);
-		while((sndbufmax < 65535) && (setsockopt(fd, SOL_SOCKET, SO_SNDBUF,
-			(char *) &sndbufmax, optlen) >= 0)) sndbufmax++;
-		getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (char *) &sndbufmax,
-			&optlen);
-	}
-	opt = sndbufmax;
+	opt = rcvbufmax >= 8192 ? 8192 : rcvbufmax;
 #else
-	opt = READBUFSIZE;
+	opt = READBUFSIZE >= 8192 ? 8192 : READBUFSIZE;
 #endif
 # endif
 	if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &opt, sizeof(opt)) < 0)

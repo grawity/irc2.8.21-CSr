@@ -129,7 +129,7 @@ char	*username;
 				      sockhost, fullname));
 				if (index(aconf->name, '@') && *username)
 				    {
-					(void)strcpy(uhost, username);
+					strncpyzt(uhost, username, USERLEN+1);
 					(void)strcat(uhost, "@");
 				    }
 				else

@@ -380,6 +380,9 @@ char	*nick, *username;
 			temp = sptr->username;
 		else
 			temp = username;
+		/* Should we have to call exit_client(), set a "correct"
+			username -Sol */
+		strncpyzt(user->username, temp, USERLEN+1);
 		if ((i = check_client(sptr, temp)))
 		    {
 			sendto_ops("%s from %s.", i == -3 ?
@@ -406,11 +409,8 @@ char	*nick, *username;
 			user->username[USERLEN] = '\0';
 #ifdef IDENTD_ONLY
                         ircstp->is_ref++;
-			sendto_one(sptr, ":%s NOTICE %s :This server will not allow connections from sites that don't run RFC1413 (pidentd). You may obtain a version for UNIX/VAX/VMX from \"ftp.eskimo.com:/security/pidentd-2.5.1.tar.gz\" via anonymous FTP.", me.name, parv[0]);
-                        sendto_one(sptr, ":%s NOTICE %s : ", me.name, parv[0]);
-			sendto_one(sptr, ":%s NOTICE %s :For Windows, you have two choices. You can obtain WS_IRC+identd from 'ftp.eskimo.com:/security/Windows/wsirc14g.zip' or MIRC from 'ftp.eskimo.com:/security/Windows/mirc30b.zip'. For the Mac, try 'ftp.eskimo.com:/security/Mac/daemon100.sea.hqx'.", me.name, parv[0]);
-                        sendto_one(sptr, ":%s NOTICE %s : ", me.name, parv[0]);
-			sendto_one(sptr, ":%s NOTICE %s :Users may wish to subscribe to a new mailing list 'identd-l'. This list is intended to help users install identd on their Unix, PC, Mac, and other machines.. Send email to majordomo@eskimo.com with the body of the message containing 'subscribe identd-l your@email.address'. Do NOT put anything in the subject line! It will be ignored.", me.name, parv[0]);
+			sendto_one(sptr, ":%s NOTICE %s :This server will not allow connections from sites that don't run RFC1413 (pidentd).", me.name, parv[0]);
+                        sendto_one(sptr, ":%s NOTICE %s :Have your system administrator install it if you wish to connect here.", me.name, parv[0]);
 			return exit_client(cptr, sptr, &me, "Install identd");
 #endif
 		    }
@@ -539,7 +539,7 @@ char	*nick, *username;
 
                 lower = upper = special = 0;
 #ifdef IGNORE_FIRST_CHAR
-		tmpstr = (username[1] == '~' ? &username[2] : &username[1]);
+		tmpstr = (username[0] == '~' ? &username[2] : &username[1]);
 #else
                 tmpstr = (username[0] == '~' ? &username[1] : username);
 #endif
