@@ -22,7 +22,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: s_serv.c,v 1.1.1.1 1997/07/23 18:02:04 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: s_serv.c,v 1.4 1997/10/16 22:10:07 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -546,6 +546,8 @@ char	*parv[];
 		** Rather than KILL the link which introduced it, KILL the
 		** youngest of the two links. -avalon
 		*/
+		char nbuf[HOSTLEN*2 + USERLEN+5];/* same size as in s_misc.c */
+
 		bcptr = (cptr->firsttime > acptr->from->firsttime) ?
 				cptr : acptr->from;
 		sendto_one(bcptr,"ERROR :Server %s already exists", host);
@@ -560,9 +562,14 @@ char	*parv[];
 		** which we got the SERVER message.  Thus we canNOT
 		** `return' yet! -krys
 		*/
+		/*
+		** get_client_name() can return ptr to static buffer...
+		** can't use 2 times in same sendto_ops(), so we have
+		** to strcpy one =(  - comstud
+		*/
+		strcpy(nbuf, get_client_name(bcptr, TRUE));
 		sendto_ops("Link %s cancelled, server %s reintroduced by %s",
-			get_client_name(bcptr, TRUE), host,
-			get_client_name(cptr, TRUE));
+			nbuf, host, get_client_name(cptr, TRUE));
 		(void) exit_client(bcptr, bcptr, &me, "Server Exists");
 	}
 	if ((acptr = find_client(host, NULL)) && acptr != cptr)
@@ -583,7 +590,7 @@ char	*parv[];
 #endif
 
 	if (IsServer(cptr))
-	    {
+	{
 		/*
 		** Server is informing about a new server behind
 		** this link. Create REMOTE server structure,
@@ -591,12 +598,12 @@ char	*parv[];
 		** server links...
 		*/
 		if (parc == 1 || info[0] == '\0')
-		    {
+		{
 	  		sendto_one(cptr,
 				   "ERROR :No server info specified for %s",
 				   host);
 	  		return 0;
-		    }
+		}
 
 		/*
 		** See if the newly found server is behind a guaranteed
@@ -604,26 +611,26 @@ char	*parv[];
 		*/
 		if ((aconf = find_conf_host(cptr->confs, host, CONF_LEAF)) &&
 		    (!aconf->port || (hop > aconf->port)))
-		    {
+		{
 	      		sendto_ops("Leaf-only link %s->%s - Closing",
 				   get_client_name(cptr,  TRUE),
 				   aconf->host ? aconf->host : "*");
 	      		sendto_one(cptr, "ERROR :Leaf-only link, sorry.");
       			return exit_client(cptr, cptr, cptr, "Leaf Only");
-		    }
+		}
 		/*
 		**
 		*/
 		if (!(aconf = find_conf_host(cptr->confs, host, CONF_HUB)) ||
 		    (aconf->port && (hop > aconf->port)) )
-		    {
+		{
 			sendto_ops("Non-Hub link %s introduced %s(%s).",
 				   get_client_name(cptr,  TRUE), host,
 				   aconf ? (aconf->host ? aconf->host : "*") :
 				   "!");
 			return exit_client(cptr, cptr, cptr,
 					   "Too many servers");
-		    }
+		}
 		/*
 		** See if the newly found server has a Q line for it in
 		** our conf. If it does, lose the link that brought it
@@ -634,7 +641,7 @@ char	*parv[];
 		** Example:  Q:*:for the hell of it:eris.Berkeley.EDU
 		*/
 		if ((aconf = find_conf_name(host, CONF_QUARANTINED_SERVER)))
-		    {
+		{
 			sendto_ops_butone(NULL, &me,
 				":%s WALLOPS :%s brought in %s, %s %s",
 				me.name, me.name, get_client_name(cptr,FALSE),
@@ -649,7 +656,7 @@ char	*parv[];
 				   "Go away and get a life");
 
 			return exit_client(cptr, cptr, cptr, "Q-Lined Server");
-		    }
+		}
 
 		acptr = make_client(cptr);
 		(void)make_server(acptr);
@@ -669,30 +676,30 @@ char	*parv[];
 		** (domain name matching)
 		*/
 		for (i = 0; i <= highest_fd; i++)
-		    {
+		{
 			if (!(bcptr = local[i]) || !IsServer(bcptr) ||
 			    bcptr == cptr || IsMe(bcptr))
 				continue;
 			if (!(aconf = bcptr->serv->nline))
-			    {
+			{
 				sendto_ops("Lost N-line for %s on %s. Closing",
 					   get_client_name(cptr, TRUE), host);
 				return exit_client(cptr, cptr, cptr,
 						   "Lost N line");
-			    }
+			}
 			if (match(my_name_for_link(me.name, aconf),
 				    acptr->name) == 0)
 				continue;
 			sendto_one(bcptr, ":%s SERVER %s %d :%s",
 				   parv[0], acptr->name, hop+1, acptr->info);
-		    }
+		}
 #ifdef	USE_SERVICES
 		check_services_butone(SERVICE_WANT_SERVER, sptr,
 					":%s SERVER %s %d :%s", parv[0],
 					acptr->name, hop+1, acptr->info);
 #endif
 		return 0;
-	    }
+	}
 
 	if (!IsUnknown(cptr) && !IsHandshake(cptr))
 		return 0;
@@ -707,11 +714,11 @@ char	*parv[];
         ** Reject a direct nonTS server connection if we're TS_ONLY -orabidoo
         */
         if (!DoesTS(cptr))
-            {
+	{
                 sendto_ops("Link %s dropped, non-TS server",
                            get_client_name(cptr, TRUE));
                 return exit_client(cptr, cptr, cptr, "Non-TS server");
-            }
+	}
 #endif
 
 	strncpyzt(cptr->name, host, sizeof(cptr->name));
@@ -741,7 +748,7 @@ aClient	*cptr, *acptr;
 	static	char ubuf[12];
 
 	if (IsPerson(acptr))
-	    {
+	{
 		send_umode(NULL, acptr, 0, SEND_UMODES,
 			   ubuf);
 		if (!*ubuf)
@@ -750,15 +757,15 @@ aClient	*cptr, *acptr;
 			   acptr->hopcount + 1, acptr->tsinfo, ubuf,
 			   acptr->user->username, acptr->user->host,
 			   acptr->user->server, acptr->info);
-	    }
+	}
 	else if (IsService(acptr))
-	    {
+	{
 		sendto_one(cptr,"NICK %s :%d",
 			   acptr->name, 
 			   acptr->hopcount + 1);
 		sendto_one(cptr,":%s SERVICE * * :%s", acptr->name,
 			   acptr->info);
-	    }
+	}
 }
 
 int	m_server_estab(cptr)
@@ -887,10 +894,12 @@ Reg1	aClient	*cptr;
 	s_count++;
         s_count++;
 	add_to_fdlist(cptr->fd, &new_servfdlist);
+#ifndef NO_PRIORITY
 	if (cptr->fdlist)
 		del_from_fdlist(cptr->fd, cptr->fdlist);
 	cptr->fdlist = &new_fdlists[0];
 	add_to_fdlist(cptr->fd, cptr->fdlist);
+#endif
 	nextping = NOW;
 	sendto_ops("Link with %s (%s) established.", inpath, DoesTS(cptr) ? "TS" : "NoTS");
 	(void)add_to_client_hash_table(cptr->name, cptr);
@@ -1683,6 +1692,7 @@ char	*parv[];
 	if (MyConnect(sptr))
 	{
 		sptr->user->last2 = NOW;
+#ifndef NO_PRIORITY
 		if (sptr->fdlist != &new_fdlists[0])
 		{
 			if (sptr->fdlist)
@@ -1690,6 +1700,7 @@ char	*parv[];
 			sptr->fdlist = &new_fdlists[0];
 			add_to_fdlist(sptr->fd, sptr->fdlist);
 		}
+#endif
 	}
 
 	if (parc > 2)
@@ -2115,7 +2126,7 @@ char    *parv[];
 		sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
 		return 0;
 	}
-	if (!parv[1] || (!MyClient(sptr) && (!parv[2] || !parv[3])))
+	if (!parv[1] || !*parv[1] || (!MyClient(sptr) && (!parv[2] || !parv[3])))
 	{
 		if (MyClient(sptr))
 			sendto_one(sptr, ":%s NOTICE %s :Not enough parameters",

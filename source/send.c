@@ -23,7 +23,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: send.c,v 1.1.1.1 1997/07/23 18:02:05 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: send.c,v 1.2 1998/01/05 05:55:48 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -1177,7 +1177,7 @@ va_dcl
 	bzero((char *)sentalong,sizeof(sentalong));
 	for (cptr = client; cptr; cptr = cptr->next)
 	{
-		if (!IsClient(cptr) || !IsServer(cptr))
+		if (!IsClient(cptr) && !IsServer(cptr))
 			continue;
 		if (!SendWallops(cptr))
 			continue;

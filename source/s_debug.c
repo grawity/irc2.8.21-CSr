@@ -19,7 +19,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: s_debug.c,v 1.1.1.1 1997/07/23 18:02:04 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: s_debug.c,v 1.2 1997/08/19 22:18:40 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -204,6 +204,9 @@ char	serveropts[] = {
 #endif
 #ifdef USERNAMES_IN_TRACE
 'u',
+#endif
+#ifdef NO_PRIORITY
+'y',
 #endif
 ' ',
 'T',

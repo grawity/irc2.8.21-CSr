@@ -2,7 +2,7 @@
 #define SETUP_H
 
 /*
-**  $Id: setup.h.in,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
+**  $Id: setup.h.in,v 1.2 1997/07/27 03:50:48 cbehrens Exp $
 */
 
 /* Define if on AIX 3.
@@ -79,6 +79,9 @@
 
 /* Define if you have the <unistd.h> header file.  */
 #undef HAVE_UNISTD_H
+
+/* Define if you have the <stropts.h> header file.  */
+#undef HAVE_STROPTS_H
 
 /* Define if you have the <arpa/inet.h> header file.  */
 #undef HAVE_ARPA_INET_H

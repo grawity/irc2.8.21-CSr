@@ -19,7 +19,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: ircd.c,v 1.1.1.1 1997/07/23 18:02:04 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: ircd.c,v 1.2 1997/07/29 19:49:02 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -1035,6 +1035,10 @@ done_check:
 			lastmisc = NOW;
 		}
 		read_message(1, &new_fdlists[0]); /* busy clients */
+						/* or all clients if
+							NO_PRIORITY
+						*/
+#ifdef NO_PRIORITY
 		curdiff = (NOW-me.since);
 		if (curdiff != lastdiff)
 		{
@@ -1069,6 +1073,7 @@ done_check:
 #endif
 			lastdiff = curdiff;
 		}
+#endif
 	
 		/* read servs more often */
 		if (lifesux)
@@ -1119,9 +1124,11 @@ done_check:
 			flush_connections(me.fd);
 			lastflush = NOW;
 		}
+#ifndef NO_PRIORITY
 		/* check which clients are active */
 		if (NOW > nextfdlistcheck)
 			nextfdlistcheck = check_fdlists();
+#endif
 	}
 }
 

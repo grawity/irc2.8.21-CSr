@@ -35,7 +35,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: s_bsd.c,v 1.2 1997/07/24 05:13:39 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: s_bsd.c,v 1.3 1997/07/29 19:49:03 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -2346,7 +2346,7 @@ struct	hostent	*hp;
 		if (errno == EINTR)
 			errno = ETIMEDOUT;
 		return -1;
-	    }
+	}
 
         /* Attach config entries to client here rather than in
          * completed_connection. This to avoid null pointer references
@@ -2360,7 +2360,7 @@ struct	hostent	*hp;
 
 	if (!find_conf_host(cptr->confs, aconf->host, CONF_NOCONNECT_SERVER) ||
 	    !find_conf_host(cptr->confs, aconf->host, CONF_CONNECT_SERVER))
-	    {
+	{
       		sendto_ops("Host %s is not enabled for connecting:no C/N-line",
 			   aconf->host);
                 if (by && IsPerson(by) && !MyClient(by))
@@ -2372,17 +2372,18 @@ struct	hostent	*hp;
 		cptr->fd = -2;
 		free_client(cptr);
                 return(-1);
-	    }
+	}
 	/*
 	** The socket has been connected or connect is in progress.
 	*/
 	(void)make_server(cptr);
 	if (by && IsPerson(by))
-	    {
+	{
 		(void)strcpy(cptr->serv->by, by->name);
 		cptr->serv->user = by->user;
 		by->user->refcnt++;
-	    } else
+	}
+	else
 		(void)strcpy(cptr->serv->by, "AutoConn.");
 	(void)strcpy(cptr->serv->up, me.name);
 	if (cptr->fd > highest_fd)

@@ -1,5 +1,5 @@
 ---
-$Id: README.CS,v 1.2 1997/07/24 05:13:29 cbehrens Exp $
+$Id: README.CS,v 1.5 1998/01/05 05:55:47 cbehrens Exp $
 ---
 
 This is the README for irc2.8.21+CSr30.5.  Basically, this is just a list
@@ -7,14 +7,36 @@ of changes...more information can be found in include/comstud.h.
 
 Any questions or comments can be directed to cbehrens@concentric.net
 The newest versions of +CS ircds can be found at:
-     ftp://pain.concentric.net/pub/cbehrens/ircd
-                   or
-     http://www.concentric.net/~Cbehrens/ircd
+     ftp://ftp.lump.net/pub/cbehrens/ircd
 
 ---
 
 NOTE: Please change values in comstud.h to your liking...
       The default values are probably less than ideal for you! 
+
+New in CSr31:
+
+1) res fixes.
+2) NO_PRIORITY define.  People running <= Solaris 2.5.1 will want to
+   #define this.  It seems there are 2 problems with using any
+   priority code on Solaris (in hybrid and digi too).  The 2 problems
+   are
+     a) People get "one way lagged"  It seems that the server won't
+          read from clients even though they have sent data.
+          My guess is that poll() does not return that an fd is 
+          ready to be read if you ignore it for a few seconds.
+          It will be eventually read, sometimes 30 minutes later.
+     b) netstat -m shows enormous amounts of streams data in use..
+          probably because of a).
+   Turning the priority code off solves both of these problems.
+   Next +CS release should totally remove the need for priority
+   code.  If I can do it, it will be available in /hybrid also.
+3) Enhanced inet_ntoa, from Thomas Helvey <tomh@inxpress.net>
+   Actually, this just pretty much clutters support.c...and that
+   function doesn't use much CPU to begin with, but oh well..
+4) s_misc.c - get_client_name used 2 times in same send2ops...can't do
+      this as it returns ptr to static buffer.
+5) Fixed wallops not propagating?
 
 New in CSr30.5:
 

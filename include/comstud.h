@@ -2,8 +2,19 @@
 #define COMSTUD_H
 
 /*
-**  $Id: comstud.h,v 1.2 1997/07/23 19:21:59 cbehrens Exp $
+**  $Id: comstud.h,v 1.3 1997/07/29 19:49:01 cbehrens Exp $
 */
+
+
+/* NO_PRIORITY     - Turns off the priority system.  Solaris still seems
+                     to have a problem with delaying read()ing an fd until
+                     a later time even though the fd is ready to be read.
+                     I've never had a report of lag problems on other
+                     OSes...but here is the define.
+*/
+
+#undef NO_PRIORITY
+
 
 
 /* OLD_Y_LIMIT     - CSr30 now makes Y: limits the GLOBAL limit.

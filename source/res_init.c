@@ -75,11 +75,6 @@ res_init()
 		_res.defdname[sizeof(_res.defdname)] = (char) 0;
 		haveenv++;
 	}
-#define       MATCH(line, name) \
-	(!strncmp(line, name, sizeof(name) - 1) && \
-	(line[sizeof(name) - 1] == ' ' || \
-	line[sizeof(name) - 1] == '\t'))
-
 
 	if ((fp = fopen(_PATH_RESCONF, "r")) != NULL) {
 	    /* read the config file */
@@ -88,10 +83,12 @@ res_init()
 		if (*buf == ';' || *buf == '#')
 			continue;
 		/* read default domain name */
-		if (MATCH(buf, "domain")) {
+		if (!strncmp(buf, "domain", 6) &&
+			((buf[6] == ' ') || (buf[6] == '\t')))
+		{
 		    if (haveenv)	/* skip if have from environ */
 			    continue;
-		    cp = buf + sizeof("domain") - 1;
+		    cp = buf + 6; /* strlen("domain") */
 		    while (*cp == ' ' || *cp == '\t')
 			    cp++;
 		    if ((*cp == '\0') || (*cp == '\n'))
@@ -99,16 +96,18 @@ res_init()
 		    (void)strncpy(_res.defdname, cp, sizeof(_res.defdname) - 1);
 		    _res.defdname[sizeof(_res.defdname)-1] = (char) 0;
 		    if ((cp = (char *)
-				strpbrk(ircd_res.defdname, " \t\n")) != NULL)
+				strpbrk(_res.defdname, " \t\n")) != NULL)
 			*cp = '\0';
 		    havesearch = 0;
 		    continue;
 		}
 		/* set search list */
-		if (MATCH(buf, "search"))
+		if (!strncmp(buf, "search", 6) &&
+			((buf[6] == ' ') || (buf[6] == '\t')))
+		{
 		    if (haveenv)	/* skip if have from environ */
 			    continue;
-		    cp = buf + sizeof("search") - 1;
+		    cp = buf + 6; /* strlen("search") */
 		    while (*cp == ' ' || *cp == '\t')
 			    cp++;
 		    if ((*cp == '\0') || (*cp == '\n'))
@@ -142,8 +141,11 @@ res_init()
 		    continue;
 		}
 		/* read nameservers to query */
-		if (MATCH(buf, "nameserver") && nserv < MAXNS) {
-		    cp = buf + sizeof("nameserver") - 1;
+		if ((!strncmp(buf, "nameserver", 10) &&
+			((buf[10] == ' ') || (buf[10] == '\t'))) &&
+			(nserv < MAXNS))
+		{
+		    cp = buf + 10; /* strlen("nameserver") */
 		    while (*cp == ' ' || *cp == '\t')
 			    cp++;
 		    if ((*cp == '\0') || (*cp == '\n'))

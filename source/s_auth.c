@@ -18,7 +18,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: s_auth.c,v 1.1.1.1 1997/07/23 18:02:04 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: s_auth.c,v 1.2 1997/07/27 21:03:40 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -255,8 +255,9 @@ Reg1	aClient	*cptr;
 	}
 	ircstp->is_asuc++;
 	strncpyzt(cptr->username, ruser, USERLEN+1);
-//	if (strncmp(system, "OTHER", 5))
-		cptr->flags |= FLAGS_GOTID;
+/*	if (strncmp(system, "OTHER", 5))
+*/
+	cptr->flags |= FLAGS_GOTID;
 	Debug((DEBUG_INFO, "got username [%s]", ruser));
 	return;
 }

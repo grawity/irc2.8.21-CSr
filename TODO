@@ -1,0 +1,3 @@
+fix configure/bsd blocking, etc.
+2 notices for 'has been connected'
+remove loop before select/poll.  Add fds to fdlist as-you-go.

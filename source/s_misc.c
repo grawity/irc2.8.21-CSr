@@ -22,7 +22,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: s_misc.c,v 1.1.1.1 1997/07/23 18:02:04 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: s_misc.c,v 1.2 1997/07/29 19:49:04 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -390,7 +390,7 @@ char	*comment;	/* Reason for the exit */
 	char	comment1[HOSTLEN + HOSTLEN + 2];
 
 	if (MyConnect(sptr))
-	    {
+	{
 		if (IsClient(sptr))
 			m_clients--;
 		if (IsInvisible(sptr))
@@ -447,10 +447,10 @@ char	*comment;	/* Reason for the exit */
 		    }
 #endif /* BUFFERED_LOGS */
 		}
-	    }
+	}
 #endif /* FNAME_OPERLOG */
 		if (sptr->fd >= 0)
-		    {
+		{
 		      if (cptr != NULL && sptr != cptr)
 			sendto_one(sptr, "ERROR :Closing Link: %s %s (%s)",
 				   get_client_name(sptr,FALSE),
@@ -458,7 +458,7 @@ char	*comment;	/* Reason for the exit */
 		      else
 			sendto_one(sptr, "ERROR :Closing Link: %s (%s)",
 				   get_client_name(sptr,FALSE), comment);
-		    }
+		}
 		/*
 		** Currently only server connections can have
 		** depending remote clients here, but it does no
@@ -492,31 +492,31 @@ char	*comment;	/* Reason for the exit */
    remote clients.  This is true, and I don't see this changing...so I'm
    adding in this if(), because looking thru all the clients is really
    really lame -- Comstud */
-        if (IsServer(sptr))
-        {
+	if (IsServer(sptr))
+	{
 		(void)strcpy(comment1, me.name);
 		(void)strcat(comment1," ");
 		(void)strcat(comment1, sptr->name);
 		for (acptr = client; acptr; acptr = next)
-		    {
+		{
 			next = acptr->next;
 			if (!IsServer(acptr) && acptr->from == sptr)
 				exit_one_client(NULL, acptr, &me, comment1);
-		    }
+		}
 		/*
 		** Second SQUIT all servers behind this link
 		*/
 		for (acptr = client; acptr; acptr = next)
-		    {
+		{
 			next = acptr->next;
 			if (IsServer(acptr) && acptr->from == sptr)
 				exit_one_client(NULL, acptr, &me, me.name);
-		    }
+		}
 	} /* IsServer */
 	} /* MyConnect */
 	exit_one_client(cptr, sptr, from, comment);
 	return cptr == sptr ? FLUSH_BUFFER : 0;
-    }
+}
 
 /*
 ** Exit one client, local or remote. Assuming all dependants have

@@ -22,7 +22,7 @@
  */
 
 #ifndef lint
-static  char rcsid[] = "@(#)$Id: s_user.c,v 1.1.1.1 1997/07/23 18:02:04 cbehrens Exp $";
+static  char rcsid[] = "@(#)$Id: s_user.c,v 1.3 1997/07/29 19:49:06 cbehrens Exp $";
 #endif
 
 #include "struct.h"
@@ -1552,6 +1552,7 @@ here:
 	{
 		sptr->user->last = NOW;	
 		sptr->user->last2 = NOW;
+#ifndef NO_PRIORITY
 		if (sptr->fdlist != &new_fdlists[0])
 		{
 			if (sptr->fdlist)
@@ -1559,6 +1560,7 @@ here:
 			sptr->fdlist = &new_fdlists[0];
 			add_to_fdlist(sptr->fd, sptr->fdlist);
 		}
+#endif
 	}
 	return 0;
 }
@@ -1656,6 +1658,7 @@ char	*parv[];
 	if (MyConnect(sptr))
 	{
 		sptr->user->last2 = NOW;
+#ifndef NO_PRIORITY
 		if (sptr->fdlist != &new_fdlists[0])
 		{
 			if (sptr->fdlist)
@@ -1663,6 +1666,7 @@ char	*parv[];
 			sptr->fdlist = &new_fdlists[0];
 			add_to_fdlist(sptr->fd, sptr->fdlist);
 		}
+#endif
 	}
 
 	/*
@@ -1822,6 +1826,7 @@ char	*parv[];
 	if (MyConnect(sptr))
 	{
 		sptr->user->last2 = NOW;
+#ifndef NO_PRIORITY
 		if (sptr->fdlist != &new_fdlists[0])
 		{
 			if (sptr->fdlist)
@@ -1829,6 +1834,7 @@ char	*parv[];
 			sptr->fdlist = &new_fdlists[0];
 			add_to_fdlist(sptr->fd, sptr->fdlist);
 		}
+#endif
 	}
 
     	if (parc < 2)
@@ -2343,7 +2349,9 @@ char	*parv[];
 
 	if (strlen(awy2) > (size_t) TOPICLEN)
 		awy2[TOPICLEN] = '\0';
-//	sendto_serv_butone(cptr, ":%s AWAY :%s", parv[0], awy2);
+/*
+	sendto_serv_butone(cptr, ":%s AWAY :%s", parv[0], awy2);
+*/
 #ifdef	USE_SERVICES
 	check_services_butonee(SERVICE_WANT_AWAY, ":%s AWAY :%s",
 				parv[0], parv[1]);

@@ -19,7 +19,7 @@
 
 
 /*
-**  $Id: sys.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
+**  $Id: sys.h,v 1.2 1997/07/27 03:50:49 cbehrens Exp $
 */
 
 #ifndef	__sys_include__
@@ -45,7 +45,9 @@
 #endif
 
 #ifdef USE_POLL
+#ifdef HAVE_STROPTS_H
 #include <stropts.h>
+#endif
 #include <poll.h>
 #define pollfd_t struct pollfd
 #endif /* USE_POLL_ */
