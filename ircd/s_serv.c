@@ -2103,7 +2103,11 @@ char	*parv[];
 					sendto_one(sptr,rpl_str(RPL_TRACEUSER),
 						   me.name, parv[0],
 						   class, name,
+#ifdef DOG3
 						acptr->priority,
+#else
+						0,
+#endif
 						now-acptr->lasttime);
 				cnt++;
 			    }

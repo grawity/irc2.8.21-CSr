@@ -1050,6 +1050,7 @@ va_dcl
 #endif
 }
 
+#ifdef DOG3
 void sendto_fdlist(listp,formp,p1,p2,p3,p4,p5,p6,p7,p8,p9)
 fdlist  *listp;
 char    *formp;
@@ -1061,3 +1062,4 @@ char *p1,*p2,*p3,*p4,*p5,*p6,*p7,*p8,*p9;
 	for(fd=listp->entry[j=1]; j<= listp->last_entry ; fd=listp->entry[++j])
 		send_message(local[fd],sendbuf,len);
 } 
+#endif

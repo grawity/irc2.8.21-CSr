@@ -45,11 +45,15 @@ int	HASHSIZE = 2003;
 int	CHANNELHASHSIZE = 607;
 #else
 #ifdef DOUGH_HASH
+int	HASHSIZE = MAX_NEW;
+int	CHANNELHASHSIZE = DEFAULT_CHANNELHASHSIZE;
 static  aHashEntry      clientTable[MAX_NEW];
 #else
-static	aHashEntry	clientTable[HASHSIZE];
+int	HASHSIZE = DEFAULT_HASHSIZE;
+int	CHANNELHASHSIZE = DEFAULT_CHANNELHASHSIZE;
+static	aHashEntry	clientTable[DEFAULT_HASHSIZE];
 #endif
-static	aHashEntry	channelTable[CHANNELHASHSIZE];
+static	aHashEntry	channelTable[DEFAULT_CHANNELHASHSIZE];
 #endif
 
 static	int	hash_mult[] = { 173, 179, 181, 191, 193, 197,
@@ -172,7 +176,6 @@ void	clear_client_hash_table()
 		clientTable = (aHashEntry *)MyMalloc(HASHSIZE *
 						     sizeof(aHashEntry));
 #endif
-
 	bzero((char *)clientTable, sizeof(aHashEntry) * HASHSIZE);
 }
 

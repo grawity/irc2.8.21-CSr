@@ -27,11 +27,11 @@ typedef	struct	hashentry {
 	} aHashEntry;
 
 #ifndef	DEBUGMODE
-#define	HASHSIZE	16333   /* prime number */
-#define	CHANNELHASHSIZE	7019	/* prime number */
-#else
+#define	DEFAULT_HASHSIZE	16333   /* prime number */
+#define	DEFAULT_CHANNELHASHSIZE	7019	/* prime number */
+#endif
+
 extern	int	HASHSIZE;
 extern	int	CHANNELHASHSIZE;
-#endif
 
 #endif	/* __hash_include__ */

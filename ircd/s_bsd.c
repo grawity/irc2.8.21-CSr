@@ -1050,6 +1050,7 @@ aClient *cptr;
 			local[i] = local[j];
 			local[i]->fd = i;
 			local[j] = NULL;
+#ifdef DOG3
 			/* update server list */
 			if (IsServer(local[i]))
 			{
@@ -1058,6 +1059,7 @@ aClient *cptr;
 				addto_fdlist(i,&busycli_fdlist);
 				addto_fdlist(i,&serv_fdlist);
 			}
+#endif
 			(void)close(j);
 			while (!local[highest_fd])
 				highest_fd--;
@@ -1531,9 +1533,12 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 				continue;
 			if (IsMe(cptr) && IsListening(cptr))
 			    {
-#ifdef DOG3
+#ifdef CONNECTFAST
 		/* next line was 2, changing to 1 */
-		/*if we dont have many clients just let em on */
+		/* if we dont have many clients just let em on */
+                /* This is VERY bad if someone tries to send a lot
+                   of clones to the server though, as mbuf's can't
+                   be allocated quickly enough... - Comstud */
 			if ((highest_fd < MAXCONNECTIONS /2 ) ||
 				(now > cptr->lasttime + 1))
 #else 

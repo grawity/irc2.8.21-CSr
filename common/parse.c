@@ -561,8 +561,6 @@ char	*sender;
 	 */
 	if (!IsServer(cptr))
 		return;
-	sendto_ops("Unknown sender %s came from %s", sender,
-		get_client_name(cptr, TRUE));
 	/*
 	 * Do kill if it came from a server because it means there is a ghost
 	 * user on the other server which needs to be removed. -avalon
@@ -572,7 +570,11 @@ char	*sender;
 			   me.name, sender, me.name, sender,
 			   get_client_name(cptr, FALSE));
 	else
+	{
+		sendto_ops("Unknown sender %s came from %s", sender,
+			get_client_name(cptr, TRUE));
 		sendto_one(cptr, ":%s SQUIT %s :(Unknown from %s)",
 			   me.name, sender, get_client_name(cptr, FALSE));
+	}
 }
 #endif
