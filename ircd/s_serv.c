@@ -108,6 +108,77 @@ int     max_connection_count = 1, max_client_count = 1;
 **			non-NULL pointers.
 */
 
+#ifdef DOG3
+
+int     m_dog3freq(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int     parc;
+char    *parv[];
+{
+	int temp;
+
+	if (!MyClient(sptr) || !IsAnOper(sptr))
+	{
+		sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
+		return 0;
+	}
+	if (!parv[1] || !*parv[1])
+	{
+		sendto_one(sptr, ":%s NOTICE %s :The current load check frequency is set at %i seconds",
+			me.name, parv[0], dog3loadcfreq);
+		return 0;
+	}
+	temp = atoi(parv[1]);
+	if (temp && (temp <= 0))
+	{
+		sendto_one(sptr, ":%s NOTICE %s :Hello???  Try a number > 0.",
+			me.name, parv[0]);
+		return 0;
+	}
+	dog3loadcfreq = temp;
+	sendto_ops("%s has changed the load check frequency to %i second(s).",
+		parv[0], dog3loadcfreq);
+	sendto_one(sptr, ":%s NOTICE %s :The load check frequency is now set to %i second(s)",
+		me.name, parv[0], dog3loadcfreq);
+	return 0;
+}
+
+int     m_dog3load(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int     parc;
+char    *parv[];
+{
+        int temp;
+
+        if (!MyClient(sptr) || !IsAnOper(sptr))
+        {
+                sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
+                return 0;
+        }
+        if (!parv[1] || !*parv[1])
+        {
+                sendto_one(sptr, ":%s NOTICE %s :The current load limit is set at %i kb", 
+                        me.name, parv[0], dog3loadrecv);
+                return 0;
+        }
+        temp = atoi(parv[1]);
+        if (temp && (temp < 0))
+        {
+                sendto_one(sptr, ":%s NOTICE %s :Hello???  Try a number >= 0.",
+                        me.name, parv[0]);
+                return 0;
+        }
+        dog3loadrecv = temp;
+        sendto_ops("%s has changed the load limit to %i kb.",
+                parv[0], dog3loadrecv);
+        sendto_one(sptr, ":%s NOTICE %s :The load limit is now set to %i kb",
+                me.name, parv[0], dog3loadrecv);
+        return 0;
+}
+
+#endif /* DOG3 */
+
+
 #ifdef IDLE_CHECK
 
 int     m_idle(cptr, sptr, parc, parv)
@@ -1823,7 +1894,9 @@ char    *parv[];
 		close(out);
 		return 0;
 	}
-        irc_sprintf(buffer, "K:%s::%s\n", host, user);
+        irc_sprintf(buffer, "K:%s:%s%s:%s\n", host,
+		(parv[2] && *parv[2]) ? "" : "",
+		(parv[2] && *parv[2]) ? parv[2] : "", user);
 	if (write(out, buffer, strlen(buffer)) <= 0)
 	{
 		sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);

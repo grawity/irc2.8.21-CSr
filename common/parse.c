@@ -487,25 +487,21 @@ static	int	cancel_clients(cptr, sptr, cmd)
 aClient	*cptr, *sptr;
 char	*cmd;
 {
-	/* Basically let's just ignore everything...nothing
-	   will get passed on, so it's most likely safe to do this
-	   - Comstud
-	*/
+	sendto_ops("Message from %s[%s] != %s", sptr->name,
+		sptr->from->name, get_client_name(cptr, TRUE));
 	if (IsServer(sptr) || IsMe(sptr))
 	{ 
-		sendto_ops("Message from %s came from wrong direction",
-			sptr->name);
 		sendto_ops("Not dropping link: %s", cptr->name);
 		return -1;
 	}
 	if (IsServer(cptr))
 	{
-		sendto_ops("Message from %s!%s@%s came from wrong direction",
-			sptr->name,
-			sptr->user ? sptr->user->username : "unknown",
-			sptr->user ? sptr->user->host : "unknown");
-		sendto_ops("Not killing client: %s", sptr->name);
-		return -1;
+                sendto_serv_butone(NULL, ":%s KILL %s :%s (%s[%s] != %s)",
+                                   me.name, sptr->name, me.name,
+                                   sptr->name, sptr->from->name,
+                                   get_client_name(cptr, TRUE));
+                sptr->flags |= FLAGS_KILLED;
+                return exit_client(cptr, sptr, &me, "Fake Prefix");
 	}
 	/* Fake prefix came from a client of mine...something is screwed
 	   with it, so we can exit this one

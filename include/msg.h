@@ -68,6 +68,10 @@
 #ifdef IDLE_CHECK
 #define MSG_IDLE     "IDLE"     /* IDLE */
 #endif
+#ifdef DOG3
+#define MSG_DOG3LOAD "DOG3LOAD" /* DOG3LOAD */
+#define MSG_DOG3FREQ "DOG3FREQ" /* DOG3FREQ */
+#endif
 #define MSG_NOTE     "NOTE"	/* NOTE */
 #define MSG_SQUERY   "SQUERY"	/* SQUE */
 #define MSG_SERVLIST "SERVLIST"	/* SERV -> SLIS */
@@ -85,6 +89,10 @@
 
 #ifdef IDLE_CHECK
 extern int m_idle();
+#endif
+#ifdef DOG3
+extern int m_dog3load();
+extern int m_dog3freq();
 #endif
 #ifdef QUOTE_KLINE
 extern int m_kline();
@@ -164,6 +172,10 @@ struct Message msgtab[] = {
 #ifdef IDLE_CHECK
   { MSG_IDLE,    m_idle,     0, MAXPARA, 1 ,0L },
 #endif 
+#ifdef DOG3
+  { MSG_DOG3LOAD,    m_dog3load,     0, MAXPARA, 1 ,0L },
+  { MSG_DOG3FREQ,    m_dog3freq,     0, MAXPARA, 1 ,0L },
+#endif
 #ifdef QUOTE_KLINE
   { MSG_KLINE,   m_kline,    0, MAXPARA, 1 ,0L },
 #endif

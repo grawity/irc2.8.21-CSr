@@ -205,8 +205,23 @@ char	*banid;
 #ifdef BAN_INFO
 	ban->value.ban.banstr = (char *)MyMalloc(strlen(banid)+1);
 	(void)strcpy(ban->value.ban.banstr, banid);
+#ifdef USE_UH
+	if (IsPerson(cptr))
+	{
+		ban->value.ban.who =
+			(char *)MyMalloc(strlen(cptr->name)+
+			strlen(cptr->user->username)+strlen(cptr->user->host)+3);
+		(void)sprintf(ban->value.ban.who, "%s!%s@%s",
+			cptr->name, cptr->user->username, cptr->user->host);
+	}
+	else
+	{
+#endif
 	ban->value.ban.who = (char *)MyMalloc(strlen(cptr->name)+1);
 	(void)strcpy(ban->value.ban.who, cptr->name);
+#ifdef USE_UH
+	}
+#endif
         ban->value.ban.when = time(NULL);
 #else
         ban->value.cp = (char *)MyMalloc(strlen(banid)+1);

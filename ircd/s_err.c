@@ -19,6 +19,7 @@
 
 #include "struct.h"
 #include "numeric.h"
+#include "comstud.h"
 
 #ifndef lint
 static  char sccsid[] = "@(#)s_err.c	1.12 11/1/93 (C) 1992 Darren Reed";
@@ -38,7 +39,11 @@ static	Numeric	local_replies[] = {
 /* 001 */	RPL_WELCOME, ":Welcome to the Internet Relay Network %s",
 /* 002 */	RPL_YOURHOST, ":Your host is %s, running version %s",
 /* 003 */	RPL_CREATED, ":This server was created %s",
-/* 004 */	RPL_MYINFO, "%s %s oiws biklmnopstv",
+#ifdef FK_USERMODES
+/* 004 */	RPL_MYINFO, "%s %s oiwsfuckr biklmnopstv",
+#else
+/* 004 */       RPL_MYINFO, "%s %s oiwsucr biklmnopstv",
+#endif
 		0, (char *)NULL
 };
 
@@ -99,7 +104,7 @@ static	Numeric	numeric_errors[] = {
 /* 462 */	ERR_ALREADYREGISTRED, ":You may not reregister",
 /* 463 */	ERR_NOPERMFORHOST, ":Your host isn't among the privileged",
 /* 464 */	ERR_PASSWDMISMATCH, ":Password Incorrect",
-/* 465 */	ERR_YOUREBANNEDCREEP, ":You are banned from this server",
+/* 465 */	ERR_YOUREBANNEDCREEP, ":You are banned from this server: %s",
 /* 466 */	ERR_YOUWILLBEBANNED, (char *)NULL,
 /* 467 */	ERR_KEYSET, "%s :Channel key already set",
 		0, (char *)NULL, 0, (char *)NULL, 0, (char *)NULL,
@@ -125,6 +130,7 @@ static	Numeric	numeric_errors[] = {
 		0, (char *)NULL, 0, (char *)NULL,
 /* 501 */	ERR_UMODEUNKNOWNFLAG, ":Unknown MODE flag",
 /* 502 */	ERR_USERSDONTMATCH, ":Cant change mode for other users",
+/* 503 */	ERR_GHOSTEDCLIENT, "%s :Message could not be delivered to %s",
 		0, (char *)NULL
 };
 

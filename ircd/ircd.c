@@ -46,6 +46,8 @@ fdlist busycli_fdlist; /* high-priority clients */
 fdlist default_fdlist; /* just the number of the entry */
 fdlist auth_fdlist;
 int lifesux = 0;
+int dog3loadcfreq = DEFAULT_LOADCFREQ;
+int dog3loadrecv = DEFAULT_LOADRECV;
 
 time_t check_fdlists();
 
@@ -767,29 +769,33 @@ char	*argv[];
 	static time_t lasttime=0;
 	static long lastrecvK;
 	static int init=0;
-	static time_t loadcfreq=LOADCFREQ;
+	static time_t loadcfreq=DEFAULT_LOADCFREQ;
 
 	if (now-lasttime < loadcfreq)
 		goto done_check;
-	lasttime = now;
-	if (me.receiveK - LOADRECV > lastrecvK)
+	if (me.receiveK - dog3loadrecv > lastrecvK)
 	{
 		if (!lifesux)
 		{
+			sendto_ops("Entering high-traffic mode - %uk/%us > %uk/%us",
+				me.receiveK-lastrecvK, now-lasttime,
+				dog3loadrecv, now-lasttime);
 			loadcfreq *= 2; /* add hysteresis */
 			lifesux = TRUE;
-			sendto_ops("Entering high-traffic mode");
 		}
 	}
 	else
 	{
-		loadcfreq = LOADCFREQ;
+		loadcfreq = dog3loadcfreq;
 		if (lifesux)
 		{
 			lifesux = 0;
-			sendto_ops("Resuming standard operation");
+			sendto_ops("Resuming standard operation - %uk/%us <= %uk/%us",
+				me.receiveK-lastrecvK, now-lasttime,
+				dog3loadrecv, now-lasttime);
 		}
 	}
+	lasttime = now;
 	lastrecvK = me.receiveK;
 done_check:
 	;

@@ -33,6 +33,8 @@ extern fdlist busycli_fdlist; /* high-priority clients */
 extern fdlist default_fdlist; /* just the number of the entry */
 extern fdlist auth_fdlist;
 extern int lifesux;
+extern int dog3loadcfreq;
+extern int dog3loadrecv;
 #endif
 
 #ifdef CLONE_CHECK

@@ -201,6 +201,8 @@
 #define ERR_UMODEUNKNOWNFLAG 501
 #define ERR_USERSDONTMATCH   502
 
+#define ERR_GHOSTEDCLIENT    503
+
 /*
  * Numberic replies from server commands.
  * These are currently in the range 200-399.

@@ -169,9 +169,11 @@ typedef struct  CloneItem aClone;
 #define FLAGS_FMODE	0x100000 /* +f usermode */
 #define FLAGS_CMODE	0x200000 /* +c usermode */
 #define FLAGS_KMODE	0x400000 /* +k usermode */
+#define FLAGS_UMODE	0x800000 /* +u usermode */
+#define FLAGS_RMODE	0x1000000 /* +r usermode */
 
 #define	SEND_UMODES	(FLAGS_INVISIBLE|FLAGS_OPER|FLAGS_WALLOP)
-#define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE)
+#define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_RMODE)
 #define	FLAGS_ID	(FLAGS_DOID|FLAGS_GOTID)
 
 /*
@@ -183,7 +185,9 @@ typedef struct  CloneItem aClone;
 #define	IsAnOper(x)		((x)->flags & (FLAGS_OPER|FLAGS_LOCOP))
 #define IsFMode(x)		((x)->flags & FLAGS_FMODE)
 #define IsCMode(x)		((x)->flags & FLAGS_CMODE)
+#define IsUMode(x)		((x)->flags & FLAGS_UMODE)
 #define IsKMode(x)		((x)->flags & FLAGS_KMODE)
+#define IsRMode(x)		((x)->flags & FLAGS_RMODE)
 #define	IsPerson(x)		((x)->user && IsClient(x))
 #define	IsPrivileged(x)		(IsAnOper(x) || IsServer(x))
 #define	SendWallops(x)		((x)->flags & FLAGS_WALLOP)

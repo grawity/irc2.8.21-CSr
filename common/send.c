@@ -32,6 +32,7 @@ Computing Center and Jarkko Oikarinen";
 #include "sys.h"
 #include "h.h"
 #include <stdio.h>
+#include "numeric.h"
 
 #ifdef DOG3
 #include "fdlist.h"
@@ -801,7 +802,8 @@ va_dcl
 			(((flag == 1) && IsAnOper(cptr)) ||
 			 ((flag == 2) && IsAnOper(cptr) && IsCMode(cptr)) ||
 			((flag == 3) && IsKMode(cptr)) ||
-			((flag == 4) && IsFMode(cptr))))
+			((flag == 4) && IsFMode(cptr)) ||
+			((flag == 5) && IsRMode(cptr))))
                     {
                         (void)irc_sprintf(nbuf, ":%s NOTICE %s :*** Notice -- ",
                                         me.name, cptr->name);
@@ -977,6 +979,34 @@ va_dcl
 #else
 	par = p1;
 #endif
+/*      This if() checks to make sure we don't send the same
+        message back to the place we received it from.  This
+        occurs when a client becomes ghosted and 2 servers
+        have different information about the client.
+               -- Taner & Comstud
+*/
+	if (from && to && !MyClient(from) &&
+		IsPerson(to) && (to->from == from->from))
+	{
+		if (IsServer(from))
+		{
+			sendto_ops("Send message to %s[%s] from %s would have caused Fake Direction",
+				to->name, to->from->name, from->name);
+			return;
+		}
+		sendto_ops("Send message failed to ghosted %s[%s] from %s[%s]",
+			to->name, to->from->name, from->name,
+			from->from->name);
+		sendto_serv_butone(NULL, ":%s KILL %s :%s (%s[%s@%s] Ghosted)",
+			me.name, to->name, me.name, to->name,
+			to->user->username, to->user->host);
+		to->flags |= FLAGS_KILLED;
+		(void)exit_client(NULL, to, &me, "Ghost");
+		if (IsPerson(from))
+			sendto_one(from, err_str(ERR_GHOSTEDCLIENT),
+				me.name, to->name);
+                return;
+	} 
 	if (to && from && MyClient(to) && IsPerson(from) &&
 	    !mycmp(par, from->name))
 	    {

@@ -1026,6 +1026,12 @@ badlookup:
 	return -1;
 }
 
+static int is_comment(comment)
+char  *comment;
+{
+	return (*comment == '');
+}
+
 int	find_kill(cptr)
 aClient	*cptr;
 {
@@ -1049,17 +1055,22 @@ aClient	*cptr;
 		    (match(tmp->host, host) == 0) &&
  		    (!name || match(tmp->name, name) == 0) &&
 		    (!tmp->port || (tmp->port == cptr->acpt->port)))
- 			if (BadPtr(tmp->passwd) ||
- 			    check_time_interval(tmp->passwd, reply))
- 			break;
-
+		{
+ 			if (BadPtr(tmp->passwd))
+				break;
+			if (is_comment(tmp->passwd))
+				break;
+			if (check_time_interval(tmp->passwd, reply))
+	 			break;
+		}
 	if (reply[0])
 		sendto_one(cptr, reply,
 			   me.name, ERR_YOUREBANNEDCREEP, cptr->name);
 	else if (tmp)
-		sendto_one(cptr, err_str(ERR_YOUREBANNEDCREEP), me.name,
-			   cptr->name);
-
+		sendto_one(cptr, err_str(ERR_YOUREBANNEDCREEP),
+			me.name, cptr->name,
+			(BadPtr(tmp->passwd) || !is_comment(tmp->passwd)) ?
+			"<No reason>" : tmp->passwd);
  	return (tmp ? -1 : 0);
  }
 

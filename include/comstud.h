@@ -52,6 +52,12 @@
 
 #define NO_LOCAL_KLINE
 
+/* USE_UH           - define this if you want to use n!u@h
+                      for BAN_INFO
+*/
+
+#define USE_UH
+
 /* BAN_INFO         - define this if you want to see who did bans
                       and when they were done
 */
@@ -171,7 +177,7 @@
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr9/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr10/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -255,7 +261,7 @@
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr9/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr10/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

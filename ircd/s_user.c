@@ -359,7 +359,7 @@ char	*nick, *username;
 	short	oldstatus = sptr->status;
 	anUser	*user = sptr->user;
 	int	i;
-	int	nullhost;
+	int	reject = 0;
 /* Moved this to make_user
 	user->last = time(NULL);
  -- CS
@@ -369,7 +369,13 @@ char	*nick, *username;
 
 	if (MyConnect(sptr))
 	    {
-		nullhost = (strcmp(user->host, "null") == 0);
+		if (!strcmp(user->host, "null"))
+			reject = 1; /* Vlad/Com/Joh */
+		else if (!strcmp(user->host, "1"))
+			reject = 2; /* EggDrop */
+/*
+		else if (!strcmp(user->host, "."))
+			reject = 3; /* Annoy/OJNK */
 		if (sptr->flags & FLAGS_GOTID)
 			temp = sptr->username;
 		else
@@ -451,25 +457,32 @@ char	*nick, *username;
                {
 #endif
 #ifdef REJECT_BOTS
-			if (nullhost)
+			if (reject == 1)
 			{
                                 ircstp->is_ref++;
-                                sendto_flagops(1,"Rejecting joh/com bot: [%s!%s@%s]",
+                                sendto_flagops(5,"Rejecting vlad/joh/com bot: %s [%s@%s]",
                                         nick, user->username, user->host);
                                 return exit_client(cptr, sptr, &me, "No bots allowed");
 			} 
-			if (strstr(nick, "LameHelp"))
+			if ((reject == 2) || strstr(nick, "LameHelp"))
 			{
                                 ircstp->is_ref++;
-                                sendto_flagops(1,"Rejecting eggdrop bot: [%s!%s@%s]",
+                                sendto_flagops(5,"Rejecting eggdrop bot: %s [%s@%s]",
                                         nick, user->username, user->host);
                                 return exit_client(cptr, sptr, &me, "No bots allowed");
+			}
+			if (reject == 3)
+			{
+				ircstp->is_ref++;
+				sendto_flagops(5,"Rejecting ojnk/annoy bot: %s [%s@%s]",
+					nick, user->username, user->host);
+				return exit_client(cptr, sptr, &me, "No bots allowed");
 			}
                         if (!matches("*bot*", nick)||!matches("*Serv*", nick)||
                                 !matches("*help*", nick))
                         {
                                 ircstp->is_ref++;
-                                sendto_flagops(1,"Rejecting bot: [%s!%s@%s]",
+                                sendto_flagops(5,"Rejecting bot: %s [%s@%s]",
                                         nick, user->username, user->host);
                                 return exit_client(cptr, sptr, &me, "No bots allowed");
                         }
@@ -544,7 +557,7 @@ char	*nick, *username;
 #ifdef NO_MIXED_CASE
                 if (lower && upper)
                   {
-                    sendto_flagops(1,"Invalid username: %s [%s@%s]",
+                    sendto_flagops(5, "Invalid username: %s [%s@%s]",
                                nick, username, user->host);
                     ircstp->is_ref++;
                     return exit_client(cptr, sptr, &me, "Invalid username");
@@ -553,7 +566,7 @@ char	*nick, *username;
 #ifdef NO_SPECIAL
                 if (special)
                   {
-                    sendto_flagops(1,"Invalid username: %s [%s@%s]",
+                    sendto_flagops(5,"Invalid username: %s [%s@%s]",
                                nick, user->username, user->host);
                     ircstp->is_ref++;
                     return exit_client(cptr, sptr, &me, "Invalid username");
@@ -566,7 +579,7 @@ char	*nick, *username;
                 if (!matches("* vc:*", sptr->info))
                 {
                         ircstp->is_ref++;
-                        sendto_flagops(1, "Rejecting IPhone user: [%s!%s@%s]",
+                        sendto_flagops(5, "Rejecting IPhone user: [%s!%s@%s]",
                                 nick, user->username, user->host);
                         return exit_client(cptr, sptr, &me, "No IPhone users");
                 }
@@ -2288,12 +2301,14 @@ static int user_modes[]	     = { FLAGS_OPER, 'o',
 #ifdef FK_USERMODES
 				 FLAGS_FMODE, 'f',
 #endif
+				 FLAGS_UMODE, 'u',
 #ifdef CLIENT_NOTICES
 				 FLAGS_CMODE, 'c',
 #endif
 #ifdef FK_USERMODES
 				 FLAGS_KMODE, 'k',
 #endif
+				 FLAGS_RMODE, 'r',
 				 0, 0 };
 
 /*
