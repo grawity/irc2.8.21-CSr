@@ -46,7 +46,7 @@ Reg1	aClient	*cptr;
 	strncpyzt(np->ww_nick, cptr->name, NICKLEN+1);
 	strncpyzt(np->ww_info, cptr->info, REALLEN+1);
 	np->ww_user = cptr->user;
-	np->ww_logout = time(NULL);
+	np->ww_logout = NOW;
 	np->ww_online = (cptr->from != NULL) ? cptr : NULL;
 	np->ww_user->refcnt++;
 
@@ -76,7 +76,7 @@ time_t	timelimit;
 	Reg2	int	i = 0;
 
 	wp = wp2 = &was[ww_index];
-	timelimit = time(NULL)-timelimit;
+	timelimit = NOW-timelimit;
 
 	do {
 		if (!mycmp(nick, wp->ww_nick) && wp->ww_logout >= timelimit)

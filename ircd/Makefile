@@ -186,7 +186,7 @@ s_auth.o: s_auth.c ../include/struct.h ../include/config.h ../include/dbuf.h \
 
 s_conf.o: s_conf.c ../include/struct.h ../include/config.h ../include/sys.h \
 	  ../include/common.h ../include/numeric.h  ../include/dbuf.h \
-	  ../include/comstud.h
+	  ../include/comstud.h ../include/dich_conf.h
 	$(CC) $(CFLAGS) -c s_conf.c
 
 s_debug.o: ../include/config.h ../include/struct.h ../include/common.h \
@@ -230,7 +230,7 @@ hash.o: ../include/struct.h ../include/sys.h ../include/hash.h hash.c \
 	@/bin/mv -f hash.c.old hash.c
 	@touch hash.o
 
-dich_conf.o: dich_conf.h ../include/struct.h ../include/common.h \
+dich_conf.o: ../include/dich_conf.h ../include/struct.h ../include/common.h \
 	     dich_conf.c
 	$(CC) $(CFLAGS) -c dich_conf.c
 

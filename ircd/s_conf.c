@@ -73,14 +73,9 @@ Computing Center and Jarkko Oikarinen";
 
 #include "comstud.h"
 
-#ifdef USE_DICH_CONF
+#if defined(USE_DICH_CONF) || defined(B_LINES) || defined(E_LINES)
 #include "dich_conf.h"
-
-/* Lists to do K: line matching -Sol */
-aConfList	KList1 = { 0, NULL };	/* ordered */
-aConfList	KList2 = { 0, NULL };	/* ordered, reversed */
-aConfList	KList3 = { 0, NULL };	/* what we can't sort */
-#endif
+#endif /* USE_DICH_CONF || B_LINES || E_LINES */
 
 static	int	check_time_interval PROTO((char *, char *));
 static	int	lookup_confhost PROTO((aConfItem *));
@@ -153,7 +148,9 @@ char	*username;
 
 		if (index(aconf->host, '@') && *username)
 		    {	
-			strncpyzt(uhost, username, sizeof(uhost));
+			/* strncpyzt(uhost, username, sizeof(uhost));
+			   username is limited in length -Sol */
+			strncpyzt(uhost, username, USERLEN+1);
 			(void)strcat(uhost, "@");
 		    }
 		else
@@ -635,7 +632,17 @@ int	sig;
 	clear_conf_list(&KList1);
 	clear_conf_list(&KList2);
 	clear_conf_list(&KList3);
-#endif
+#endif /* USE_DICH_CONF */
+#ifdef B_LINES
+	clear_conf_list(&BList1);
+	clear_conf_list(&BList2);
+	clear_conf_list(&BList3);
+#endif /* B_LINES */
+#ifdef E_LINES
+	clear_conf_list(&EList1);
+	clear_conf_list(&EList2);
+	clear_conf_list(&EList3);
+#endif /* E_LINES */
 	(void) initconf(0);
 	close_listeners();
 
@@ -720,7 +727,7 @@ int	opt;
 					{'r', '\r'}, {'t', '\t'}, {'v', '\v'},
 					{'\\', '\\'}, { 0, 0}};
 	Reg1	char	*tmp, *s;
-	int	fd, i;
+	int	fd, i, dontadd;
 	char	line[512], c[80];
 	int	ccount = 0, ncount = 0;
 	aConfItem *aconf = NULL;
@@ -785,17 +792,30 @@ int	opt;
 		tmp = getfield(line);
 		if (!tmp)
 			continue;
+		dontadd = 0;
 		switch (*tmp)
 		{
 			case 'A': /* Name, e-mail address of administrator */
 			case 'a': /* of this server. */
 				aconf->status = CONF_ADMIN;
 				break;
+#ifdef B_LINES
+			case 'B': /* Addresses that we don't want to check */
+			case 'b': /* for bots. */
+				aconf->status = CONF_BOT_IGNORE;
+				break;
+#endif /* B_LINES */
 			case 'C': /* Server where I should try to connect */
 			case 'c': /* in case of lp failures             */
 				ccount++;
 				aconf->status = CONF_CONNECT_SERVER;
 				break;
+#ifdef E_LINES
+                        case 'E': /* Addresses that we don't want to check */
+                        case 'e': /* for bots. */
+                                aconf->status = CONF_ELINE;
+                                break;
+#endif /* E_LINES */
 			case 'H': /* Hub server line */
 			case 'h':
 				aconf->status = CONF_HUB;
@@ -978,6 +998,7 @@ int	opt;
 		{
 			char	*host = host_field(aconf);
 
+			dontadd = 1;
 			switch (sortable(host))
 			{
 				case 0 :
@@ -991,9 +1012,53 @@ int	opt;
 					break;
 			}
 
-			free(host);
+			MyFree(host);
 		}
-#endif
+#endif /* USE_DICH_CONF */
+#ifdef B_LINES
+		if (aconf->host && (aconf->status & CONF_BOT_IGNORE))
+		{
+			char	*host = host_field(aconf);
+
+			dontadd = 1;
+			switch (sortable(host))
+			{
+				case 0 :
+					l_addto_conf_list(&BList3, aconf, host_field);
+					break;
+				case 1 :
+					addto_conf_list(&BList1, aconf, host_field);
+					break;
+				case -1 :
+					addto_conf_list(&BList2, aconf, rev_host_field);
+					break;
+			}
+
+			MyFree(host);
+		}
+#endif /* B_LINES */
+#ifdef E_LINES
+                if (aconf->host && (aconf->status & CONF_ELINE))
+                {
+                        char    *host = host_field(aconf);
+
+			dontadd = 1;
+                        switch (sortable(host))
+                        {
+                                case 0 :
+                                        l_addto_conf_list(&EList3, aconf, host_field);
+                                        break;
+                                case 1 :
+                                        addto_conf_list(&EList1, aconf, host_field);
+                                        break;
+                                case -1 :
+                                        addto_conf_list(&EList2, aconf, rev_host_field);
+                                        break;
+                        }
+
+                        MyFree(host);
+                }
+#endif /* E_LINES */
 
 		(void)collapse(aconf->host);
 		(void)collapse(aconf->name);
@@ -1001,8 +1066,11 @@ int	opt;
 		      "Read Init: (%d) (%s) (%s) (%s) (%d) (%d)",
 		      aconf->status, aconf->host, aconf->passwd,
 		      aconf->name, aconf->port, Class(aconf)));
-		aconf->next = conf;
-		conf = aconf;
+		if (!dontadd)
+		{
+			aconf->next = conf;
+			conf = aconf;
+		}
 		aconf = NULL;
 	    }
 	if (aconf)
@@ -1013,7 +1081,7 @@ int	opt;
 	(void)wait(0);
 #endif
 	check_class();
-	nextping = nextconnect = time(NULL);
+	nextping = nextconnect = NOW;
 	return 0;
     }
 
@@ -1082,6 +1150,11 @@ aClient	*cptr;
 	aConfList	*list;
 #endif /* USE_DICH_CONF */
 
+#ifdef E_LINES
+	if (find_eline(cptr))
+		return 0;
+#endif
+
 	if (!cptr->user)
 		return 0;
 
@@ -1095,9 +1168,8 @@ aClient	*cptr;
 	reply[0] = '\0';
 
 #ifdef USE_DICH_CONF
-	rev = (char *) malloc(strlen(host)+1);
-	strcpy(rev, host);
-	reverse(rev);
+	rev = (char *) MyMalloc(strlen(host)+1);
+	reverse(rev, host);
 
 	/* Start with hostnames of the form "*word" (most frequent) -Sol */
 	list = &KList2;
@@ -1151,7 +1223,7 @@ aClient	*cptr;
 	}
 
 matched:
-	free(rev);
+	MyFree(rev);
 
 # ifdef DICH_CONF_DEBUG
 	if (reply[0] || tmp)
@@ -1190,6 +1262,82 @@ matched:
 			"<No reason>" : tmp->passwd);
  	return (tmp ? -1 : 0);
  }
+
+int	find_conf_match(cptr, List1, List2, List3)
+aClient	*cptr;
+aConfList	*List1;
+aConfList	*List2;
+aConfList	*List3;
+{
+	char	*host, *name;
+	aConfItem *tmp;
+	char		*rev;
+	aConfList	*list;
+
+	if (!cptr->user)
+		return 0;
+
+	host = cptr->sockhost;
+	name = cptr->user->username;
+
+	if (strlen(host)  > (size_t) HOSTLEN ||
+            (name ? strlen(name) : 0) > (size_t) HOSTLEN)
+		return (0);
+
+	rev = (char *) MyMalloc(strlen(host)+1);
+	reverse(rev, host);
+
+	/* Start with hostnames of the form "*word" (most frequent) -Sol */
+	list = List2;
+	while ((tmp = find_matching_conf(list, rev)) != NULL)
+	{
+		if (tmp->name && (!name || !match(tmp->name, name)) &&
+		    (!tmp->port || (tmp->port == cptr->acpt->port)))
+			goto found_match;
+		list = NULL;
+	}
+
+	/* Try hostnames of the form "word*" -Sol */
+	list = List1;
+	while ((tmp = find_matching_conf(list, host)) != NULL)
+	{
+		if (tmp->name && (!name || !match(tmp->name, name)) &&
+		    (!tmp->port || (tmp->port == cptr->acpt->port)))
+			goto found_match;
+		list = NULL;
+	}
+
+	/* If none of the above worked, try non-sorted entries -Sol */
+	list = List3;
+	while ((tmp = l_find_matching_conf(list, host)) != NULL)
+	{
+		if (tmp->host && tmp->name && (!name || !match(tmp->name, name))
+		    && (!tmp->port || (tmp->port == cptr->acpt->port)))
+			goto found_match;
+		list = NULL;
+	}
+
+found_match:
+	MyFree(rev);
+
+ 	return (tmp ? -1 : 0);
+ }
+
+#ifdef B_LINES
+int	find_bline(cptr)
+aClient *cptr;
+{
+	return find_conf_match(cptr, &BList1, &BList2, &BList3);
+}
+#endif /* B_LINES */
+
+#ifdef E_LINES
+int	find_eline(cptr)
+aClient *cptr;
+{
+	return find_conf_match(cptr, &EList1, &EList2, &EList3);
+}
+#endif /* E_LINES */
 
 #ifdef R_LINES
 /* find_restrict works against host/name and calls an outside program 
@@ -1323,7 +1471,7 @@ char	*interval, *reply;
  		perm_max_hours, perm_max_minutes;
  	int	now, perm_min, perm_max;
 
- 	tick = time(NULL);
+ 	tick = NOW;
 	tptr = localtime(&tick);
  	now = tptr->tm_hour * 60 + tptr->tm_min;
 

@@ -21,9 +21,9 @@ aClone *make_clone()
         if (!(acl = (aClone *)MyMalloc(size)))
                 outofmemory();
         bzero((char *)acl, (int)size);
-        strcpy(acl->hostname, "");
+	*acl->hostname = (char) 0;
         acl->num = 0;
-        acl->last = time(NULL);
+        acl->last = NOW;
         acl->prev = NULL;
         if (Clones)
                 Clones->prev = acl;
@@ -65,7 +65,7 @@ void update_clones()
         Reg2 aClone *temp;
         time_t old;
 
-        old = time(NULL);
+        old = NOW;
         while (acl != NULL)
         {
                 temp = acl->next;

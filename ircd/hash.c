@@ -36,24 +36,31 @@ static char sccsid[] = "@(#)hash.c	2.10 7/3/93 (C) 1991 Darren Reed";
 #define MAX_NEW (MAX_INITIAL*MAX_SUB)
 #endif
 
+
+int CHANNELHASHSIZE = DEFAULT_CHANNELHASHSIZE;
+
+#ifdef DOUGH_HASH
+int     HASHSIZE = MAX_NEW;
+#else
+int     HASHSIZE = DEFAULT_HASHSIZE
+#endif
+
 #ifdef	DEBUGMODE
+
 static	aHashEntry	*clientTable = NULL;
 static	aHashEntry	*channelTable = NULL;
 static	int	clhits, clmiss;
 static	int	chhits, chmiss;
-int	HASHSIZE = 2003;
-int	CHANNELHASHSIZE = 607;
+
 #else
+
 #ifdef DOUGH_HASH
-int	HASHSIZE = MAX_NEW;
-int	CHANNELHASHSIZE = DEFAULT_CHANNELHASHSIZE;
 static  aHashEntry      clientTable[MAX_NEW];
 #else
-int	HASHSIZE = DEFAULT_HASHSIZE;
-int	CHANNELHASHSIZE = DEFAULT_CHANNELHASHSIZE;
 static	aHashEntry	clientTable[DEFAULT_HASHSIZE];
 #endif
 static	aHashEntry	channelTable[DEFAULT_CHANNELHASHSIZE];
+
 #endif
 
 static	int	hash_mult[] = { 173, 179, 181, 191, 193, 197,

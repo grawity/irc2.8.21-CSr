@@ -233,7 +233,7 @@ char	*banid;
 #ifdef USE_UH
 	}
 #endif
-        ban->value.ban.when = time(NULL);
+        ban->value.ban.when = NOW;
 #else
         ban->value.cp = (char *)MyMalloc(strlen(banid)+1);
         (void)strcpy(ban->value.cp, banid);
@@ -1608,7 +1608,7 @@ char	*parv[];
 		*/
 		if (MyClient(sptr) && flags)
 		    {
-			chptr->channelts = time(NULL) + timedelta;
+			chptr->channelts = NOW + timedelta;
 			sendto_match_TS_servs(0, chptr, cptr, ":%s JOIN :%s",
 						parv[0], name);
 			sendto_match_TS_servs(1, chptr, cptr,
@@ -1927,7 +1927,7 @@ char	*parv[];
 			strncpyzt(chptr->topic, topic, sizeof(chptr->topic));
 #ifdef TOPIC_INFO
                         strcpy(chptr->topic_nick, sptr->name);
-                        chptr->topic_time = time(NULL);
+                        chptr->topic_time = NOW;
 #endif
 			sendto_match_servs(chptr, cptr,":%s TOPIC %s :%s",
 					   parv[0], chptr->chname,
@@ -2045,7 +2045,7 @@ char	*parv[];
 	aChannel *chptr;
 	char	*name, *p = NULL;
 
-#ifdef DOG3
+#if defined(DOG3) && defined(RESTRICT)
 	if (lifesux && !IsAnOper(sptr))
 	{
 		sendto_one(sptr, rpl_str(RPL_LOAD2HI), me.name,

@@ -36,6 +36,30 @@ Computing Center and Jarkko Oikarinen";
 #include <fcntl.h>
 #include "h.h"
 
+#if defined(USE_DICH_CONF) || defined(B_LINES) || defined(E_LINES)
+#include "dich_conf.h"
+#endif
+
+#ifdef USE_DICH_CONF
+/* Lists to do K: line matching -Sol */
+aConfList       KList1 = { 0, NULL };   /* ordered */
+aConfList       KList2 = { 0, NULL };   /* ordered, reversed */
+aConfList       KList3 = { 0, NULL };   /* what we can't sort */
+#endif /* USE_DICH_CONF */
+
+#ifdef B_LINES
+/* Lists to do B: line matching -Sol */
+aConfList       BList1 = { 0, NULL };   /* ordered */
+aConfList       BList2 = { 0, NULL };   /* ordered, reversed */
+aConfList       BList3 = { 0, NULL };   /* what we can't sort */
+#endif /* B_LINES */
+
+#ifdef E_LINES
+aConfList       EList1 = { 0, NULL };   /* ordered */
+aConfList       EList2 = { 0, NULL };   /* ordered, reversed */
+aConfList       EList3 = { 0, NULL };   /* what we can't sort */
+#endif /* E_LINES */
+
 #ifdef DOG3
 
 #include "dog3.h"
@@ -59,11 +83,9 @@ void send_high_sendq();
 	char clonekillhost[100];
 #endif
 
+time_t	NOW;
 aClient me;			/* That's me */
 aClient *client = &me;		/* Pointer to beginning of Client list */
-#ifdef IDLE_CHECK
-int	idlelimit;
-#endif
 int	rehashed = 1;
 
 void	server_reboot();
@@ -288,9 +310,6 @@ time_t	currenttime;
 	int	ping = 0, i, rflag = 0, checkit = 0;
 	time_t	oldest = 0, timeout;
 	static time_t  lastcheck = 0;
-#ifdef IDLE_CHECK
-	register int idleflag;
-#endif
 
 	if (rehashed || (currenttime-lastcheck > KLINE_CHECK))
 	{
@@ -312,12 +331,6 @@ time_t	currenttime;
 			(void)exit_client(cptr, cptr, &me, "Dead socket");
 			continue;
 		    }
-#ifdef IDLE_CHECK
-		idleflag = (idlelimit && MyConnect(cptr) && cptr->user &&
-			!IsAnOper(cptr)&&
-			(currenttime-cptr->user->last>idlelimit) &&
-			matches(IDLE_IGNORE, inetntoa((char *)&cptr->ip)));
-#endif 
 		killflag = (checkit && IsPerson(cptr)) ?
 			find_kill(cptr) : 0;
 #ifdef R_LINES_OFTEN
@@ -333,9 +346,6 @@ time_t	currenttime;
 		 * is already indented enough so I think its justified. -avalon
 		 */
 		if (!killflag && !rflag &&
-#ifdef IDLE_CHECK
-			!idleflag &&
-#endif
 			IsRegistered(cptr) &&
 		    (ping >= currenttime - cptr->lasttime))
 			goto ping_timeout;
@@ -346,9 +356,6 @@ time_t	currenttime;
 		 * to be active, close this connection too.
 		 */
 		if (killflag || rflag ||
-#ifdef IDLE_CHECK
-			idleflag ||
-#endif
 		    ((currenttime - cptr->lasttime) >= (2 * ping) &&
 		     (cptr->flags & FLAGS_PINGSENT)) ||
 		    (!IsRegistered(cptr) &&
@@ -387,11 +394,6 @@ time_t	currenttime;
 			if (killflag && IsPerson(cptr))
 				sendto_ops("Kill line active for %s",
 					   get_client_name(cptr, FALSE));
-#ifdef IDLE_CHECK
-                        if (idleflag && IsPerson(cptr) && IsRegistered(cptr))
-                                sendto_ops("Idle time limit exceeded for %s",
-                                        get_client_name(cptr, FALSE));
-#endif
 #if defined(R_LINES) && defined(R_LINES_OFTEN)
 			if (IsPerson(cptr) && rflag)
 				sendto_ops("Restricting %s, closing link.",
@@ -400,11 +402,6 @@ time_t	currenttime;
                         if (killflag)
                                 (void)exit_client(cptr, cptr, &me,
                                 "K-Lined");
-#ifdef IDLE_CHECK
-                        else if (idleflag)
-                                (void)exit_client(cptr, cptr, &me,
-                                "Idle time limit exceeded");
-#endif
                         else
                                 (void)exit_client(cptr, cptr, &me, "Ping timeout");
 			i = 0;
@@ -488,7 +485,7 @@ char	*argv[];
 {
 	int	portarg = 0;
 	uid_t	uid, euid;
-	time_t	delay = 0, now;
+	time_t	delay = 0;
 #ifndef AIX
         struct rlimit r;
 #endif
@@ -497,6 +494,8 @@ char	*argv[];
                            the main loop */
 	time_t nextfdlistcheck=0; /*end of priority code */
 #endif
+
+	NOW = time(NULL);
 #ifdef DBUF_INIT
         dbuf_init(); /* set up some dbuf stuff to control paging */
 #endif
@@ -504,9 +503,6 @@ char	*argv[];
         r.rlim_cur = MAXCONNECTIONS;
         r.rlim_max = MAXCONNECTIONS;
         setrlimit(RLIMIT_NOFILE, &r);
-#endif
-#ifdef IDLE_CHECK
-        idlelimit = DEFAULT_IDLELIMIT*60;
 #endif
 	sbrk0 = (char *)sbrk((size_t)0);
 	uid = getuid();
@@ -744,7 +740,7 @@ char	*argv[];
 	make_server(&me);
 	(void)strcpy(me.serv->up, me.name);
 
-	me.lasttime = me.since = me.firsttime = time(NULL);
+	me.lasttime = me.since = me.firsttime = NOW;
 	(void)add_to_client_hash_table(me.name, &me);
 
 	check_class();
@@ -763,12 +759,13 @@ char	*argv[];
 #ifdef USE_SYSLOG
 	syslog(LOG_NOTICE, "Server Ready");
 #endif
+	NOW = time(NULL);
 #ifdef DOG3
-	check_fdlists(time(NULL));
+	check_fdlists();
 #endif
 	for (;;)
 	    {
-		now = time(NULL);
+		NOW = time(NULL);
 #ifdef DOG3 
 {
 	static time_t lasttime=0;
@@ -776,15 +773,15 @@ char	*argv[];
 	static int init=0;
 	static time_t loadcfreq=DEFAULT_LOADCFREQ;
 
-	if (now-lasttime < loadcfreq)
+	if (NOW-lasttime < loadcfreq)
 		goto done_check;
 	if (me.receiveK - dog3loadrecv > lastrecvK)
 	{
 		if (!lifesux)
 		{
 			sendto_ops("Entering high-traffic mode - %uk/%us > %uk/%us",
-				me.receiveK-lastrecvK, now-lasttime,
-				dog3loadrecv, now-lasttime);
+				me.receiveK-lastrecvK, NOW-lasttime,
+				dog3loadrecv, NOW-lasttime);
 			loadcfreq *= 2; /* add hysteresis */
 			lifesux = TRUE;
 		}
@@ -796,11 +793,11 @@ char	*argv[];
 		{
 			lifesux = 0;
 			sendto_ops("Resuming standard operation - %uk/%us <= %uk/%us",
-				me.receiveK-lastrecvK, now-lasttime,
-				dog3loadrecv, now-lasttime);
+				me.receiveK-lastrecvK, NOW-lasttime,
+				dog3loadrecv, NOW-lasttime);
 		}
 	}
-	lasttime = now;
+	lasttime = NOW;
 	lastrecvK = me.receiveK;
 done_check:
 	;
@@ -814,15 +811,15 @@ done_check:
 		** active C lines, this call to Tryconnections is
 		** made once only; it will return 0. - avalon
 		*/
-		if (nextconnect && now >= nextconnect)
-			nextconnect = try_connections(now);
+		if (nextconnect && NOW >= nextconnect)
+			nextconnect = try_connections(NOW);
 		/*
 		** DNS checks. One to timeout queries, one for cache expiries.
 		*/
-		if (now >= nextdnscheck)
-			nextdnscheck = timeout_query_list(now);
-		if (now >= nextexpire)
-			nextexpire = expire_cache(now);
+		if (NOW >= nextdnscheck)
+			nextdnscheck = timeout_query_list(NOW);
+		if (NOW >= nextexpire)
+			nextexpire = expire_cache(NOW);
 		/*
 		** take the smaller of the two 'timed' event times as
 		** the time of next event (stops us being late :) - avalon
@@ -834,7 +831,7 @@ done_check:
 			delay = nextping;
 		delay = MIN(nextdnscheck, delay);
 		delay = MIN(nextexpire, delay);
-		delay -= now;
+		delay -= NOW;
 		/*
 		** Adjust delay to something reasonable [ad hoc values]
 		** (one might think something more clever here... --msa)
@@ -863,16 +860,15 @@ done_check:
 #endif
 {
 		static time_t lasttime=0;
-		if ((lasttime + (lifesux +1) * 2)< (now = time(NULL)))
+		if ((lasttime + (lifesux +1) * 2)< NOW)
 		{
 			read_message(delay,NULL); /*  check everything! */
-			lasttime = now;
+			lasttime = NOW;
 		}
 }
 #endif
 		Debug((DEBUG_DEBUG ,"Got message(s)"));
 		
-		now = time(NULL);
 		/*
 		** ...perhaps should not do these loops every time,
 		** but only if there is some chance of something
@@ -882,11 +878,11 @@ done_check:
 		** ping times) --msa
 		*/
 #ifdef DOG3
-		if ((now >= nextping && !lifesux) || rehashed)
+		if ((NOW >= nextping && !lifesux) || rehashed)
 #else
-		if ((now >= nextping) || rehashed)
+		if ((NOW >= nextping) || rehashed)
 #endif
-			nextping = check_pings(now);
+			nextping = check_pings(NOW);
 
 		if (dorehash)
 		    {
@@ -901,8 +897,8 @@ done_check:
 		flush_connections(me.fd);
 #ifdef DOG3
 		/* check which clients are active */
-		if (now > nextfdlistcheck)
-			nextfdlistcheck = check_fdlists(now);
+		if (NOW > nextfdlistcheck)
+			nextfdlistcheck = check_fdlists();
 #endif
 	    }
     }
@@ -954,7 +950,7 @@ static	void	open_debugfile()
 		else
 			(void)strcpy(cptr->name, "FD2-Pipe");
 		Debug((DEBUG_FATAL, "Debug: File <%s> Level: %d at %s",
-			cptr->name, cptr->port, myctime(time(NULL))));
+			cptr->name, cptr->port, myctime(NOW)));
 	    }
 	else
 		local[2] = NULL;
@@ -1037,8 +1033,7 @@ fdlist *listp;
 } 
 
 
-time_t check_fdlists(now)
-time_t now;
+time_t check_fdlists()
 {
 	register aClient *cptr;
 	int pri; /* temp. for priority */
@@ -1070,6 +1065,6 @@ time_t now;
 	}
 	busycli_fdlist.last_entry=j; /* rest of the fdlist is garbage */
 
-	return (now + FDLISTCHKFREQ + lifesux * FDLISTCHKFREQ);
+	return (NOW + FDLISTCHKFREQ + lifesux * FDLISTCHKFREQ);
 }
 #endif /* DOG3 */

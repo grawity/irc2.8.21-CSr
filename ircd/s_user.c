@@ -384,10 +384,7 @@ char	*nick, *username;
 	anUser	*user = sptr->user;
 	int	i;
 	int	reject = 0;
-/* Moved this to make_user
-	user->last = time(NULL);
- -- CS
-*/
+
 	parv[0] = sptr->name;
 	parv[1] = parv[2] = NULL;
 
@@ -458,10 +455,8 @@ char	*nick, *username;
 			return exit_client(cptr, sptr, &me, "Bad Password");
 		    }
 		bzero(sptr->passwd, sizeof(sptr->passwd));
-		/*
-		 * following block for the benefit of time-dependent K:-lines
-		 */
-		if ((ConfSendq(aconf) <= 1) || find_kill(sptr))
+
+		if (find_kill(sptr))
 		    {
 			ircstp->is_ref++;
 			return exit_client(cptr, sptr, &me, "K-lined");
@@ -476,41 +471,52 @@ char	*nick, *username;
 		if (oldstatus == STAT_MASTER && MyConnect(sptr))
 			(void)m_oper(&me, sptr, 1, parv);
 
-#if defined(REJECT_BOTS) || defined(CLONE_CHECK)
-               if (matches(BOT_IP_IGNORE, inetntoa((char *)&cptr->ip)))
-               {
+#ifdef B_LINES
+		if (!find_bline(cptr))
+		{
 #endif
-#ifdef REJECT_BOTS
+#if defined(BOTS_NOTICE) || defined(REJECT_BOTS)
 			if (reject == 1)
 			{
                                 ircstp->is_ref++;
-                                sendto_flagops(5,"Rejecting vlad/joh/com bot: %s [%s@%s]",
+#ifdef BOTS_NOTICE
+                                sendto_flagops(5,"Possible vlad/joh/com bot: %s [%s@%s]",
                                         nick, user->username, user->host);
+#endif
+#ifdef REJECT_BOTS
                                 return exit_client(cptr, sptr, &me, "No bots allowed");
+#endif
 			} 
 			if ((reject == 2) || strstr(nick, "LameHelp"))
 			{
                                 ircstp->is_ref++;
-                                sendto_flagops(5,"Rejecting eggdrop bot: %s [%s@%s]",
+#ifdef BOTS_NOTICE
+                                sendto_flagops(5,"Possible eggdrop bot: %s [%s@%s]",
                                         nick, user->username, user->host);
+#endif
+#ifdef REJECT_BOTS
                                 return exit_client(cptr, sptr, &me, "No bots allowed");
+#endif
 			}
 			if (reject == 3)
 			{
 				ircstp->is_ref++;
-				sendto_flagops(5,"Rejecting ojnk/annoy bot: %s [%s@%s]",
+#ifdef BOTS_NOTICE
+				sendto_flagops(5,"Possible ojnk/annoy bot: %s [%s@%s]",
 					nick, user->username, user->host);
+#endif
+#ifdef REJECT_BOTS
 				return exit_client(cptr, sptr, &me, "No bots allowed");
+#endif
 			}
                         if (!matches("*bot*", nick)||!matches("*Serv*", nick)||
                                 !matches("*help*", nick))
                         {
                                 ircstp->is_ref++;
-                                sendto_flagops(5,"Rejecting bot: %s [%s@%s]",
+                                sendto_flagops(5,"Possible bot: %s [%s@%s]",
                                         nick, user->username, user->host);
-                                return exit_client(cptr, sptr, &me, "No bots allowed");
                         }
-#endif /* REJECT_BOTS */
+#endif /* REJECT_BOTS || BOTS_NOTICE */
 #ifdef CLONE_CHECK
                 update_clones();
                 if ((clone = find_clone(user->host)) == NULL)
@@ -522,7 +528,7 @@ char	*nick, *username;
                 if (clone)
                 {
                         clone->num++;
-                        clone->last = time(NULL);
+                        clone->last = NOW;
                         if (clone->num == NUM_CLONES)
                                 sendto_flagops(1, "CloneBot protection activated against %s", user->host);
                         if (clone->num >= NUM_CLONES)
@@ -534,7 +540,7 @@ char	*nick, *username;
 				{
 					(void)irc_sprintf(buf,
 					"%s: Clonebot rejected: %s!%s@%s\n",
-						myctime(time(NULL)), parv[0],
+						myctime(NOW), parv[0],
 						sptr->user->username,
 						sptr->user->host);
 					(void)write(logfile, buf, strlen(buf));
@@ -552,7 +558,7 @@ char	*nick, *username;
                         }
                 }
 #endif /* CLONE_CHECK */
-#if defined(REJECT_BOTS) || defined(CLONE_CHECK)
+#ifdef B_LINES
 		} /* end of check for ip# */
 #endif
 #if defined(NO_MIXED_CASE) || defined(NO_SPECIAL)
@@ -635,7 +641,7 @@ char	*nick, *username;
 			   me.name, version);
 		(void)m_lusers(sptr, sptr, 1, parv);
 		(void)m_motd(sptr, sptr, 1, parv);
-		nextping = time(NULL);
+		nextping = NOW;
 	    }
 	else if (IsServer(cptr))
 	    {
@@ -1014,7 +1020,7 @@ nickkilldone:
 		if (newts)
 			sptr->tsinfo = newts;
 		else
-			newts = sptr->tsinfo = (ts_val)time(NULL) + timedelta;
+			newts = sptr->tsinfo = (ts_val)NOW + timedelta;
 		/* copy the nick in place */
 		(void)strcpy(sptr->name, nick);
 		(void)add_to_client_hash_table(nick, sptr);
@@ -1050,7 +1056,7 @@ nickkilldone:
 		** on that channel. Propagate notice to other servers.
 		*/
 		if (mycmp(parv[0], nick))
-			sptr->tsinfo = newts ? newts : (ts_val)time(NULL) +
+			sptr->tsinfo = newts ? newts : (ts_val)NOW +
 					timedelta;
 		sendto_common_channels(sptr, ":%s NICK :%s", parv[0], nick);
 		if (sptr->user)
@@ -1070,7 +1076,7 @@ nickkilldone:
 
 		/* This had to be copied here to avoid problems.. */
 		(void)strcpy(sptr->name, nick);
-		sptr->tsinfo = time(NULL) + timedelta;
+		sptr->tsinfo = NOW + timedelta;
 		if (sptr->user)
 			/*
 			** USER already received, now we have NICK.
@@ -1286,7 +1292,7 @@ int	notice;
 			   parv[0], nick);
             }
     if (resetidle && MyConnect(sptr) && sptr->user)
-	sptr->user->last = time(NULL);	
+	sptr->user->last = NOW;	
     return 0;
 }
 
@@ -1533,7 +1539,7 @@ char	*parv[];
 		found = 0;
 		(void)collapse(nick);
 /*
-#ifdef DOG3
+#if defined(DOG3) && defined(RESTRICT)
 		if (wilds = (index(nick, '?') || index(nick, '*')))
 			if (lifesux && !IsAnOper(sptr))
 			{
@@ -1657,10 +1663,10 @@ char	*parv[];
 				sendto_one(sptr, rpl_str(RPL_WHOISIDLE),
 					   me.name, parv[0], name,
 #ifdef SIGNON_TIME
-					   time(NULL) - user->last,
+					   NOW - user->last,
                                            acptr->firsttime);
 #else
-					   time(NULL) - user->last);
+					   NOW - user->last);
 #endif
 		    }
 		if (!found)
@@ -2267,7 +2273,7 @@ char	*parv[];
                     (logfile = open(FNAME_OPERLOG, O_WRONLY|O_APPEND)) != -1)
 		{
                         (void)irc_sprintf(buf, "%s OPER (%s) (%s) by (%s!%s@%s)\n",
-				      myctime(time(NULL)), name, encr,
+				      myctime(NOW), name, encr,
 				      parv[0], sptr->user->username,
 				      sptr->sockhost);
 		  (void)write(logfile, buf, strlen(buf));
@@ -2293,7 +2299,7 @@ char	*parv[];
                 {
                       (void)irc_sprintf(buf,
                                "%s: %s!%s@%s tried (%s) %s\n",
-                               myctime(time(NULL)), sptr->name,
+                               myctime(NOW), sptr->name,
 			       sptr->user->username,
                                sptr->user->host, name, password);
                       (void)write(logfile, buf, strlen(buf));

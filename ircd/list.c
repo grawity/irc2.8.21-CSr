@@ -129,7 +129,7 @@ aClient	*from;
 	(void)strcpy(cptr->username, "unknown");
 	if (size == CLIENT_LOCAL_SIZE)
 	    {
-		cptr->since = cptr->lasttime = cptr->firsttime = time(NULL);
+		cptr->since = cptr->lasttime = cptr->firsttime = NOW;
 		cptr->confs = NULL;
 		cptr->sockhost[0] = '\0';
 		cptr->buffer[0] = '\0';
@@ -165,7 +165,7 @@ aClient *cptr;
 		user->joined = 0;
 		user->channel = NULL;
 		user->invited = NULL;
-		user->last = time(NULL);
+		user->last = NOW;
 		cptr->user = user;
 	    }
 	return user;

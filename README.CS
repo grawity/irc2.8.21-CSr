@@ -1,3 +1,40 @@
+NOTE: Please change values in comstud.h and dog3.h to your liking...
+      The default values are probably less than ideal for you! 
+
+New in CSr18:
+
+1) Fix from Philippe for dich_conf K: line matching and so forth...
+2) Added B: lines to desigate hosts/ip#'s to ignore for bot/clone checking
+   if defined...Thanks to Philippe for this as well
+
+Note: BOT_IP_IGNORE is no longer a #define, you must use B: lines
+      (the same way as K: and I: lines to specify a host/ip or so forth
+       to make pass thru the bot/clone check...)
+
+3) Fixed DEBUGMODE and DOUGH_HASH not being able to be defined together (?)
+4) Remove IDLE checking for disconnecting IDLE users...this patch was
+   basically a waste, since most clients auto-reconnect...maybe I'll do
+   something that won't let the clients reconnect...we'll see...
+5) Removed the #define's for removing flood control for opers...if you want
+   this, you will have to hack it in yourself...I don't want to catch any
+   crap for it =)
+6) Minimal performance improvement, lowering the # of calls to time()
+7) Performance improvements, removing K: lines from the main linear
+   "conf" list, when using DICH_CONF...before, it still added them to
+   the "conf" list, and also kept them in separate DICH lists...This
+   improves the speed in looking up I:/Y: lines and so forth...so when
+   clients connect, less CPU is used.
+8) Added #define for E-lines.  These lines are for hosts that should
+   be allowed to connect, even if it matches a K-line...for instance,
+   K-line all of *netcom.com, E-line *cbehrens@*netcom.com to allow it
+   to connect  (This is only valuable to open I: servers mostly)
+9) When using QUOTE KLINE with DICH_CONF, the K-line is added to ircd.conf
+   and added in memory internally without rereading the whole ircd.conf
+10) Fixed various other things with QUOTE KLINE...
+11) Fixed timezone bug
+12) Added #define RESTRICT, so that you can #define whether or not
+    you want to disable /list, and /lusers when in dog3's HTM
+
 New in CSr17:
 
 1) Updates for +TSora

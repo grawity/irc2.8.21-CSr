@@ -87,7 +87,7 @@ int	op;
 	int	ret = 0;
 
 #ifdef	LRAND48
-	srand48(time(NULL));
+	srand48(NOW);
 #endif
 	if (op & RES_INITLIST)
 	    {
@@ -193,7 +193,7 @@ Link	*lp;
 	nreq = (ResRQ *)MyMalloc(sizeof(ResRQ));
 	bzero((char *)nreq, sizeof(ResRQ));
 	nreq->next = NULL; /* where NULL is non-zero ;) */
-	nreq->sentat = time(NULL);
+	nreq->sentat = NOW;
 	nreq->retries = 3;
 	nreq->resend = 1;
 	nreq->srch = -1;
@@ -1171,7 +1171,7 @@ ResRQ	*rptr;
 	    }
 	else
 		cp->ttl = rptr->ttl;
-	cp->expireat = time(NULL) + cp->ttl;
+	cp->expireat = NOW + cp->ttl;
 	rptr->he.h_name = NULL;
 #ifdef DEBUG
 	Debug((DEBUG_INFO,"make_cache:made cache %#x", cp));
@@ -1322,7 +1322,7 @@ char	*parv[];
 		for(cp = cachetop; cp; cp = cp->list_next)
 		    {
 			sendto_one(sptr, "NOTICE %s :Ex %d ttl %d host %s(%s)",
-				   parv[0], cp->expireat - time(NULL), cp->ttl,
+				   parv[0], cp->expireat - NOW, cp->ttl,
 				   cp->he.h_name, inetntoa(cp->he.h_addr));
 			for (i = 0; cp->he.h_aliases[i]; i++)
 				sendto_one(sptr,"NOTICE %s : %s = %s (CN)",

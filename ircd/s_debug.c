@@ -141,12 +141,6 @@ char	serveropts[] = {
 #ifdef DBUF_TAIL
 'D',
 #endif
-#ifdef OPER_CAN_FLOOD2
-'f',
-#endif
-#ifdef OPER_CAN_FLOOD1
-'F',
-#endif
 #ifdef HIGHEST_CONNECTON
 'h',
 #endif
@@ -156,10 +150,7 @@ char	serveropts[] = {
 #ifdef REJECT_IPHONE
 'i',
 #endif
-#ifdef IDLE_CHECK
-'I',
-#endif
-#ifdef DONT_SHOW_FAKES
+#ifdef DONT_SEND_FAKES
 'j',
 #endif
 #ifdef QUOTE_KLINE
@@ -175,17 +166,20 @@ char	serveropts[] = {
 #ifdef CLIENT_NOTICES
 'n',
 #endif
+#ifdef BOTS_NOTICE
+'N',
+#endif
 #ifdef FAILED_OPER_NOTICE
 'o',
 #endif
 #ifdef CLONE_CHECK
-# ifdef CLONE_KILL
+# ifdef KILL_CLONES
 'P',
 # else
 'p',
 # endif
 #endif
-#ifdef NO_REDUNDANT_MODES
+#ifdef NO_RED_MODES
 'r',
 #endif
 #ifdef NO_SPECIAL
@@ -335,7 +329,7 @@ char	*nick;
 		return;
 	    }
 	secs = rus.ru_utime.tv_sec + rus.ru_stime.tv_sec;
-	rup = time(NULL) - me.since;
+	rup = NOW - me.since;
 	if (secs == 0)
 		secs = 1;
 

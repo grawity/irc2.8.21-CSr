@@ -26,6 +26,28 @@
 
 #include "comstud.h"
 
+#if defined(USE_DICH_CONF) || defined(B_LINES) || defined(E_LINES)
+#include "dich_conf.h"
+#endif
+
+#ifdef USE_DICH_CONF
+extern aConfList       KList1;   /* ordered */
+extern aConfList       KList2;   /* ordered, reversed */
+extern aConfList       KList3;   /* what we can't sort */
+#endif /* USE_DICH_CONF */
+
+#ifdef B_LINES
+extern aConfList       BList1;   /* ordered */
+extern aConfList       BList2;   /* ordered, reversed */
+extern aConfList       BList3;   /* what we can't sort */
+#endif /* B_LINES */
+
+#ifdef E_LINES
+extern aConfList       EList1;   /* ordered */
+extern aConfList       EList2;   /* ordered, reversed */
+extern aConfList       EList3;   /* what we can't sort */
+#endif /* E_LINES */
+
 #ifdef DOG3
 #include "fdlist.h"
 extern fdlist serv_fdlist;
@@ -43,10 +65,7 @@ extern      aClone  *make_clone PROTO(());
 extern      aClone  *find_clone PROTO(());
 #endif
 
-#ifdef IDLE_CHECK
-extern	int idlelimit;
-#endif
-
+extern	time_t	NOW;
 extern	int rehashed;
 extern	time_t	nextconnect, nextdnscheck, nextping;
 extern	aClient	*client, me, *local[];

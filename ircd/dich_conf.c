@@ -1,11 +1,31 @@
+/************************************************************************
+ *   IRC - Internet Relay Chat, ircd/dich_conf.c
+ *   Copyright (C) 1995 Philippe Levan
+ *
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 1, or (at your option)
+ *   any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program; if not, write to the Free Software
+ *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
 /*
  * The dich_conf.h and dich_conf.c were written to provide a generic interface
  * for configuration lines matching.
- * I decided to write it after I read Roy's K: line tree patch and was guided
- * by the following question : why use a tree ?
- * The idea of the tree is to have a left branch and a right branch, with
- * "higher" or "lower" entries on one side or the other : that's the same as
- * dichotomizing, which only requires an ordered list.
+ * I decided to write it after I read Roy's K: line tree patch.
+ * the underlying ideas are the following :
+ * . get rid of the left/right branches by using a dichotomy on an ordered
+ *   list
+ * . arrange patterns matching one another in a tree so that if we find a
+ *   possible match, all other possible matches are "below"
  * These routines are meant for fast matching. There is no notion of "best"
  * of "first" (meaning the order in which the lines are read) match.
  * Therefore, the following functions are fit for K: lines matching but not
@@ -20,32 +40,74 @@
  */
 
 #include <string.h>
-#include "struct.h"
 #include "common.h"
+#include "struct.h"
+
+#undef STDLIBH
 #include "sys.h"
-#include "numeric.h"
+
+#include "h.h"
 #include "dich_conf.h"
 
 #ifndef SYSV
 #define memmove(x,y,N) bcopy(y,x,N)
 #endif
 
-/*
- * The following 2 functions are, in part, borrowed from Roy's K: line tree
- * patch -Sol
- */
-void
-reverse(s)
-    char s[];
+void report_conf_links(sptr, List, numeric, c)
+aClient *sptr;
+aConfList *List;
+int	numeric;
+char	c;
 {
-        /* Reverse a string, from K&R C 2nd ed.    -roy */
+	register aConfItem *tmp;
+	register int current;
+	char *host, *pass, *name;
+	static	char	null[] = "<NULL>";
+	int port;
 
-        int c, i, j;
-        for (i = 0, j = strlen(s)-1; i < j; i++, j--) {
-                c = s[i];
-                s[i] = s[j];
-                s[j] = c;
-        }
+	if (!List || !List->conf_list)
+		return;
+
+	for (current = 0; current < List->length; current++)
+	{
+		aConfEntry *ptr = &List->conf_list[current];
+
+		for(;ptr;ptr=ptr->next)
+		{
+			if (ptr->sub)
+				report_conf_links(sptr, ptr->sub, numeric, c);
+			if (!(tmp=ptr->conf))
+				continue;
+			host = BadPtr(tmp->host) ? null : tmp->host;
+			pass = BadPtr(tmp->passwd) ? null : tmp->passwd;
+			name = BadPtr(tmp->name) ? null : tmp->name;
+			port = (int)tmp->port;
+			if (tmp->status == CONF_KILL)
+				sendto_one(sptr, rpl_str(numeric), me.name,
+					sptr->name, c, host, pass,
+					name, port, get_conf_class(tmp));
+			else
+				sendto_one(sptr, rpl_str(numeric), me.name,
+					sptr->name, c, host, name, port,
+					get_conf_class(tmp));
+		}
+	} 
+}
+
+void reverse(s1, s2)
+char *s1;
+char *s2;
+{
+	char *start_point;
+
+	start_point = s2;
+
+	while(*s2)
+		s2++;
+	s2--;
+	while(s2 >= start_point)
+		*s1++ = *s2--;
+	*s1 = '\0';
 }
 
 /*
@@ -67,20 +129,24 @@ char	*my_string;
 				   lists (will have to use linear functions)
 				   -Sol */
 
-	for (p=my_string;*p && (*p == '*' || *p == '?');p++);
+	if (strchr(my_string, '?'))
+		return 0;	/* reject strings with '?' as non-sortable
+				   whoever uses '?' patterns anyway ? -Sol */
+
+	for (p=my_string;*p && (*p == '*');p++);
 	if (!*p)
 		return 0;	/* only wildcards, not good -Sol */
 
-	for (;*p && *p != '*' && *p != '?';p++);
-	if (*p == 0)
+	for (;*p && *p != '*';p++);
+	if (!*p)
 		return -1; /* string of the form *word : needs reversal -Sol */
 
 	rev = (char *) MyMalloc(strlen(my_string)+1);
-	strcpy(rev, my_string);
+	reverse(rev, my_string);
 
-	for (p=rev;*p && (*p == '*' || *p == '?');p++);
-	for (;*p && *p != '*' && *p != '?';p++);
-	if (*p == 0)
+	for (p=rev;*p && (*p == '*');p++);
+	for (;*p && *p != '*';p++);
+	if (!*p)
 	{
 		MyFree(rev);
 		return 1; /* string of the form word* -Sol */
@@ -150,8 +216,7 @@ aConfItem	*my_conf;
 	else
 		ptr = my_conf->host;
 	tmp = (char *) MyMalloc(strlen(ptr)+1);
-	strcpy(tmp, ptr);
-	reverse(tmp);
+	reverse(tmp, ptr);
 
 	return tmp;
 }
@@ -188,9 +253,10 @@ aConfList	*my_list;
 	unsigned int	length = my_list->length;
 	aConfEntry	*base = my_list->conf_list;
 
-	if ((length % 100) == 0)
+	if ((length % 5) == 0)	/* Re-alloc only after 5 entries -Sol */
 	{
-		/* List is going to grow : allocate 100 more entries -Sol */
+		/* List is going to grow : allocate 5 more entries
+		   Choose 5 to keep the list as small as possible -Sol */
 		aConfEntry	*new;
 
 		new = (aConfEntry *) MyMalloc((length+100)*sizeof(aConfEntry));
@@ -211,6 +277,8 @@ aConfList	*my_list;
 /*
  * This function inserts an entry at the correct location (lexicographicaly
  * speakin) in the configuration list.
+ * If the new entry matches entries already in the list, we replace them
+ * with the new entry and chain them as a list in its "sub" field.
  * If the field chosen as a criteria is already in the list, we chain the
  * new entry. -Sol
  */
@@ -239,14 +307,16 @@ char		*(*cmp_field)();
 		base->pattern = field;
 		base->conf = my_conf;
 		base->next = NULL;
+		base->sub = NULL;
 		my_list->length++;
 		return;
 	}
 
 	while (lower != upper)
 	{
-		pos = strcmp(field, base[compare].pattern);
-		if (pos == 0)
+		pos = strcasecmp(field, base[compare].pattern);
+		if ((pos == 0) || !matches(field, base[compare].pattern) ||
+		    !matches(base[compare].pattern, field))
 		{
 			lower = upper = compare;
 			break;
@@ -262,7 +332,7 @@ char		*(*cmp_field)();
 		compare = (lower+upper)/2;
 	}
 
-	pos = strcmp(field, base[compare].pattern);
+	pos = strcasecmp(field, base[compare].pattern);
 
 	if (!pos)
 	{
@@ -273,10 +343,58 @@ char		*(*cmp_field)();
 		new->pattern = NULL;
 		new->conf = my_conf;
 		new->next = base[compare].next;
+		new->sub = NULL;
 		base[compare].next = new;
 	}
 	else
 	{
+		if (!matches(base[compare].pattern, field))
+		{
+			if (!base[compare].sub)
+			{
+				base[compare].sub = (aConfList *)
+					MyMalloc(sizeof(aConfList));
+				memset(base[compare].sub, 0, sizeof(aConfList));
+			}
+			addto_conf_list(base[compare].sub, my_conf, cmp_field);
+			return;
+		}
+		if (!matches(field, base[compare].pattern))
+		{
+			unsigned int	bottom, top;
+			aConfList	*new;
+
+			/* Look for entries to be moved to sublist. -Sol */
+			bottom = compare;
+			while ((bottom > 0) &&
+			       !matches(field, base[bottom-1].pattern))
+				bottom--;
+			top = compare;
+			while ((top < length-1) &&
+			       !matches(field, base[top+1].pattern))
+				top++;
+
+			/* Create sublist -Sol */
+			new = (aConfList *) MyMalloc(sizeof(aConfList));
+			new->length = top-bottom+1;
+			new->conf_list = (aConfEntry *)
+				MyMalloc((new->length/5+1)*5*
+					sizeof(aConfEntry));
+			memcpy(new->conf_list, &base[bottom],
+				new->length*sizeof(aConfEntry));
+			/* Pack entries -Sol */
+			memmove(&base[bottom+1], &base[top+1],
+				(length-top-1)*sizeof(aConfEntry));
+			/* Don't worry if we are using more memory than
+			   necessary : it will be adjusted next time we
+			   realloc. -Sol */
+			base[bottom].pattern = field;
+			base[bottom].conf = my_conf;
+			base[bottom].next = NULL;
+			base[bottom].sub = new;
+			my_list->length -= (top-bottom);
+			return;
+		}
 		if (grow_list(my_list))
 			base = my_list->conf_list;
 		if (pos > 0)
@@ -287,6 +405,7 @@ char		*(*cmp_field)();
 			base[compare+1].pattern = field;
 			base[compare+1].conf = my_conf;
 			base[compare+1].next = NULL;
+			base[compare+1].sub = NULL;
 		}
 		else
 		{
@@ -296,6 +415,7 @@ char		*(*cmp_field)();
 				base[compare].pattern = field;
 			base[compare].conf = my_conf;
 			base[compare].next = NULL;
+			base[compare].sub = NULL;
 		}
 		my_list->length++;
 	}
@@ -317,23 +437,37 @@ aConfList	*my_list;
 
 		/* Loop through all patterns to free conf-entries
 		   with the same pattern -Sol */
-		for (current = 0; current < my_list->length; current++)
-		{
-			aConfEntry	*ptr = &my_list->conf_list[current];
+                for (current = 0; current < my_list->length; current++)
+                {
+                        aConfEntry      *ptr = &my_list->conf_list[current];
 
-			while (ptr->next)
-			{
-				aConfEntry	*tmp = ptr->next->next;
+                        if (ptr->sub)
+                        {
+                                clear_conf_list(ptr->sub);
+                                MyFree(ptr->sub);
+                        }
+			if (ptr->conf)
+				free_conf(ptr->conf);
+                        while (ptr->next)
+                        {
+                                aConfEntry      *tmp = ptr->next->next;
 
-				if (ptr->next->pattern)
-					MyFree(ptr->next->pattern);
-				MyFree(ptr->next);
-				ptr->next = tmp;
-			}
-			if (ptr->pattern)
-				MyFree(ptr->pattern);
-		}
-		MyFree(my_list->conf_list);
+                                if (ptr->next->pattern)
+                                        MyFree(ptr->next->pattern);
+				if (ptr->next->sub)
+				{
+					clear_conf_list(ptr->next->sub);
+					MyFree(ptr->next->sub);
+				}
+				if (ptr->next->conf)
+					free_conf(ptr->next->conf);
+                               	MyFree(ptr->next);
+                                ptr->next = tmp;
+                        }
+                        if (ptr->pattern)
+                                MyFree(ptr->pattern);
+                }
+                MyFree(my_list->conf_list);
 	}
 
 	my_list->length = 0;
@@ -350,80 +484,72 @@ find_matching_conf(my_list, tomatch)
 aConfList	*my_list;
 char		*tomatch;
 {
-	static	aConfEntry	*base;
+	static	aConfEntry	*matching;
 	static	aConfEntry	*offset;
-	static	unsigned int	lower, upper, compare;
+	aConfEntry		*base;
+	unsigned int		lower, upper, compare;
 	static	char		*name;
-	int			dont_match = 0;
 
 	if (my_list && tomatch)
+	{
+		matching = NULL;
+
 		if (!my_list->length)
-		{
-			lower = upper = compare = -1;
-			return NULL;
-		}
-
-	if (!my_list || !tomatch)
-	{
-		if (lower == -1)
 			return NULL;
 
-		if (offset && offset->next)
-		{
-			offset = offset->next;
-			return offset->conf;
-		}
-
-		dont_match = 1;
-	}
-	else
-	{
 		base = my_list->conf_list;
 		lower = 0;
 		upper = my_list->length-1;
 		compare = (lower+upper)/2;
 		name = tomatch;
-		offset = NULL;
-	}
 
-	while (lower != upper)
-	{
-		int	pos;
-
-		if (!dont_match)
+		while (lower != upper)
 		{
+			int	pos;
+
 			if (!matches(base[compare].pattern, name))
 			{
-				offset = &base[compare];
+				matching = offset = &base[compare];
 				return base[compare].conf;
 			}
-		}
-		else
-			dont_match = 0;
 
-		pos = strcmp(name, base[compare].pattern);
+			pos = strcasecmp(name, base[compare].pattern);
 
-		if (pos < 0)
-			upper = compare;
-		else
-			if (lower == compare)
-				lower = compare+1;
+			if (pos < 0)
+				upper = compare;
 			else
-				lower = compare;
-		compare = (lower+upper)/2;
-	}
+				if (lower == compare)
+					lower = compare+1;
+				else
+					lower = compare;
+			compare = (lower+upper)/2;
+		}
 
-	if (!dont_match)
-	{
 		if (!matches(base[compare].pattern, name))
 		{
-			offset = &base[compare];
+			matching = offset = &base[compare];
 			return base[compare].conf;
 		}
-	}
 
-	lower = upper = compare = -1;
-	return NULL;
+		return NULL;
+	}
+	else
+		if (!matching)
+			return NULL;
+		else
+		{
+			if (offset->next)
+			{
+				offset = offset->next;
+				return offset->conf;
+			}
+			if (!matching->sub)
+			{
+				matching = NULL;
+				return NULL;
+			}
+			return find_matching_conf(matching->sub, name);
+		}
 }
 
 /*
@@ -447,6 +573,7 @@ char		*(*cmp_field)();
 	base[length].pattern = field;
 	base[length].conf = my_conf;
 	base[length].next = NULL;
+	base[length].sub = NULL;
 	my_list->length++;
 }
 

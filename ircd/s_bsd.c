@@ -967,7 +967,7 @@ aClient *cptr;
 		ircstp->is_sbr += cptr->receiveB;
 		ircstp->is_sks += cptr->sendK;
 		ircstp->is_skr += cptr->receiveK;
-		ircstp->is_sti += time(NULL) - cptr->firsttime;
+		ircstp->is_sti += NOW - cptr->firsttime;
 		if (ircstp->is_sbs > 1023)
 		    {
 			ircstp->is_sks += (ircstp->is_sbs >> 10);
@@ -986,7 +986,7 @@ aClient *cptr;
 		ircstp->is_cbr += cptr->receiveB;
 		ircstp->is_cks += cptr->sendK;
 		ircstp->is_ckr += cptr->receiveK;
-		ircstp->is_cti += time(NULL) - cptr->firsttime;
+		ircstp->is_cti += NOW - cptr->firsttime;
 		if (ircstp->is_cbs > 1023)
 		    {
 			ircstp->is_cks += (ircstp->is_cbs >> 10);
@@ -1018,7 +1018,7 @@ aClient *cptr;
 		 * a rehash in between, the status has been changed to
 		 * CONF_ILLEGAL). But only do this if it was a "good" link.
 		 */
-		aconf->hold = time(NULL);
+		aconf->hold = NOW;
 		aconf->hold += (aconf->hold - cptr->since > HANGONGOODLINK) ?
 				HANGONRETRYDELAY : ConfConFreq(aconf);
 		if (nextconnect > aconf->hold)
@@ -1379,7 +1379,6 @@ Reg1	aClient *cptr;
 fd_set	*rfd;
 {
 	Reg1	int	dolen = 0, length = 0, done;
-	time_t	now = time(NULL);
 
 	if (FD_ISSET(cptr->fd, rfd) &&
 	    !(IsPerson(cptr) && DBufLength(&cptr->recvQ) > 6090))
@@ -1391,23 +1390,9 @@ fd_set	*rfd;
 		length = recv(cptr->fd, readbuf, rcvbufmax*sizeof(char), 0);
 #endif
 
-#ifdef OPER_CAN_FLOOD1
-	if (!IsAnOper(cptr))
-	{
-#else 
-# ifdef OPER_CAN_FLOOD2
-	if (!IsOper(cptr))
-	{
-# endif
-#endif
-		cptr->lasttime = now;
+		cptr->lasttime = NOW;
 		if (cptr->lasttime > cptr->since)
 			cptr->since = cptr->lasttime;
-#if defined(OPER_CAN_FLOOD1) || defined(OPER_CAN_FLOOD2)
-	}
-	else
-		cptr->since=cptr->lasttime = now;
-#endif
 		cptr->flags &= ~(FLAGS_PINGSENT|FLAGS_NONL);
 		/*
 		 * If not ready, fake it so it isnt closed
@@ -1441,19 +1426,12 @@ fd_set	*rfd;
 			return exit_client(cptr, cptr, cptr, "dbuf_put fail");
 
 		if (IsPerson(cptr) &&
-#ifdef OPER_CAN_FLOOD1
-				!IsAnOper(cptr) &&
-#else
-# ifdef OPER_CAN_FLOOD2
-				!IsOper(cptr) &&
-# endif
-#endif
 		    DBufLength(&cptr->recvQ) > CLIENT_FLOOD)
 			return exit_client(cptr, cptr, cptr, "Excess Flood");
 
 		while (DBufLength(&cptr->recvQ) && !NoNewLine(cptr) &&
 		       ((cptr->status < STAT_UNKNOWN) ||
-			(cptr->since - now < 10)))
+			(cptr->since - NOW < 10)))
 		    {
 			/*
 			** If it has become registered as a Service or Server
@@ -1533,9 +1511,10 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 #ifdef	pyr
 	struct	timeval	nowt;
 	u_long	us;
+	time_t	now;
 #endif
 	fd_set	read_set, write_set;
-	time_t	delay2 = delay, now;
+	time_t	delay2 = delay;
 	u_long	usec = 0;
 	int	res, length, fd;
 	int	auth = 0;
@@ -1555,13 +1534,11 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 #ifdef NPATH
 	check_command(&delay, NULL);
 #endif
-#ifdef	pyr
-	(void) gettimeofday(&nowt, NULL);
-	now = nowt.tv_sec;
-#else
-	now = time(NULL);
+#ifdef  pyr
+        (void) gettimeofday(&nowt, NULL);
+        now = nowt.tv_sec;
 #endif
-
+ 
 	for (res = 0;;)
 	    {
 		FD_ZERO(&read_set);
@@ -1597,9 +1574,9 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
                    of clones to the server though, as mbuf's can't
                    be allocated quickly enough... - Comstud */
 			if ((highest_fd < MAXCONNECTIONS /2 ) ||
-				(now > cptr->lasttime + 1))
+				(NOW > cptr->lasttime + 1))
 #else 
-				if (now > (cptr->lasttime + 2))
+				if (NOW > (cptr->lasttime + 2))
 #endif
 					FD_SET(i, &read_set);
 				else if (delay2 > 2)
@@ -1706,7 +1683,7 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 		    {
 			FD_CLR(i, &read_set);
 			nfds--;
-			cptr->lasttime = time(NULL);
+			cptr->lasttime = NOW;
 			/*
 			** There may be many reasons for error return, but
 			** in otherwise correctly working environment the
@@ -1745,7 +1722,7 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 			else
 #endif
 				(void)add_connection(cptr, fd);
-			nextping = time(NULL);
+			nextping = NOW;
 			if (!cptr->acpt)
 				cptr->acpt = &me;
 		    }
@@ -1979,7 +1956,7 @@ struct	hostent	*hp;
 
 	get_sockhost(cptr, aconf->host);
 	add_client_to_list(cptr);
-	nextping = time(NULL);
+	nextping = NOW;
 
 	return 0;
 }
@@ -2142,7 +2119,7 @@ char	*namebuf, *linebuf, *chname;
 	time_t	now;
 	struct	tm	*tp;
 
-	now = time(NULL);
+	now = NOW;
 	tp = localtime(&now);
 	if (strlen(linebuf) > (size_t) 9)
 	    {
@@ -2358,7 +2335,7 @@ static	void	polludp()
 	Reg1	char	*s;
 	struct	sockaddr_in	from;
 	int	n, fromlen = sizeof(from);
-	static	time_t	last = 0, now;
+	static	time_t	last = 0;
 	static	int	cnt = 0, mlen = 0;
 
 	/*
@@ -2378,12 +2355,11 @@ static	void	polludp()
 	Debug((DEBUG_DEBUG,"udp poll"));
 
 	n = recvfrom(udpfd, readbuf, mlen, 0, &from, &fromlen);
-	now = time(NULL);
-	if (now == last)
+	if (NOW == last)
 		if (++cnt > 14)
 			return;
 	cnt = 0;
-	last = now;
+	last = NOW;
 
 	if (n == -1)
 	    {

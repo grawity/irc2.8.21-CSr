@@ -20,6 +20,15 @@
 #ifndef	__common_include__
 #define __common_include__
 
+#if defined(HPUX )|| defined(AIX)
+#include <time.h>
+#ifdef AIX
+#include <sys/time.h>
+#endif
+#else
+#include <sys/time.h>
+#endif
+
 #ifdef	PARAMH
 #include <sys/param.h>
 #endif

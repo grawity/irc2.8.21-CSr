@@ -298,7 +298,9 @@
 #define RPL_ENDOFSTATS       219
 
 #define RPL_UMODEIS          221
-
+#define RPL_STATSBLINE       222
+#define RPL_STATSELINE       223
+ 
 #define RPL_SERVICEINFO      231
 #define RPL_ENDOFSERVICES    232
 #define	RPL_SERVICE          233

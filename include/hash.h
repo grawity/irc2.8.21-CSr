@@ -26,10 +26,8 @@ typedef	struct	hashentry {
 	void	*list;
 	} aHashEntry;
 
-#ifndef	DEBUGMODE
 #define	DEFAULT_HASHSIZE	16333   /* prime number */
 #define	DEFAULT_CHANNELHASHSIZE	7019	/* prime number */
-#endif
 
 extern	int	HASHSIZE;
 extern	int	CHANNELHASHSIZE;

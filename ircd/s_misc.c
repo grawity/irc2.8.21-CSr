@@ -88,8 +88,7 @@ time_t	clock;
 	else if (lt->tm_yday > gm->tm_yday)
 		minswest = (gm->tm_hour - (lt->tm_hour + 24)) * 60;
 	else
-		minswest = ((gm->tm_hour + 24) - lt->tm_hour) * 60;
-
+		minswest = ((lt->tm_hour + 24) - gm->tm_hour) * 60;
 	plus = (minswest > 0) ? '-' : '+';
 	if (minswest < 0)
 		minswest = -minswest;
@@ -360,7 +359,7 @@ char	*comment;	/* Reason for the exit */
 				sptr->user->host);
 #endif
 #ifdef FNAME_USERLOG
-		on_for = time(NULL) - sptr->firsttime;
+		on_for = NOW - sptr->firsttime;
 # if defined(USE_SYSLOG) && defined(SYSLOG_USERS)
 		if (IsPerson(sptr))
 			syslog(LOG_NOTICE, "%s (%3d:%02d:%02d): %s!%s@%s\n",
@@ -621,7 +620,6 @@ char	*name;
 	Reg2	int	i;
 	Reg3	struct stats	*sp;
 	struct	stats	tmp;
-	time_t	now = time(NULL);
 
 	sp = &tmp;
 	bcopy((char *)ircstp, (char *)sp, sizeof(*sp));
@@ -635,7 +633,7 @@ char	*name;
 			sp->is_sbr += acptr->receiveB;
 			sp->is_sks += acptr->sendK;
 			sp->is_skr += acptr->receiveK;
-			sp->is_sti += now - acptr->firsttime;
+			sp->is_sti += NOW - acptr->firsttime;
 			sp->is_sv++;
 			if (sp->is_sbs > 1023)
 			    {
@@ -654,7 +652,7 @@ char	*name;
 			sp->is_cbr += acptr->receiveB;
 			sp->is_cks += acptr->sendK;
 			sp->is_ckr += acptr->receiveK;
-			sp->is_cti += now - acptr->firsttime;
+			sp->is_cti += NOW - acptr->firsttime;
 			sp->is_cl++;
 			if (sp->is_cbs > 1023)
 			    {

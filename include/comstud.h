@@ -1,6 +1,13 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/* RESTRICT         - define this if using dog3 stuff, and wish to
+                      disallow /LUSERS, /LIST and other CPU
+                      intensive commands when in HIGH TRAFFIC MODE
+*/
+
+#undef RESTRICT
+
 /* USE_DICH_CONF    - define this to try a new code for K: line matching
                     - Note: This is a lot cleaner than Roy's kline
                       patches...as far as CPU usage...someone want to
@@ -9,7 +16,25 @@
 */
 
 #define USE_DICH_CONF
- 
+
+/* B_LINES          - Define this if you wish to ignore ip#'s or hosts
+                      from being tested for bots or clonebots...
+                      B:*eskimo.com::* will not check for bots or
+                      clones from eskimo.com domain.
+*/
+
+#define B_LINES
+
+/* E_LINES          - Define this if you wish to have lines that bypass
+                      K: line checking...ie for example:
+                      You want to K-line all of netcom.com except for
+                      *cbehrens@*netcom.com, use:
+                      K:*netcom.com::*
+                      E:*netcom.com::*cbehrens
+*/
+
+#define E_LINES 
+
 /* MAXBUFFERS       - make receive socket buffers the maximum
                       size they can be...up to 64K
 NOTE: send buffers will remain at 8K as bad things will happen if
@@ -158,28 +183,21 @@ they are increased!
 
 #define REJECT_IPHONE
 
-/* REJECT_BOTS     - define if you want to reject users from
-                     connecting to the server with nicks
-                     with 'bot', 'serv', or 'help' in them.
-             Note:   you can specify an ip address to
-                     ignore this
-             Note:   this doesn't prevent anyone from
-                     /nick HackBot once on IRC
-*/
+/* REJECT_BOTS     - Performs minimal checking to see if a client
+                     which is trying to connect is a bot...
+                     If it is, it will be rejected from connecting.
+                     See BOTS_NOTICE
 
 #define REJECT_BOTS
 
-/* OPER_CAN_FLOOD1 - define this if you don't need flood protection
-                     for all /opers including local (o:) ones
+/* BOTS_NOTICE     - Performs minimal checking to see if a client
+                     which is trying to connect is a bot...
+                     If it is, it will send a notice to opers who
+                     are usermode +r about a possible bot connecting
+                     (or being rejected if REJECT_BOTS is defined).
 */
 
-#undef OPER_CAN_FLOOD1
-
-/* OPER_CAN_FLOOD2 - define this if you want only O: opers to be
-                     able to flood
-*/
-
-#undef OPER_CAN_FLOOD2
+#define BOTS_NOTICE
 
 /* STATS_NOTICE    - send a notice to /opers on the server when
                      someone does /stats requests
@@ -203,7 +221,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr17/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr18/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -237,7 +255,7 @@ they are increased!
                        be /reset on notice as well as /msg
 */
 
-#define  RESETIDLEONNOTICE
+#undef  RESETIDLEONNOTICE
 
 
 /* USERNAMES_IN_TRACE - define this if you want to see usernames
@@ -251,15 +269,6 @@ they are increased!
 */
 
 #define USERNAMES_IN_TRACE
-
-/* IDLE_CHECK     - define this if you wish to have an idle checker
-                    built into the server
-             Note:  Idletime is not reset on msgs to invalid nicks
-                    or channels
-             Note:  Idletime is not reset on msgs to self
-*/
-
-#define IDLE_CHECK
 
 /* KLINE_CHECK    - this is how often (in seconds) that K: lines
                     should be checked.  Every fifteen minutes is
@@ -287,36 +296,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr17/lib/logs/clones.log"
-
-/* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
-                        this value is the default # a client
-                        can be idle before being kicked off of
-                        IRC
-                 Note:  This value can be changed on IRC with
-                        /quote idle
-*/
-
-#define DEFAULT_IDLELIMIT  0
-
-/* IDLE_IGNORE   - if you have IDLE_CHECK defined, you
-                   can use this to specify an ip# that
-                   will be allowed to idle
-                   Wildcards are allowed
-            Note:  If you want everyone to be checked use:
-               #define IDLE_IGNORE ""
-*/
-
-#define IDLE_IGNORE "204.122.*"
-
-/* BOT_IP_IGNORE - if you have CLONE_CHECK or REJECT_BOTS
-                   defined, this can contain an ip# to ignore
-                   Wildcards are allowed
-            Note:  If you don't want to ignore an IP use:
-               #define BOT_IP_IGNORE ""
-*/
-
-#define BOT_IP_IGNORE "204.122.*"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr18/lib/logs/clones.log"
 
 /*  THE REST OF THIS STUFF IS TO CONFIGURE CLONE CHECKING */
 
@@ -358,7 +338,15 @@ Note: good numbers to use are 5 bots joining with no more than
 
 #define CLONE_TIME 30
 
-/* END OF FILE */
+/***********************************************************************/
+/*             DO NOT CHANGE ANYTHING AFTER THIS POINT                 */
+/***********************************************************************/
+
+#if !defined(CLONE_CHECK) && !defined(REJECT_BOTS) && !defined(BOTS_NOTICE)
+#ifdef B_LINES
+#undef B_LINES
+#endif
+#endif
 
 #endif /* COMSTUD_H */
 

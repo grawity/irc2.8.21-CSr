@@ -41,6 +41,10 @@ Computing Center and Jarkko Oikarinen";
 #include <utmp.h>
 #include "h.h"
 
+#if defined(USE_DICH_CONF) || defined(B_LINES) || defined(E_LINES)
+#include "dich_conf.h"
+#endif
+
 #ifdef DOG3
 extern time_t check_fdlists();
 #endif
@@ -179,44 +183,6 @@ char    *parv[];
 }
 
 #endif /* DOG3 */
-
-
-#ifdef IDLE_CHECK
-
-int     m_idle(cptr, sptr, parc, parv)
-aClient *cptr, *sptr;
-int     parc;
-char    *parv[];
-{
-        int temp;
-
-	if (!MyClient(sptr) || !IsAnOper(sptr))
-        {
-                sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
-                return 0;
-        }
-        if (!parv[1] || !*parv[1])
-        {
-                sendto_one(sptr, ":%s NOTICE %s :The current idle limit is set at %i minutes",
-                        me.name, parv[0], idlelimit/60);
-                return 0;
-        }
-      temp = atoi(parv[1]);
-      if (temp && (temp < 10))
-      {
-              sendto_one(sptr, ":%s NOTICE %s :Hello???  Try a number > 10.",
-                      me.name, parv[0]);
-              return 0;
-      }
-      idlelimit = temp*60;
-      sendto_ops("%s has changed the idle time limit to %i minute(s).",
-              parv[0], idlelimit/60);
-      sendto_one(sptr, ":%s NOTICE %s :The idle limit is now set to %i minute(s)",
-              me.name, parv[0], idlelimit/60);
-      return 0;
-}
-
-#endif
 
 /*
 ** m_version
@@ -397,9 +363,9 @@ char	*parv[];
 		return 0;
 
 	if (atoi(parv[3]))
-	    	v = (atol(parv[4]) - (ts_val)time(NULL) - timedelta) / 2;
+	    	v = (atol(parv[4]) - (ts_val)NOW - timedelta) / 2;
 	else
-	    	v = atol(parv[4]) - (ts_val)time(NULL) - timedelta;
+	    	v = atol(parv[4]) - (ts_val)NOW - timedelta;
 
 	if (ts_servcount() == 1)
 		timedelta += v;
@@ -751,7 +717,7 @@ Reg1	aClient	*cptr;
 	if (IsUnknown(cptr))
 	    {
 		if (bconf->passwd[0])
-			sendto_one(cptr,"PASS %s :%TS",bconf->passwd);
+			sendto_one(cptr,"PASS %s :TS",bconf->passwd);
 		/*
 		** Pass my info to the new server
 		*/
@@ -781,7 +747,7 @@ Reg1	aClient	*cptr;
 	if (DoesTS(cptr))
 		sendto_one(cptr, "SVINFO %d %d %d :%ld", TS_CURRENT, TS_MIN,
 			(ts_servcount() == 0 ? 1 : 0),
-			(ts_val)time(NULL) + timedelta);
+			(ts_val)NOW + timedelta);
  
 	det_confs_butmask(cptr, CONF_LEAF|CONF_HUB|CONF_NOCONNECT_SERVER);
 	/*
@@ -801,9 +767,9 @@ Reg1	aClient	*cptr;
 	/* adds to fdlist */
 	addto_fdlist(cptr->fd,&serv_fdlist);
 	/* this causes the server to be marked as "busy" */
-	check_fdlists(time(NULL));
+	check_fdlists();
 #endif 
-	nextping = time(NULL);
+	nextping = NOW;
 	sendto_ops("Link with %s established.", inpath);
 	(void)add_to_client_hash_table(cptr->name, cptr);
 	/* doesnt duplicate cptr->serv if allocted this struct already */
@@ -1186,7 +1152,7 @@ char	*parv[];
 **            it--not reversed as in ircd.conf!
 */
 
-static int report_array[11][3] = {
+static	int report_array[11][3] = {
 		{ CONF_CONNECT_SERVER,    RPL_STATSCLINE, 'C'},
 		{ CONF_NOCONNECT_SERVER,  RPL_STATSNLINE, 'N'},
 		{ CONF_CLIENT,            RPL_STATSILINE, 'I'},
@@ -1303,13 +1269,27 @@ char	*parv[];
 				   (int)DBufLength(&acptr->sendQ),
 				   (int)acptr->sendM, (int)acptr->sendK,
 				   (int)acptr->receiveM, (int)acptr->receiveK,
-				   time(NULL) - acptr->firsttime);
+				   NOW - acptr->firsttime);
 		    }
 		break;
+#ifdef B_LINES
+	case 'B' : case 'b' :
+                report_conf_links(sptr, &BList1, RPL_STATSBLINE, 'B');
+                report_conf_links(sptr, &BList2, RPL_STATSBLINE, 'B');
+                report_conf_links(sptr, &BList3, RPL_STATSBLINE, 'B');
+		break;
+#endif
 	case 'C' : case 'c' :
                 report_configured_links(sptr, CONF_CONNECT_SERVER|
 					CONF_NOCONNECT_SERVER);
 		break;
+#ifdef E_LINES
+	case 'E' : case 'e' :
+		report_conf_links(sptr, &EList1, RPL_STATSELINE, 'E');
+		report_conf_links(sptr, &EList2, RPL_STATSELINE, 'E');
+		report_conf_links(sptr, &EList3, RPL_STATSELINE, 'E');
+		break;
+#endif 
 	case 'H' : case 'h' :
                 report_configured_links(sptr, CONF_HUB|CONF_LEAF);
 		break;
@@ -1317,7 +1297,13 @@ char	*parv[];
 		report_configured_links(sptr, CONF_CLIENT);
 		break;
 	case 'K' : case 'k' :
+#ifdef USE_DICH_CONF
+		report_conf_links(sptr, &KList1, RPL_STATSKLINE, 'K');
+                report_conf_links(sptr, &KList2, RPL_STATSKLINE, 'K');
+                report_conf_links(sptr, &KList3, RPL_STATSKLINE, 'K');
+#else
 		report_configured_links(sptr, CONF_KILL);
+#endif
 		break;
 	case 'M' : case 'm' :
 		for (mptr = msgtab; mptr->cmd; mptr++)
@@ -1347,7 +1333,7 @@ char	*parv[];
 	    {
 		register time_t now;
 
-		now = time(NULL) - me.since;
+		now = NOW - me.since;
 		sendto_one(sptr, rpl_str(RPL_STATSUPTIME), me.name, parv[0],
 			   now/86400, (now/3600)%24, (now/60)%60, now%60);
 #ifdef HIGHEST_CONNECTION
@@ -1498,7 +1484,7 @@ char	*parv[];
 		if(hunt_server(cptr, sptr, ":%s LUSERS %s :%s", 2, parc, parv)
 				!= HUNTED_ISME)
 			return 0;
-#ifdef DOG3 
+#if defined(DOG3) && defined(RESTRICT)
 	/* this is to reduce load while connecting */
 	if (lifesux && !IsAnOper(sptr))
 	{
@@ -1888,7 +1874,7 @@ char *hostname;
         }
         strcpy(host, hostname);
 
-        if (isdigit(*host))
+        if (isdigit(*(host+strlen(host)-1)))
         {
                 int i;
                 char *tmp;
@@ -1937,6 +1923,7 @@ char    *parv[];
         aClient *acptr;
         char tempuser[30];
         char temphost[512];
+	aConfItem *aconf;
 
         if (!MyClient(sptr) ||
 #ifdef NO_LOCAL_KLINE
@@ -1969,18 +1956,8 @@ char    *parv[];
 		}
                 if (!*host)
                         host = "*";
-		if (*user == '~')
-			user++;
-                if (*user != '*')
-                        strcpy(tempuser, "*");
-                else
-                        strcpy(tempuser, "");
-                strcat(tempuser, user);
-                if (*host != '*')
-                        strcpy(temphost, "*");
-                else
-                        strcpy(temphost, "");
-                strcat(temphost, host);
+		strcpy(tempuser, user);
+                strcpy(temphost, host);
                 user = tempuser;
                 host = temphost;
         }
@@ -2009,6 +1986,38 @@ char    *parv[];
                         parv[0]);
                 return 0;
         }
+#ifdef USE_DICH_CONF
+	aconf = make_conf();
+	aconf->status = CONF_KILL;
+	DupString(aconf->host, host);
+	if (parv[2])
+		sprintf(buffer, "%s", parv[2]); 
+	DupString(aconf->passwd, parv[2] ? buffer : NULL);
+	DupString(aconf->name, user);
+	aconf->port = 0;
+	Class(aconf) = find_class(0);
+	if ((aconf->status & CONF_KILL) && aconf->host)
+	{
+		char    *host = host_field(aconf);
+
+		switch (sortable(host))
+		{
+			case 0 :
+				l_addto_conf_list(&KList3, aconf, host_field);
+				break;
+			case 1 :
+				addto_conf_list(&KList1, aconf, host_field);
+				break;
+			case -1 :
+				addto_conf_list(&KList2, aconf, rev_host_field);
+				break;
+		}
+		MyFree(host);
+	}
+	rehashed = 1;
+        sendto_ops("%s added K-Line for [%s@%s]", parv[0], user, host);
+        sendto_one(sptr, ":%s NOTICE %s :Added K-Line [%s@%s] to server configfile", me.name, parv[0], user, host);
+#endif /* USE_DICH_CONF */
         if ((out = open(configfile, O_WRONLY|O_APPEND))==-1)
         {
                 sendto_one(sptr, ":%s NOTICE %s :Problem opening server configfile", me.name, parv[0]);
@@ -2034,9 +2043,13 @@ char    *parv[];
 		return 0;
 	}
         close(out);
+#ifdef USE_DICH_CONF
+	return 0;
+#else
         sendto_ops("%s added K-Line for [%s@%s]", parv[0], user, host);
         sendto_one(sptr, ":%s NOTICE %s :Added K-Line [%s@%s] to server configfile", me.name, parv[0], user, host);
         return rehash(cptr, sptr, 0);
+#endif
 }
 
 #endif /* QUOTE_KLINE */
@@ -2121,7 +2134,6 @@ char	*parv[];
 	char	*tname;
 	int	doall, link_s[MAXCONNECTIONS], link_u[MAXCONNECTIONS];
 	int	cnt = 0, wilds, dow;
-	time_t	now;
 
 	if (check_registered(sptr))
 		return 0;
@@ -2135,7 +2147,6 @@ char	*parv[];
 		tname = parv[1];
 	else
 		tname = me.name;
-	now = time(NULL);
 	switch (hunt_server(cptr, sptr, ":%s TRACE :%s", 1, parc, parv))
 	{
 	case HUNTED_PASS: /* note: gets here only if parv[1] exists */
@@ -2238,7 +2249,7 @@ char	*parv[];
 #else
 						0,
 #endif
-						now-acptr->lasttime);
+						NOW-acptr->lasttime);
 				cnt++;
 			    }
 			break;
