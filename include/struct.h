@@ -55,6 +55,7 @@ typedef	long	ts_val;
 
 typedef struct	IdleItem anIdle;
 typedef struct  CloneItem aClone;
+typedef struct	MotdItem aMotd;
 
 #ifndef VMSP
 #include "class.h"
@@ -255,6 +256,11 @@ struct  CloneItem       {
         long    last;
         struct CloneItem *prev;
         struct CloneItem *next;
+};
+
+struct	MotdItem	{
+	char	line[82];
+	struct	MotdItem *next;
 };
 
 struct	ConfItem	{

@@ -37,6 +37,7 @@ Computing Center and Jarkko Oikarinen";
 #include "h.h"
 #include "dich_conf.h"
 
+
 /* Lists to do K: line matching -Sol */
 aConfList       KList1 = { 0, NULL };   /* ordered */
 aConfList       KList2 = { 0, NULL };   /* ordered, reversed */
@@ -54,6 +55,11 @@ aConfList       EList1 = { 0, NULL };   /* ordered */
 aConfList       EList2 = { 0, NULL };   /* ordered, reversed */
 aConfList       EList3 = { 0, NULL };   /* what we can't sort */
 #endif /* E_LINES */
+
+#ifdef BETTER_MOTD
+	aMotd *motd;
+	struct tm *motd_tm;
+#endif
 
 int	s_count = 1;    /* All servers */
 int	c_count = 0;    /* All clients */
@@ -390,7 +396,6 @@ time_t	currenttime;
 			continue;
 		    }
 #ifdef IDLE_CHECK
-		if (checkit2 && IsPerson(cptr))
 		idleflag = (checkit2 && IsPerson(cptr)) ? (idlelimit && !IsAnOper(cptr) &&
 			(currenttime-cptr->user->last > idlelimit) &&
 			!find_eline(cptr)) : 0;
@@ -475,7 +480,7 @@ time_t	currenttime;
 			 * on them - send a messgae to the user being killed
 			 * first.
 			 */
-			if (killflag) /* this is above: && IsPerson(cptr)) /*
+			if (killflag) /* this is above: && IsPerson(cptr)) */
 				sendto_ops("Kill line active for %s",
 					   get_client_name(cptr, FALSE));
 #ifdef IDLE_CHECK
@@ -580,7 +585,7 @@ char	*argv[];
 	int	portarg = 0;
 	uid_t	uid, euid;
 	time_t	delay = 0;
-#ifndef AIX
+#if !defined(AIX) && !defined(ULTRIX)
         struct rlimit r;
 #endif
 #ifdef DOG3
@@ -588,12 +593,12 @@ char	*argv[];
                            the main loop */
 	time_t nextfdlistcheck=0; /*end of priority code */
 #endif
-
 	NOW = time(NULL);
+	read_motd(MOTD);
 #ifdef DBUF_INIT
         dbuf_init(); /* set up some dbuf stuff to control paging */
 #endif
-#ifndef AIX
+#if !defined(AIX) && !defined(ULTRIX)
         r.rlim_cur = MAXCONNECTIONS;
         r.rlim_max = MAXCONNECTIONS;
         setrlimit(RLIMIT_NOFILE, &r);

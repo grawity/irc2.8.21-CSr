@@ -307,6 +307,55 @@ aConfItem *aconf;
 	return namebuf;
 }
 
+#ifdef BUFFERED_LOGS
+
+void cs_buf_logs(which, buf, len)
+int which;
+char *buf;
+int len;
+{
+#define ULOGBUFFERLEN 4000
+#define CLOGBUFFERLEN 2000
+
+	static char userbuf[ULOGBUFFERLEN];
+	static char clonebuf[CLOGBUFFERLEN];
+	int userbuflen = 0, clonebuflen = 0, doit=0;
+	char *filename, *buffer;
+	int fd, *len2;
+
+	switch(which)
+	{
+	case 1:
+		if (userbuflen+len >= ULOGBUFFERLEN-1) 
+			doit++;
+		filename = FNAME_USERLOG;
+		buffer = userbuf;
+		len2 = &userbuflen;
+		break;
+	case 2:
+		if (clonebuflen+len >= CLOGBUFFERLEN-1)
+			doit++;
+		filename = FNAME_CLONELOG;
+		buffer = clonebuf;
+		len2 = &clonebuflen;
+		break;
+	}
+	if (!len || doit)
+	{
+		if ((fd = open(filename, O_WRONLY|O_APPEND)) != -1)
+		{
+			(void)write(fd, buffer, *len2);
+			close(fd);
+		}
+		*buffer = (char) 0;
+		*len2 = 0;
+	}
+	strcat(buffer, buf);
+	*len2 = *len2 + len;
+}
+
+#endif
+
 /*
 ** exit_client
 **	This is old "m_bye". Name  changed, because this is not a
@@ -340,7 +389,7 @@ char	*comment;	/* Reason for the exit */
     {
 	Reg1	aClient	*acptr;
 	Reg2	aClient	*next;
-#ifdef	FNAME_USERLOG
+#if defined(FNAME_USERLOG) || (defined(SYSLOG) && defined(SYSLOG_USERS))
 	time_t	on_for;
 #endif
 	char	comment1[HOSTLEN + HOSTLEN + 2];
@@ -364,9 +413,10 @@ char	*comment;	/* Reason for the exit */
 				sptr->name, sptr->user->username,
 				sptr->user->host);
 #endif
-#ifdef FNAME_USERLOG
+#if defined(FNAME_USERLOG) || (defined(SYSLOG) && defined(SYSLOG_USERS))
 		on_for = NOW - sptr->firsttime;
-# if defined(USE_SYSLOG) && defined(SYSLOG_USERS)
+#endif
+#if defined(USE_SYSLOG) && defined(SYSLOG_USERS)
 		if (IsPerson(sptr))
 			syslog(LOG_NOTICE, "%s (%3d:%02d:%02d): %s!%s@%s\n",
 				myctime(sptr->firsttime),
@@ -374,37 +424,34 @@ char	*comment;	/* Reason for the exit */
 				on_for % 60,
 				sptr->name,
 				sptr->user->username, sptr->user->host);
-# else
+#endif
+#ifdef FNAME_USERLOG
 	    {
-		char	linebuf[160];
-		int	logfile;
+		char linebuf[160];
+		int logfile, len;
 
-		/*
- 		 * This conditional makes the logfile active only after
-		 * it's been created - thus logging can be turned off by
-		 * removing the file.
-		 *
-		 * stop NFS hangs...most systems should be able to open a
-		 * file in 3 seconds. -avalon (curtesy of wumpus)
-		 */
-		if (IsPerson(sptr) &&
-		    (logfile = open(FNAME_USERLOG, O_WRONLY|O_APPEND)) != -1)
-		    {
-			(void)irc_sprintf(linebuf,
-				"%s (%3d:%02d:%02d): %s!%s@%s [%s]\n",
+		if (IsPerson(sptr))
+		{
+			len = irc_sprintf(linebuf,
+			"%s (%3d:%02d:%02d): %s!%s@%s [%s]\n",
 				myctime(sptr->firsttime),
 				on_for / 3600, (on_for % 3600)/60,
 				on_for % 60,
-				sptr->name,
-				sptr->user->username, sptr->user->host,
-				sptr->username);
+				sptr->name, sptr->user->username,
+				sptr->user->host, sptr->username);
+#ifdef BUFFERED_LOGS
+			cs_buf_logs(1, linebuf, len);
+#else 
+		    if ((logfile = open(FNAME_USERLOG,
+				O_WRONLY|O_APPEND)) != -1)
+		    {
 			(void)write(logfile, linebuf, strlen(linebuf));
 			(void)close(logfile);
 		    }
-		/* Modification by stealth@caen.engin.umich.edu */
+#endif /* BUFFERED_LOGS */
+		}
 	    }
-# endif
-#endif
+#endif /* FNAME_OPERLOG */
 		if (sptr->fd >= 0)
 		    {
 		      if (cptr != NULL && sptr != cptr)

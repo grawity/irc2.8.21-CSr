@@ -618,20 +618,24 @@ char	*nick, *username;
                                 sendto_flagops(1, "CloneBot protection activated against %s", user->host);
                         if (clone->num >= NUM_CLONES)
                         {
-				int logfile;
 #ifdef FNAME_CLONELOG
-				if ((logfile = open(FNAME_CLONELOG,
+			int logfile;
+			int len;
+
+			len = irc_sprintf(buf, "%s: Clonebot rejected: %s!%s@%s\n",
+				myctime(NOW), parv[0], sptr->user->username,
+				sptr->user->host);
+#ifdef BUFFERED_LOGS
+			cs_buf_logs(2, buf, len);
+#else
+			if ((logfile = open(FNAME_CLONELOG,
 					O_WRONLY|O_APPEND)) != -1)
-				{
-					(void)irc_sprintf(buf,
-					"%s: Clonebot rejected: %s!%s@%s\n",
-						myctime(NOW), parv[0],
-						sptr->user->username,
-						sptr->user->host);
-					(void)write(logfile, buf, strlen(buf));
-					(void)close(logfile);
-				}
-#endif
+			{
+				(void)write(logfile, buf, strlen(buf));
+				(void)close(logfile);
+			}
+#endif /* BUFFERED_LOGS */
+#endif /* FNAME_CLONELOG */
                                 sendto_flagops(1, "Rejecting clonebot: %s [%s@%s]",
                                         nick, username, user->host);
 #ifdef KILL_CLONES
@@ -2334,14 +2338,11 @@ char	*parv[];
 #ifdef FNAME_OPERLOG
 	      {
                 int     logfile;
-
+ 
                 /*
                  * This conditional makes the logfile active only after
                  * it's been created - thus logging can be turned off by
                  * removing the file.
-                 *
-                 * stop NFS hangs...most systems should be able to open a
-                 * file in 3 seconds. -avalon (curtesy of wumpus)
                  */
                 if (IsPerson(sptr) &&
                     (logfile = open(FNAME_OPERLOG, O_WRONLY|O_APPEND)) != -1)
@@ -2351,12 +2352,10 @@ char	*parv[];
 				      parv[0], sptr->user->username,
 				      sptr->sockhost);
 		  (void)write(logfile, buf, strlen(buf));
-
 		  (void)close(logfile);
 		}
-                /* Modification by pjg */
 	      }
-#endif
+#endif /* FNAME_OPERLOG */
 #ifdef	USE_SERVICES
 		check_services_butone(SERVICE_WANT_OPER, sptr,
 				      ":%s MODE %s :+o", parv[0], parv[0]);

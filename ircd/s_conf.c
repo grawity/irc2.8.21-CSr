@@ -655,6 +655,13 @@ int	sig;
 			if (!tmp2->clients)
 				free_conf(tmp2);
 		    }
+#ifdef BETTER_MOTD
+	read_motd(MOTD);
+#endif
+#ifdef BUFFERED_LOGS
+        cs_buf_logs(1,"",0);
+        cs_buf_logs(2,"",0);
+#endif
 	rehashed = 1;
 	return ret;
 }

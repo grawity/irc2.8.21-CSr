@@ -51,22 +51,26 @@ static	char	buf[BUFSIZE];
 
 #ifdef HIGHEST_CONNECTION
 int     max_connection_count = 1, max_client_count = 1;
+time_t  max_connection_time = 0;
 #endif
 
 #ifdef HIGHEST_CONNECTION
 void
 check_max_count()
 {
-      if (m_clients > max_client_count)
-              max_client_count = m_clients;
-      if ((m_clients + m_servers) > max_connection_count)
-      {
-              max_connection_count = m_clients + m_servers;
-              if (max_connection_count % 10 == 0)
-                      sendto_flagops(1,
-                              "New highest connections: %d (%d clients)",
-                              max_connection_count, max_client_count);
-      }
+	if (!max_connection_time)
+		max_connection_time = NOW;
+	if (m_clients > max_client_count)
+		max_client_count = m_clients;
+	if ((m_clients + m_servers) > max_connection_count)
+	{
+		max_connection_count = m_clients + m_servers;
+		max_connection_time = NOW;
+		if (max_connection_count % 10 == 0)
+			sendto_flagops(1,
+				"New highest connections: %d (%d clients)",
+				max_connection_count, max_client_count);
+	}
 }
 #endif /* HIGHEST_CONNECTION */
 
@@ -1326,6 +1330,7 @@ char	*parv[];
 	Reg1	int	i;
 	int	doall = 0, wilds = 0;
 	char	*name;
+	char	*ptr;
 
 	if (check_registered(sptr))
 		return 0;
@@ -1443,8 +1448,11 @@ char	*parv[];
 		sendto_one(sptr, rpl_str(RPL_STATSUPTIME), me.name, parv[0],
 			   now/86400, (now/3600)%24, (now/60)%60, now%60);
 #ifdef HIGHEST_CONNECTION
+		ptr = ctime(&max_connection_time);
                 sendto_one(sptr, rpl_str(RPL_STATSCONN), me.name, parv[0],
                            max_connection_count, max_client_count);
+		sendto_one(sptr, ":%s %d %s :Highest connection reached at %s",
+			me.name, RPL_MOTD, parv[0], ptr);
 #endif 
 		break;
 	    }
@@ -1580,6 +1588,7 @@ int	parc;
 char	*parv[];
     {
 	aClient *acptr;
+	char *ptr;
 
 	if (check_registered_user(sptr))
 		return 0;
@@ -1627,8 +1636,13 @@ char	*parv[];
 	sendto_one(sptr, rpl_str(RPL_LUSERME),
 		   me.name, parv[0], m_cs, m_ss);
 #ifdef HIGHEST_CONNECTION
+	ptr = ctime(&max_connection_time);
+	if (strchr(ptr, '\n'))
+		*strchr(ptr, '\n') = (char) 0;
 	sendto_one(sptr, rpl_str(RPL_STATSCONN), me.name, parv[0],
                           max_connection_count, max_client_count);
+	sendto_one(sptr, ":%s %d %s :Highest connection reached at %s",
+			me.name, RPL_MOTD, parv[0], ptr); 
 #endif
 	return 0;
 }
@@ -2149,6 +2163,10 @@ char	*parv[];
 	syslog(LOG_WARNING, "Server RESTART by %s\n",
 		get_client_name(sptr,FALSE));
 #endif
+#ifdef BUFFERED_LOGS
+        cs_buf_logs(1,"",0);
+        cs_buf_logs(2,"",0);
+#endif
 	server_reboot();
 	return 0;
 }
@@ -2343,6 +2361,51 @@ char	*parv[];
 	return 0;
     }
 
+#ifdef BETTER_MOTD
+
+void read_motd(filename)
+char *filename;
+{
+	register aMotd *temp, *last;
+	struct stat sb;
+	char buffer[81], *blah;
+	FILE *st;
+
+	while(motd)
+	{
+		temp = motd->next;
+		MyFree(motd);
+		motd = temp;
+	}
+	st = fopen(filename, "rt");
+	if (!st)
+		return;
+	fstat(fileno(st), &sb);
+	motd_tm = localtime(&sb.st_mtime);
+	last = NULL;
+	while(!feof(st))
+	{
+		fgets(buffer, 80, st);
+		if ((blah = strchr(buffer, '\n')) != NULL)
+			*blah = (char) 0;
+		if ((blah = strchr(buffer, '\r')) != NULL)
+			*blah = (char) 0;
+		temp = (aMotd *) MyMalloc(sizeof(aMotd));
+		if (!temp)
+			outofmemory();
+		strcpy(temp->line, buffer);
+		temp->next = NULL;
+		if (!motd)
+			motd = temp;
+		else
+			last->next = temp;
+		last = temp;
+	}
+	fclose(st);
+}
+
+#endif
+				
 /*
 ** m_motd
 **	parv[0] = sender prefix
@@ -2353,21 +2416,47 @@ aClient *cptr, *sptr;
 int	parc;
 char	*parv[];
 {
+#ifdef BETTER_MOTD
+	register aMotd *temp;
+	struct tm *tm;
+#else
 	int	fd;
 	char	line[80];
 	Reg1	char	 *tmp;
 	struct	stat	sb;
 	struct	tm	*tm;
+#endif
 
 	if (check_registered(sptr))
 		return 0;
 
 	if (hunt_server(cptr, sptr, ":%s MOTD :%s", 1,parc,parv)!=HUNTED_ISME)
 		return 0;
-	/*
-	 * stop NFS hangs...most systems should be able to open a file in
-	 * 3 seconds. -avalon (curtesy of wumpus)
-	 */
+
+#ifdef BETTER_MOTD
+	tm = motd_tm;
+	if (motd == NULL)
+	{
+		sendto_one(sptr, err_str(ERR_NOMOTD), me.name, parv[0]);
+		return 0;
+	}
+	sendto_one(sptr, rpl_str(RPL_MOTDSTART), me.name, parv[0], me.name);
+	sendto_one(sptr, ":%s %d %s :- %d/%d/%d %d:%02d", me.name, RPL_MOTD,
+		parv[0], tm->tm_mday, tm->tm_mon+1, 1900+tm->tm_year,
+		tm->tm_hour, tm->tm_min);
+	temp=motd;
+	while(temp)
+	{
+		sendto_one(sptr, rpl_str(RPL_MOTD), me.name, parv[0], temp->line);
+		temp=temp->next;
+	}
+	sendto_one(sptr, rpl_str(RPL_ENDOFMOTD), me.name, parv[0]);
+	return 0;
+#else
+
+/* Here's old MOTD way of opening and reading on every client connect
+   and /MOTD.  Pretty dumb if you ask me... */
+
 	fd = open(MOTD, O_RDONLY);
 	if (fd == -1)
 	    {
@@ -2393,6 +2482,7 @@ char	*parv[];
 	sendto_one(sptr, rpl_str(RPL_ENDOFMOTD), me.name, parv[0]);
 	(void)close(fd);
 	return 0;
+#endif
     }
 
 /*
@@ -2478,6 +2568,10 @@ char	*parv[];
 			sendto_one(acptr, ":%s ERROR :Terminated by %s",
 				   me.name, get_client_name(sptr, TRUE));
 	    }
+#ifdef BUFFERED_LOGS
+	cs_buf_logs(1,"",0);
+	cs_buf_logs(2,"",0);
+#endif
 	(void)s_die();
 	return 0;
 }

@@ -905,13 +905,13 @@ char	*parv[], *mbuf, *pbuf;
 			/* check now so we eat the parameter if present */
 			if (keychange)
 				break;
-			*parv = check_string(*parv);
 			{
-				u_char	*s;
+				register u_char *s;
 
 				for (s = (u_char *)*parv; *s; s++)
 					*s &= 0x7f;
 			}
+			*parv = check_string(*parv);
 			if (MyClient(sptr) && opcnt >= MAXMODEPARAMS)
 				break;
 			if (!fm)
@@ -2441,7 +2441,7 @@ char	*parv[];
 
 	oldmode = &chptr->mode;
 
-/* Enables TS */
+/* Enables TS
         if (newts == 0)
                 if (haveops || !doesop)
                         tstosend = oldts;
@@ -2453,12 +2453,12 @@ char	*parv[];
                 else
                         tstosend = 0;
 /* */
-/* Disables TS:
+/* Disables TS: */
 	if (isnew)
 		chptr->channelts = tstosend = newts;
 	else if (newts == 0 || oldts == 0)
 		chptr->channelts = tstosend = 0;
-*/
+/* */
   	else if (newts == oldts)
 		tstosend = oldts;
 	else if (newts < oldts)

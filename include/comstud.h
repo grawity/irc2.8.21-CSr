@@ -1,6 +1,20 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+
+/* BUFFERED_LOGS   - define this to reduce disk IO when writing users.log
+                     and clones.log
+*/
+
+#define BUFFERED_LOGS
+
+
+/* BETTER_MOTD      - define this to keep the MOTD in ram to reduce disk
+                      IO.  /REHASH to reload the MOTD.
+*/
+
+#define BETTER_MOTD
+
 /* NO_NICK_FLOODS   - define this to limit local users to 3 nick changes
                       in 60 seconds
 */
@@ -171,6 +185,7 @@ they are increased!
                      which is trying to connect is a bot...
                      If it is, it will be rejected from connecting.
                      See BOTS_NOTICE
+*/
 
 #define REJECT_BOTS
 
@@ -205,7 +220,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr21/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr22/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -295,7 +310,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr21/lib/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr22/lib/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

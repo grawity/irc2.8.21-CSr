@@ -1,6 +1,22 @@
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
 
+New in CSr22:
+
+1) Fixed REJECT_BOTS stuff.  This was broken starting with r20 or so.
+   The actual problem was just a missing closing comment (*/) in comstud.h
+2) Fixed K: lines that I broke in ircd.c in r21.  I had an /* instead of */
+   which basically commented out all the K: checking.
+3) Fixed the mode #chan +k bug.
+4) Added BETTER_MOTD which keeps the ircd.motd in RAM which saves a lot
+   of disk access on high-access client servers
+   If you change the /motd, just /rehash to "reload" it.
+5) Added BUFFERED_LOGS which doesn't write to users.log and clones.log
+   each time a client exits or is rejected for cloning.  This should
+   save some disk access as well, tho using a bit more RAM :-/
+6) Disabled channel TS stuff once again.
+
+
 New in CSr21:
 
 1) Readded IDLE_CHECK, using ds2's idea of not allowing them to reconnect

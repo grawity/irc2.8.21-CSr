@@ -30,6 +30,12 @@
 extern        void    check_max_count();
 #endif /* HIGHEST_CONNECTION */
 
+
+#ifdef BETTER_MOTD
+	extern aMotd *motd;
+	extern struct tm *motd_tm;
+#endif
+
 extern int idlelimit;
 extern int s_count, c_count, ch_count, u_count, i_count;
 extern int o_count, m_clients, m_servers, m_invis;
