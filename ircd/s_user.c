@@ -329,6 +329,7 @@ char	*nick, *username;
 	short	oldstatus = sptr->status;
 	anUser	*user = sptr->user;
 	int	i;
+	int	nullhost;
 /* Moved this to make_user
 	user->last = time(NULL);
  -- CS
@@ -338,6 +339,7 @@ char	*nick, *username;
 
 	if (MyConnect(sptr))
 	    {
+		nullhost = (strcmp(user->host, "null") == 0);
 		if (sptr->flags & FLAGS_GOTID)
 			temp = sptr->username;
 		else
@@ -360,6 +362,12 @@ char	*nick, *username;
 		aconf = sptr->confs->value.aconf;
 		if (sptr->flags & FLAGS_DOID && !(sptr->flags & FLAGS_GOTID))
 		    {
+			char    temp[USERLEN+1];
+
+			strncpyzt(temp, username, USERLEN+1);
+			*user->username = '~';
+			(void)strncpy(&user->username[1], temp, USERLEN);
+			user->username[USERLEN] = '\0';
 #ifdef IDENTD_ONLY
                         ircstp->is_ref++;
 			sendto_one(sptr, ":%s NOTICE %s :This server will not allow connections from sites that don't run RFC1413 (pidentd). You may obtain a version for UNIX/VAX/VMX from \"ftp.eskimo.com:/security/pidentd-2.5.1.tar.gz\" via anonymous FTP.", me.name, parv[0]);
@@ -368,13 +376,6 @@ char	*nick, *username;
                         sendto_one(sptr, ":%s NOTICE %s : ", me.name, parv[0]);
 			sendto_one(sptr, ":%s NOTICE %s :Users may wish to subscribe to a new mailing list 'identd-l'. This list is intended to help users install identd on their Unix, PC, Mac, and other machines.. Send email to majordomo@eskimo.com with the body of the message containing 'subscribe identd-l your@email.address'. Do NOT put anything in the subject line! It will be ignored.", me.name, parv[0]);
 			return exit_client(cptr, sptr, &me, "Install identd");
-#else
-			char	temp[USERLEN+1];
-
-			strncpyzt(temp, username, USERLEN+1);
-			*user->username = '~';
-			(void)strncpy(&user->username[1], temp, USERLEN);
-			user->username[USERLEN] = '\0';
 #endif
 		    }
 		else if (sptr->flags & FLAGS_GOTID)
@@ -420,13 +421,27 @@ char	*nick, *username;
                {
 #endif
 #ifdef REJECT_BOTS
+			if (nullhost)
+			{
+                                ircstp->is_ref++;
+                                sendto_flagops(1,"Rejecting joh/com bot: [%s!%s@%s]",
+                                        nick, user->username, user->host);
+                                return exit_client(cptr, sptr, &me, "No bots allowed");
+			} 
+			if (strstr(nick, "LameHelp"))
+			{
+                                ircstp->is_ref++;
+                                sendto_flagops(1,"Rejecting eggdrop bot: [%s!%s@%s]",
+                                        nick, user->username, user->host);
+                                return exit_client(cptr, sptr, &me, "No bots allowed");
+			}
                         if (!matches("*bot*", nick)||!matches("*Serv*", nick)||
                                 !matches("*help*", nick))
                         {
                                 ircstp->is_ref++;
                                 sendto_flagops(1,"Rejecting bot: [%s!%s@%s]",
                                         nick, user->username, user->host);
-                                return exit_client(cptr, sptr, &me, "No bots outside of *eskimo.com allowed");
+                                return exit_client(cptr, sptr, &me, "No bots allowed");
                         }
 #endif /* REJECT_BOTS */
 #ifdef CLONE_CHECK

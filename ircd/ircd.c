@@ -389,6 +389,7 @@ time_t	currenttime;
 #endif
                         else
                                 (void)exit_client(cptr, cptr, &me, "Ping timeout");
+			i = 0;
 			continue;
 		    }
 		else if (IsRegistered(cptr) &&
@@ -434,6 +435,9 @@ ping_timeout:
         }
 #endif /* CLONE_CHECK */
 	    } /* must end the for loop */
+#if defined(CLONE_CHECK) && defined(KILL_CLONES)
+        *clonekillhost = (char) 0;
+#endif
 	if (!oldest || oldest < currenttime)
 		oldest = currenttime + PINGFREQUENCY;
 	Debug((DEBUG_NOTICE,"Next check_ping() call at: %s, %d %d %d",

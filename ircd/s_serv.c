@@ -1795,18 +1795,15 @@ char    *parv[];
                 sendto_one(sptr, ":%s NOTICE %s :Problem opening server configfile", me.name, parv[0]);
                 return 0;
         }
-        if (parv[2] && *parv[2])
+	irc_sprintf(buffer, "#%s!%s@%s K'd: %s@%s: %s\n",
+		sptr->name, sptr->user->username,
+		sptr->user->host, user, host,
+		(parv[2] && *parv[2]) ? parv[2] : "No reason");
+	if (write(out, buffer, strlen(buffer)) <= 0)
 	{
-                irc_sprintf(buffer, "#%s!%s@%s K'd: %s@%s: %s\n",
-			sptr->name, sptr->user->username,
-			sptr->user->host,
-                        user, host, parv[2]);
-                if (write(out, buffer, strlen(buffer)) <= 0)
-		{
-			sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);
-			close(out);
-			return 0;
-		}
+		sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);
+		close(out);
+		return 0;
 	}
         irc_sprintf(buffer, "K:%s::%s\n", host, user);
 	if (write(out, buffer, strlen(buffer)) <= 0)
