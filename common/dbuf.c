@@ -44,6 +44,10 @@ static  char sccsid[] = "@(#)dbuf.c	2.17 1/30/94 (C) 1990 Markku Savela";
 #include "common.h"
 #include "sys.h"
 
+#ifdef DOG3
+#define VALLOC
+#endif
+
 #if !defined(VALLOC) && !defined(valloc)
 #define	valloc malloc
 #endif
@@ -58,6 +62,32 @@ static	dbufbuf	*freelist = NULL;
 */
 
 #define DBUFSIZ sizeof(((dbufbuf *)0)->data)
+
+#ifdef DBUF_INIT
+
+/* dbuf_init--initialize a stretch of memory as dbufs.
+   Doing this early on should save virtual memory if not real memory..
+   at the very least, we get more control over what the server is doing
+
+   mika@cs.caltech.edu 6/24/95
+*/
+
+void dbuf_init()
+{
+	int i=0;
+	dbufbuf *dbp;
+
+	freelist = (dbufbuf *)valloc(sizeof(dbufbuf)*DBUF_INIT);
+	if (!freelist)
+		return; /* screw this if it doesn't work */
+	dbp = freelist;
+	for(;i<DBUF_INIT-1;i++,dbp++,dbufblocks++)
+		dbp->next = (dbp+1);
+	dbp->next = NULL;
+	dbufblocks++;
+}
+
+#endif /* DBUF_INIT */
 
 /*
 ** dbuf_alloc - allocates a dbufbuf structure either from freelist or
@@ -140,6 +170,9 @@ dbuf *dyn;
 		dyn->head = p->next;
 		dbuf_free(p);
 	    }
+#ifdef DBUF_TAIL
+	dyn->tail = dyn->head;
+#endif
 	return -1;
     }
 
@@ -150,18 +183,36 @@ char	*buf;
 int	length;
 {
 	Reg1	dbufbuf	**h, *d;
+#ifdef DBUF_TAIL
+	Reg2	int	off;
+#else
 	Reg2	int	nbr, off;
+#endif
 	Reg3	int	chunk;
 
 	off = (dyn->offset + dyn->length) % DBUFSIZ;
+#ifndef DBUF_TAIL
 	nbr = (dyn->offset + dyn->length) / DBUFSIZ;
+#endif
 	/*
 	** Locate the last non-empty buffer. If the last buffer is
 	** full, the loop will terminate with 'd==NULL'. This loop
 	** assumes that the 'dyn->length' field is correctly
 	** maintained, as it should--no other check really needed.
 	*/
+#ifdef DBUF_TAIL
+	if (!dyn->length)
+		h = &(dyn->head);
+	else
+	{
+		if (off)
+			h = &(dyn->tail);
+		else
+			h = &(dyn->tail->next);
+	}
+#else 
 	for (h = &(dyn->head); (d = *h) && --nbr >= 0; h = &(d->next));
+#endif /* DBUF_TAIL */
 	/*
 	** Append users data to buffer, allocating buffers as needed
 	*/
@@ -173,6 +224,9 @@ int	length;
 		    {
 			if ((d = (dbufbuf *)dbuf_alloc()) == NULL)
 				return dbuf_malloc_error(dyn);
+#ifdef DBUF_TAIL
+			dyn->tail = d;
+#endif
 			*h = d;
 			d->next = NULL;
 		    }
@@ -194,6 +248,9 @@ int	*length;
     {
 	if (dyn->head == NULL)
 	    {
+#ifdef DBUG_TAIL
+		dyn->tail = NULL;
+#endif
 		*length = 0;
 		return NULL;
 	    }
@@ -230,7 +287,14 @@ int	length;
 		chunk = DBUFSIZ;
 	    }
 	if (dyn->head == (dbufbuf *)NULL)
+#ifdef DBUF_TAIL
+	{
+		dyn->tail = NULL;
+#endif
 		dyn->length = 0;
+#ifdef DBUF_TAIL
+	}
+#endif
 	return 0;
     }
 

@@ -33,6 +33,12 @@ Computing Center and Jarkko Oikarinen";
 #include "h.h"
 #include <stdio.h>
 
+#ifdef DOG3
+#include "fdlist.h"
+extern fdlist serv_fdlist;
+void sendto_fdlist();
+#endif
+ 
 #ifdef	IRCII_KLUDGE
 #define	NEWLINE	"\n"
 #else

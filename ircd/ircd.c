@@ -469,8 +469,11 @@ char	*argv[];
 	time_t	delay = 0, now;
         struct rlimit r;
 
-        r.rlim_cur = 1023;
-        r.rlim_max = 1023;
+#ifdef DBUF_INIT
+        dbuf_init(); /* set up some dbuf stuff to control paging */
+#endif
+        r.rlim_cur = MAXCONNECTIONS;
+        r.rlim_max = MAXCONNECTIONS;
         setrlimit(RLIMIT_NOFILE, &r);
 #ifdef IDLE_CHECK
         idlelimit = DEFAULT_IDLELIMIT*60;

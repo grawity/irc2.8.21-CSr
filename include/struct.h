@@ -442,7 +442,7 @@ struct	SLink	{
 #ifdef BAN_INFO
                 struct {
                   char *banstr;
-                  char who[NICKLEN+1];
+                  char *who;
                   time_t when;
                 } ban;
 #endif

@@ -85,6 +85,7 @@ VOIDSIG dummy()
 **	*NOTE*	alarm calls have been preserved, so this should
 **		work equally well whether blocking or non-blocking
 **		mode is used...
+**       -- Actually, alarm calls are gone now... - Comstud
 */
 int	deliver_it(cptr, str, len)
 aClient *cptr;

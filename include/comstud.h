@@ -1,6 +1,21 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/* DBUF_TAIL        - define this if you'd like to use improved
+                      performance dealing with dbufs...
+*/
+
+#define DBUF_TAIL
+
+/* DBUF_INIT        - define this if you want to pre-allocate
+                      4 megs of dbufs...this should help in
+                      the long run according to dog3 =)
+                      1000 = 1000*4kb = 4 megs
+                      just #undef if you think it's unneeded =)
+*/
+
+#define DBUF_INIT 1000
+
 /* IDENTD_ONLY      - define this if you only want people running
                       identd to connect
               Note:   Non-identd people are allowed on by
@@ -143,7 +158,7 @@
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr6/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr7/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -227,7 +242,7 @@
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr6/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr7/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

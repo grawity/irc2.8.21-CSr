@@ -24,10 +24,11 @@
 
 #include "comstud.h"
 
+#define COMSTUD_DEBUG
 
 /* Type of host. These should be made redundant somehow. -avalon */
 
-#define	BSD			Nothing Needed 4.{2,3} BSD, SunOS 3.x, 4.x */
+/*     	BSD			Nothing Needed 4.{2,3} BSD, SunOS 3.x, 4.x */
 /*	HPUX			Nothing needed (A.08/A.09) */
 /*	ULTRIX			Nothing needed (4.2) */
 /*	OSF			Nothing needed (1.2) */
@@ -101,8 +102,8 @@
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/home/irc/irc2.8.21+CSr6/lib"	/* dir where all ircd stuff is */
-#define	SPATH	"/home/irc/irc2.8.21+CSr6/lib/ircd"
+#define	DPATH	"/home/irc/irc2.8.21+CSr7/lib"	/* dir where all ircd stuff is */
+#define	SPATH	"/home/irc/irc2.8.21+CSr7/lib/ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
 #define	LPATH	"ircd.log" /* Where the debug file lives, if DEBUGMODE */
@@ -116,8 +117,8 @@
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
 
-#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr6/logs/users.log" /* */
-#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr6/logs/opers.log" /* */
+#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr7/logs/users.log" /* */
+#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr7/logs/opers.log" /* */
 
 /* CHROOTDIR
  *

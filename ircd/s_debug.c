@@ -138,6 +138,9 @@ char	serveropts[] = {
 #ifdef IDENTD_ONLY
 'd',
 #endif
+#ifdef DBUF_TAIL
+'D',
+#endif
 #ifdef OPER_CAN_FLOOD2
 'f',
 #endif

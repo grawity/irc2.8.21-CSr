@@ -49,6 +49,9 @@ Reg4	int	length;
 	Reg1	char	*ch1;
 	Reg2	char	*ch2;
 	aClient	*acpt = cptr->acpt;
+#ifdef DOG3
+	register char *cptrbuf = cptr->buffer;
+#endif
  
 	me.receiveB += length; /* Update bytes received */
 	cptr->receiveB += length;
@@ -71,11 +74,21 @@ Reg4	int	length;
 		me.receiveK += (me.receiveB >> 10);
 		me.receiveB &= 0x03ff;
 	    }
+#ifdef DOG3
+	ch1 = cptrbuf + cptr->count;
+#else
 	ch1 = cptr->buffer + cptr->count;
+#endif
 	ch2 = buffer;
 	while (--length >= 0)
 	    {
+#ifdef DOG3
+		register char *g;
+
+		g = (*ch1 = *ch2++);
+#else
 		*ch1 = *ch2++;
+#endif
 		/*
 		 * Yuck.  Stuck.  To make sure we stay backward compatible,
 		 * we must assume that either CR or LF terminates the message
@@ -83,9 +96,17 @@ Reg4	int	length;
 		 * of messages, backward compatibility is lost and major
 		 * problems will arise. - Avalon
 		 */
+#ifdef DOG3
+		if ((g < '\16') && (g == '\n' || g == '\r'))
+#else
 		if (*ch1 == '\n' || *ch1 == '\r')
+#endif
 		    {
+#ifdef DOG3
+			if (ch1 == cptrbuf)
+#else
 			if (ch1 == cptr->buffer)
+#endif
 				continue; /* Skip extra LF/CR's */
 			*ch1 = '\0';
 			me.receiveM += 1; /* Update messages received */
@@ -112,11 +133,23 @@ Reg4	int	length;
 				return exit_client(cptr, cptr, &me,
 						   "Dead Socket");
 #endif
+#ifdef DOG3
+			ch1 = cptrbuf;
+#else
 			ch1 = cptr->buffer;
+#endif
 		    }
+#ifdef DOG3
+		else if (ch1 < cptrbuf + (sizeof(cptr->buffer)-1))
+#else
 		else if (ch1 < cptr->buffer + (sizeof(cptr->buffer)-1))
+#endif
 			ch1++; /* There is always room for the null */
 	    }
+#ifdef DOG3
+	cptr->count = ch1 - cptrbuf;
+#else
 	cptr->count = ch1 - cptr->buffer;
+#endif
 	return 0;
 }

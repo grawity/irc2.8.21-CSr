@@ -205,7 +205,8 @@ char	*banid;
 #ifdef BAN_INFO
 	ban->value.ban.banstr = (char *)MyMalloc(strlen(banid)+1);
 	(void)strcpy(ban->value.ban.banstr, banid);
-        (void)strcpy(ban->value.ban.who, cptr->name);
+	ban->value.ban.who = (char *)MyMalloc(strlen(cptr->name)+1);
+	(void)strcpy(ban->value.ban.who, cptr->name);
         ban->value.ban.when = time(NULL);
 #else
         ban->value.cp = (char *)MyMalloc(strlen(banid)+1);
@@ -239,6 +240,7 @@ char	*banid;
 			*ban = tmp->next;
 #ifdef BAN_INFO
 			MyFree(tmp->value.ban.banstr);
+			MyFree(tmp->value.ban.who);
 #else
 			MyFree(tmp->value.cp);
 #endif
@@ -484,7 +486,11 @@ char	flag, *chname;
 		if (!(lp->flags & mask))
 			continue;
 		if (mask == CHFL_BAN)
+#ifdef BAN_INFO
+			name = lp->value.ban.banstr;
+#else
 			name = lp->value.cp;
+#endif
 		else
 			name = lp->value.cptr->name;
 		if (strlen(parabuf) + strlen(name) + 10 < (size_t) MODEBUFLEN)
@@ -804,7 +810,7 @@ char	*parv[], *mbuf, *pbuf;
 					     me.name, cptr->name,
 						chptr->chname,
 #ifdef BAN_INFO
-						lp->value.cp,
+						lp->value.ban.banstr,
 						lp->value.ban.who,
 						lp->value.ban.when);
 #else
@@ -1278,6 +1284,7 @@ Reg1	aChannel *chptr;
 			tmp = tmp->next;
 #ifdef BAN_INFO
 			MyFree(obtmp->value.ban.banstr);
+			MyFree(obtmp->value.ban.who);
 #else
 			MyFree(obtmp->value.cp);
 #endif

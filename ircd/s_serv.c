@@ -1735,11 +1735,19 @@ char    *parv[];
                         me.name, parv[0]);
                 return 0;
         }
-        if (strchr(parv[1], '@'))
+        if (strchr(parv[1], '@') || *parv[1] == '*')
         {
-                user = parv[1];
-                host = strchr(parv[1], '@');
-                *(host++) = '\0';
+		if (strchr(parv[1], '@'))
+		{
+	                user = parv[1];
+			host = strchr(parv[1], '@');
+			*(host++) = '\0';
+		}
+		else
+		{
+			user = "*";
+			host = parv[1];
+		}
                 if (!*host)
                         host = "*";
 		if (*user == '~')
@@ -1761,6 +1769,12 @@ char    *parv[];
         {
                 if (!(acptr = find_chasing(sptr, parv[1], NULL)))
                         return 0;
+		if (IsServer(acptr))
+		{
+			sendto_one(sptr, ":%s NOTICE %s :Can't KLINE a server, use @'s where appropriate",
+				me.name, parv[0]);
+			return 0;
+		}
                 strcpy(tempuser, "*");
 		if (*acptr->user->username == '~')
 			strcat(tempuser, (char *)acptr->user->username+1);
@@ -1983,7 +1997,7 @@ char	*parv[];
 			/* Only opers see users if there is a wildcard
 			 * but anyone can see all the opers.
 			 */
-			if (IsOper(sptr)  &&
+			if (IsAnOper(sptr)  &&
 			    (MyClient(sptr) || !(dow && IsInvisible(acptr)))
 			    || !dow || IsAnOper(acptr))
 			    {
