@@ -1742,6 +1742,8 @@ char    *parv[];
                 *(host++) = '\0';
                 if (!*host)
                         host = "*";
+		if (*user == '~')
+			user++;
                 if (*user != '*')
                         strcpy(tempuser, "*");
                 else
@@ -1760,12 +1762,13 @@ char    *parv[];
                 if (!(acptr = find_chasing(sptr, parv[1], NULL)))
                         return 0;
                 strcpy(tempuser, "*");
-                strcat(tempuser, acptr->user->username);
+		if (*acptr->user->username == '~')
+			strcat(tempuser, (char *)acptr->user->username+1);
+		else
+	                strcat(tempuser, acptr->user->username);
                 user = tempuser;
                 host = cluster(acptr->user->host);
         }
-	if (*user == '~')
-		user++;
         if (!matches(user, "akjhfkahfasfjd") &&
                 !matches(host, "ldksjfl.ksskdjfd.jfklsjf"))
         {

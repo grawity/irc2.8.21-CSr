@@ -17,5 +17,5 @@
  */
 
 #ifndef	PATCHLEVEL
-#define PATCHLEVEL "2.8.21+CSr5"
+#define PATCHLEVEL "2.8.21+CSr6"
 #endif
