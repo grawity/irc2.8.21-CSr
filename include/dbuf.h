@@ -77,7 +77,7 @@ typedef struct dbuf
 typedef struct dbufbuf
     {
 	struct	dbufbuf	*next;	/* Next data buffer, NULL if this is last */
-	char	data[4080];	/* Actual data stored here */
+	char	data[4092];	/* Actual data stored here */
     } dbufbuf;
 
 /*

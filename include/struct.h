@@ -355,6 +355,10 @@ struct Client	{
 	long	sendM;		/* Statistics: protocol messages send */
 	long	sendK;		/* Statistics: total k-bytes send */
 	long	receiveM;	/* Statistics: protocol messages received */
+#ifdef DOG3
+	long lastrecvM;		/* to check for activity --Mika */
+	int priority;
+#endif 
 	long	receiveK;	/* Statistics: total k-bytes received */
 	u_short	sendB;		/* counters to count upto 1-k lots of bytes */
 	u_short	receiveB;	/* sent and received. */

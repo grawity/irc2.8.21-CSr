@@ -407,6 +407,10 @@ va_dcl
 # endif
 	Reg1	int	i;
 	Reg2	aClient *cptr;
+#ifdef DOG3
+	register int j,k=0;
+	fdlist send_fdlist;
+#endif
 
 # ifdef	USE_VARARGS
 	va_start(vl);
@@ -416,19 +420,35 @@ va_dcl
         check_command((long)2, pattern, p1, p2, p3);
 # endif
 
+#ifdef DOG3
+	for (i=serv_fdlist.entry[j=1];j<=serv_fdlist.last_entry;
+		i=serv_fdlist.entry[++j])
+#else 
 	for (i = 0; i <= highest_fd; i++)
+#endif
 	    {
 		if (!(cptr = local[i]) || (one && cptr == one->from))
 			continue;
+#ifndef DOG3
 		if (IsServer(cptr))
+#endif
 # ifdef	USE_VARARGS
 			sendto_one(cptr, pattern, vl);
 	    }
 	va_end(vl);
 # else
+#ifdef DOG3
+		send_fdlist.entry[++k] = i;
+#else
 			sendto_one(cptr, pattern, p1, p2, p3, p4,
 				   p5, p6, p7, p8);
+#endif /* DOG3 */
 	    }
+#ifdef DOG3
+	send_fdlist.last_entry = k;
+	if (k)
+		sendto_fdlist(&send_fdlist,pattern,p1,p2,p3,p4,p5,p6,p7,p8);
+#endif /* DOG3 */
 # endif
 	return;
 }
@@ -584,6 +604,10 @@ va_dcl
 	Reg1	int	i;
 	Reg2	aClient	*cptr;
 	char	*mask;
+#ifdef DOG3
+	register int j,k=0;
+	fdlist send_fdlist;
+#endif
 
 #ifdef	USE_VARARGS
 	va_start(vl);
@@ -602,13 +626,26 @@ va_dcl
 	else
 		mask = (char *)NULL;
 
+#ifdef DOG3
+	for (i=serv_fdlist.entry[j=1];j<=serv_fdlist.last_entry;
+		i=serv_fdlist.entry[++j])
+#else 
 	for (i = 0; i <= highest_fd; i++)
+#endif
 	    {
 		if (!(cptr = local[i]))
 			continue;
+#ifdef DOG3
+		if (cptr == from)
+#else
 		if ((cptr == from) || !IsServer(cptr))
+#endif
 			continue;
+#ifdef DOG3
+		if (!BadPtr(mask) &&
+#else
 		if (!BadPtr(mask) && IsServer(cptr) &&
+#endif
 		    matches(mask, cptr->name))
 			continue;
 #ifdef	USE_VARARGS
@@ -616,8 +653,17 @@ va_dcl
 	    }
 	va_end(vl);
 #else
+#ifdef DOG3
+		send_fdlist.entry[++k] = i;
+#else 
 		sendto_one(cptr, format, p1, p2, p3, p4, p5, p6, p7, p8, p9);
+#endif
 	    }
+#ifdef DOG3
+	send_fdlist.last_entry=k;
+	if (k)
+		sendto_fdlist(&send_fdlist,format,p1,p2,p3,p4,p5,p6,p7,p8,p9);
+#endif /* DOG3 */
 #endif
 }
 
@@ -973,3 +1019,15 @@ va_dcl
 	sendto_one(to, pattern, par, p2, p3, p4, p5, p6, p7, p8);
 #endif
 }
+
+void sendto_fdlist(listp,formp,p1,p2,p3,p4,p5,p6,p7,p8,p9)
+fdlist  *listp;
+char    *formp;
+char *p1,*p2,*p3,*p4,*p5,*p6,*p7,*p8,*p9;
+{
+	register int len,j,i,fd;
+	len = format(sendbuf,formp,p1,p2,p3,p4,p5,p6,p7,p8,p9);
+
+	for(fd=listp->entry[j=1]; j<= listp->last_entry ; fd=listp->entry[++j])
+		send_message(local[fd],sendbuf,len);
+} 

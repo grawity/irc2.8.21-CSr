@@ -150,6 +150,9 @@ char	serveropts[] = {
 #ifdef HIGHEST_CONNECTON
 'h',
 #endif
+#ifdef DOUGH_HASH
+'H',
+#endif
 #ifdef REJECT_IPHONE
 'i',
 #endif
@@ -197,7 +200,9 @@ char	serveropts[] = {
 #ifdef USERNAMES_IN_TRACE
 'u',
 #endif
-
+#ifdef DOG3
+'3',
+#endif
 '\0'};
 
 #include "numeric.h"

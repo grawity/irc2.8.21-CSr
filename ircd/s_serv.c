@@ -41,6 +41,10 @@ Computing Center and Jarkko Oikarinen";
 #include <utmp.h>
 #include "h.h"
 
+#ifdef DOG3
+extern time_t check_fdlists();
+#endif
+
 static	char	buf[BUFSIZE];
 
 #ifdef HIGHEST_CONNECTION
@@ -643,6 +647,12 @@ Reg1	aClient	*cptr;
 	**	code is more neat this way...  --msa
 	*/
 	SetServer(cptr);
+#ifdef DOG3
+	/* adds to fdlist */
+	addto_fdlist(cptr->fd,&serv_fdlist);
+	/* this causes the server to be marked as "busy" */
+	check_fdlists(time(NULL));
+#endif 
 	nextping = time(NULL);
 	sendto_ops("Link with %s established.", inpath);
 	(void)add_to_client_hash_table(cptr->name, cptr);
@@ -1287,6 +1297,14 @@ char	*parv[];
 		if(hunt_server(cptr, sptr, ":%s LUSERS %s :%s", 2, parc, parv)
 				!= HUNTED_ISME)
 			return 0;
+#ifdef DOG3 
+	/* this is to reduce load while connecting */
+	if (lifesux && !IsAnOper(sptr))
+	{
+		sendto_one(sptr,rpl_str(RPL_LOAD2HI),me.name,parv[0]);
+		return 0;
+	}
+#endif
 
 	(void)collapse(parv[1]);
 	for (acptr = client; acptr; acptr = acptr->next)
@@ -1900,6 +1918,7 @@ char	*parv[];
 	char	*tname;
 	int	doall, link_s[MAXCONNECTIONS], link_u[MAXCONNECTIONS];
 	int	cnt = 0, wilds, dow;
+	time_t	now;
 
 	if (check_registered(sptr))
 		return 0;
@@ -1913,14 +1932,18 @@ char	*parv[];
 		tname = parv[1];
 	else
 		tname = me.name;
-
+	now = time(NULL);
 	switch (hunt_server(cptr, sptr, ":%s TRACE :%s", 1, parc, parv))
 	{
 	case HUNTED_PASS: /* note: gets here only if parv[1] exists */
 	    {
 		aClient	*ac2ptr;
 
+#ifdef DOG3
+		ac2ptr = next_client_double(client, tname);
+#else
 		ac2ptr = next_client(client, tname);
+#endif
 		sendto_one(sptr, rpl_str(RPL_TRACELINK), me.name, parv[0],
 			   version, debugmode, tname, ac2ptr->from->name);
 		return 0;
@@ -2006,7 +2029,9 @@ char	*parv[];
 				else
 					sendto_one(sptr,rpl_str(RPL_TRACEUSER),
 						   me.name, parv[0],
-						   class, name);
+						   class, name,
+						acptr->priority,
+						now-acptr->lasttime);
 				cnt++;
 			    }
 			break;

@@ -300,7 +300,8 @@ Link	*find_user_link(lp, ptr)
 Reg1	Link	*lp;
 Reg2	aClient *ptr;
 {
-	while (lp && ptr)
+	if (ptr)
+	while (lp)
 	   {
 		if (lp->value.cptr == ptr)
 			return (lp);

@@ -1050,6 +1050,14 @@ aClient *cptr;
 			local[i] = local[j];
 			local[i]->fd = i;
 			local[j] = NULL;
+			/* update server list */
+			if (IsServer(local[i]))
+			{
+				delfrom_fdlist(j,&busycli_fdlist);
+				delfrom_fdlist(j,&serv_fdlist);
+				addto_fdlist(i,&busycli_fdlist);
+				addto_fdlist(i,&serv_fdlist);
+			}
 			(void)close(j);
 			while (!local[highest_fd])
 				highest_fd--;
@@ -1449,10 +1457,16 @@ fd_set	*rfd;
  * processed. Also check for connections with data queued and whether we can
  * write it out.
  */
+#ifdef DOG3
+int	read_message(delay, listp)
+time_t	delay;
+fdlist	*listp;
+#else
 int	read_message(delay)
 time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 		* you have to have sleep/wait somewhere else in the code.--msa
 		*/
+#endif
 {
 	Reg1	aClient	*cptr;
 	Reg2	int	nfds;
@@ -1464,8 +1478,20 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 	fd_set	read_set, write_set;
 	time_t	delay2 = delay, now;
 	u_long	usec = 0;
-	int	res, length, fd, i;
+	int	res, length, fd;
 	int	auth = 0;
+	register int i;
+#ifdef DOG3
+	register int j;
+
+	/* if it is called with NULL we check all active fd's */
+	if (!listp)
+	{
+		listp = &default_fdlist;
+		listp->last_entry = highest_fd+1; /* remember the 0th entry isnt used */
+	}
+
+#endif
 
 #ifdef NPATH
 	check_command(&delay, NULL);
@@ -1482,7 +1508,12 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 		FD_ZERO(&read_set);
 		FD_ZERO(&write_set);
 
+#ifdef DOG3
+		for (i=listp->entry[j=1];j<=listp->last_entry;
+			i=listp->entry[++j])
+#else 
 		for (i = highest_fd; i >= 0; i--)
+#endif
 		    {
 			if (!(cptr = local[i]))
 				continue;
@@ -1500,7 +1531,14 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 				continue;
 			if (IsMe(cptr) && IsListening(cptr))
 			    {
-				if ((now > cptr->lasttime + 2))
+#ifdef DOG3
+		/* next line was 2, changing to 1 */
+		/*if we dont have many clients just let em on */
+			if ((highest_fd < MAXCONNECTIONS /2 ) ||
+				(now > cptr->lasttime + 1))
+#else 
+				if (now > (cptr->lasttime + 2))
+#endif
 					FD_SET(i, &read_set);
 				else if (delay2 > 2)
 					delay2 = 2;
@@ -1576,6 +1614,7 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 	 * because these can not be processed using the normal loops below.
 	 * -avalon
 	 */
+
 	for (i = highest_fd; (auth > 0) && (i >= 0); i--)
 	    {
 		if (!(cptr = local[i]))
@@ -1594,7 +1633,12 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 			read_authports(cptr);
 		    }
 	    }
+#ifdef DOG3
+        for (i=listp->entry[j=1];j <= listp->last_entry;
+                        i=listp->entry[++j])
+#else 
 	for (i = highest_fd; i >= 0; i--)
+#endif
 		if ((cptr = local[i]) && FD_ISSET(i, &read_set) &&
 		    IsListening(cptr))
 		    {
@@ -1644,7 +1688,12 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 				cptr->acpt = &me;
 		    }
 
+#ifdef DOG3
+	for (i=listp->entry[j=1];j<=listp->last_entry;
+		i=listp->entry[++j])
+#else 
 	for (i = highest_fd; i >= 0; i--)
+#endif
 	    {
 		if (!(cptr = local[i]) || IsMe(cptr))
 			continue;
@@ -1675,8 +1724,10 @@ deadsocket:
 		length = 1;	/* for fall through case */
 		if (!NoNewLine(cptr) || FD_ISSET(i, &read_set))
 			length = read_packet(cptr, &read_set);
+#ifndef DOG3
 		if (length > 0)
 			flush_connections(i);
+#endif
 		if ((length != FLUSH_BUFFER) && IsDead(cptr))
 			goto deadsocket;
 		if (!FD_ISSET(i, &read_set) && length > 0)

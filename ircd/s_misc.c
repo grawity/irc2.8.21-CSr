@@ -348,6 +348,10 @@ char	*comment;	/* Reason for the exit */
 
 	if (MyConnect(sptr))
 	    {
+#ifdef DOG3
+		if(IsServer(sptr))
+			delfrom_fdlist(sptr->fd,&serv_fdlist);
+#endif
 		sptr->flags |= FLAGS_CLOSING;
 #ifdef CLIENT_NOTICES
                 if (IsPerson(sptr))

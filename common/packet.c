@@ -83,7 +83,7 @@ Reg4	int	length;
 	while (--length >= 0)
 	    {
 #ifdef DOG3
-		register char *g;
+		register char g;
 
 		g = (*ch1 = *ch2++);
 #else

@@ -36,6 +36,21 @@ Computing Center and Jarkko Oikarinen";
 #include <fcntl.h>
 #include "h.h"
 
+#ifdef DOG3
+
+#include "dog3.h"
+#include "fdlist.h"
+
+fdlist serv_fdlist;
+fdlist busycli_fdlist; /* high-priority clients */
+fdlist default_fdlist; /* just the number of the entry */
+fdlist auth_fdlist;
+int lifesux = 0;
+
+time_t check_fdlists();
+
+#endif /* DOG3 */
+
 #ifdef CLONE_CHECK
 	aClone *Clones = NULL;
 	char clonekillhost[100];
@@ -472,7 +487,11 @@ char	*argv[];
 	uid_t	uid, euid;
 	time_t	delay = 0, now;
         struct rlimit r;
-
+#ifdef DOG3
+	int mainloops=0; /* counter of how many times we have gone through
+                           the main loop */
+	time_t nextfdlistcheck=0; /*end of priority code */
+#endif
 #ifdef DBUF_INIT
         dbuf_init(); /* set up some dbuf stuff to control paging */
 #endif
@@ -654,6 +673,17 @@ char	*argv[];
 	initwhowas();
 	initstats();
 	open_debugfile();
+#ifdef DOG3
+	init_fdlist(&serv_fdlist);
+	init_fdlist(&busycli_fdlist);
+	init_fdlist(&default_fdlist);
+	init_fdlist(&auth_fdlist);
+	{
+		register int i;
+		for (i=MAXCONNECTIONS+1 ; i>0 ; i--)
+			default_fdlist.entry[i] = i-1;
+	}
+#endif
 	if (portnum < 0)
 		portnum = PORTNUM;
 	me.port = portnum;
@@ -726,10 +756,47 @@ char	*argv[];
 #ifdef USE_SYSLOG
 	syslog(LOG_NOTICE, "Server Ready");
 #endif
-
+#ifdef DOG3
+	check_fdlists(time(NULL));
+#endif
 	for (;;)
 	    {
 		now = time(NULL);
+#ifdef DOG3 
+{
+	static time_t lasttime=0;
+	static long lastrecvK;
+	static int init=0;
+	static time_t loadcfreq=LOADCFREQ;
+
+	if (now-lasttime < loadcfreq)
+		goto done_check;
+	lasttime = now;
+	if (me.receiveK - LOADRECV > lastrecvK)
+	{
+		if (!lifesux)
+		{
+			loadcfreq *= 2; /* add hysteresis */
+			lifesux = TRUE;
+			sendto_ops("Entering high-traffic mode");
+		}
+	}
+	else
+	{
+		loadcfreq = LOADCFREQ;
+		if (lifesux)
+		{
+			lifesux = 0;
+			sendto_ops("Resuming standard operation");
+		}
+	}
+	lastrecvK = me.receiveK;
+done_check:
+	;
+}
+#endif /* DOG3 */
+ 
+
 		/*
 		** We only want to connect if a connection is due,
 		** not every time through.  Note, if there are no
@@ -770,8 +837,23 @@ char	*argv[];
 			delay = 1;
 		else
 			delay = MIN(delay, TIMESEC);
+#ifndef DOG3
 		(void)read_message(delay);
-		
+#else
+		(void)read_message(0,&serv_fdlist); /* servers */
+		(void)read_message(1,&busycli_fdlist); /* busy clients */
+		if (lifesux)
+			(void)read_message(1,&serv_fdlist);
+				/* read servs more often */
+{
+		static time_t lasttime=0;
+		if ((lasttime + (lifesux +1) * 2)< (now = time(NULL)))
+		{
+			read_message(delay,NULL); /*  check everything! */
+			lasttime = now;
+		}
+}
+#endif
 		Debug((DEBUG_DEBUG ,"Got message(s)"));
 		
 		now = time(NULL);
@@ -783,7 +865,11 @@ char	*argv[];
 		** time might be too far away... (similarly with
 		** ping times) --msa
 		*/
+#ifdef DOG3
+		if (now >= nextping && !lifesux)
+#else
 		if (now >= nextping)
+#endif
 			nextping = check_pings(now);
 
 		if (dorehash)
@@ -797,6 +883,11 @@ char	*argv[];
 		** -avalon
 		*/
 		flush_connections(me.fd);
+#ifdef DOG3
+		/* check which clients are active */
+		if (now > nextfdlistcheck)
+			nextfdlistcheck = check_fdlists(now);
+#endif
 	    }
     }
 
@@ -910,3 +1001,41 @@ static	void	setup_signals()
 	(void)siginterrupt(SIGALRM, 1);
 #endif
 }
+
+#ifdef DOG3
+time_t check_fdlists(now)
+time_t now;
+{
+	register aClient *cptr;
+	int pri; /* temp. for priority */
+	register int i,j;
+	j = 0;
+
+	for(i=highest_fd;i>=0; i--)
+	{
+		if (!(cptr=local[i]))
+			continue;
+		if (IsServer(cptr) || IsListening(cptr) || IsOper(cptr) ||
+			DoingAuth(cptr))
+		{
+			busycli_fdlist.entry[++j] = i;
+			continue;
+		}
+		pri = cptr->priority;
+		if (cptr->receiveM==cptr->lastrecvM)
+			pri+=2; /* lower a bit */
+		else
+			pri-=30;
+		if (pri < 0) pri = 0;
+		if (pri > 80) pri = 80;
+
+		cptr->lastrecvM = cptr->receiveM;
+		cptr->priority = pri;
+		if ((pri <10) || (!lifesux && (pri < 25)))
+			busycli_fdlist.entry[++j] = i;
+	}
+	busycli_fdlist.last_entry=j; /* rest of the fdlist is garbage */
+
+	return (now + FDLISTCHKFREQ + lifesux * FDLISTCHKFREQ);
+}
+#endif /* DOG3 */

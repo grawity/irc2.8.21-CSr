@@ -1843,6 +1843,13 @@ char	*parv[];
 	aChannel *chptr;
 	char	*name, *p = NULL;
 
+	if (lifesux && !IsAnOper(sptr))
+	{
+		sendto_one(sptr, rpl_str(RPL_LOAD2HI), me.name,
+			parv[0]);
+		return 0;
+	}
+
 	sendto_one(sptr, rpl_str(RPL_LISTSTART), me.name, parv[0]);
 
 	if (parc < 2 || BadPtr(parv[1]))

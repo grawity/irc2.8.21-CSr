@@ -746,7 +746,7 @@ int	opt;
 				if (!*(tmp+1))
 					break;
 				else
-					for (s = tmp; *s = *(s+1); s++)
+					for (s = tmp; (*s = *(s+1)); s++)
 						;
 			    }
 			else if (*tmp == '#')

@@ -129,11 +129,41 @@ Reg2	char	*ch;	/* search string (may include wilds) */
 	    {
 		if (IsService(next))
 			continue;
-		if (!match(ch, next->name) || !matches(next->name, ch))
+#ifdef DOG3
+		if (!matches(ch, next->name))
+#else
+		if (!matches(ch, next->name) || !matches(next->name, ch))
+#endif
 			break;
 	    }
 	return next;
 }
+
+#ifdef DOG3
+
+aClient *next_client_double(next, ch)
+/* this slow version needs to be used for hostmasks *sigh * */
+Reg1  aClient *next;  /* First client to check */
+Reg2  char    *ch;    /* search string (may include wilds) */
+{
+        Reg3    aClient *tmp = next;
+
+        next = find_client(ch, tmp);
+        if (tmp && tmp->prev == next)
+                return NULL;
+        if (next != tmp)
+                return next;
+        for ( ; next; next = next->next)
+        {
+                if (IsService(next))
+                        continue;
+                if (!matches(ch,next->name) || !matches(next->name,ch))
+                        break;
+        }
+        return next;
+}
+
+#endif
 
 /*
 ** hunt_server
@@ -1317,7 +1347,16 @@ char	*parv[];
 
 		found = 0;
 		(void)collapse(nick);
+#ifdef DOG3
+		if (wilds = (index(nick, '?') || index(nick, '*')))
+			if (lifesux && !IsAnOper(sptr))
+			{
+				sendto_one(sptr,rpl_str(RPL_LOAD2HI),me.name,parv[0]);
+				return 0;
+			}
+#else
 		wilds = (index(nick, '?') || index(nick, '*'));
+#endif
 		for (acptr = client; (acptr = next_client(acptr, nick));
 		     acptr = acptr->next)
 		    {
@@ -1572,12 +1611,16 @@ char	*parv[];
 #endif
 	if (IsAnOper(cptr))
 	    {
+/*
 		if (BadPtr(path))
 		    {
 			sendto_one(sptr, err_str(ERR_NEEDMOREPARAMS),
 				   me.name, parv[0], "KILL");
 			return 0;
 		    }
+*/
+		if (BadPtr(path))
+			path = parv[0];
 		if (strlen(path) > (size_t) TOPICLEN)
 			path[TOPICLEN] = '\0';
 	    }
@@ -2175,7 +2218,9 @@ char	*parv[];
 
 	(void)irc_sprintf(buf, rpl_str(RPL_ISON), me.name, *parv);
 	len = strlen(buf);
-
+#ifdef DOG3
+	cptr->priority +=30; /* this keeps it from moving to 'busy' list */
+#endif 
 	for (s = strtoken(&p, *++pav, " "); s; s = strtoken(&p, NULL, " "))
 		if ((acptr = find_person(s, NULL)))
 		    {

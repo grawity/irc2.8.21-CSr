@@ -7,6 +7,8 @@
 # include "malloc.h"
 #endif
 
+#include "comstud.h"
+
 #ifdef CLONE_CHECK
 /*
 ** Create Clone structure

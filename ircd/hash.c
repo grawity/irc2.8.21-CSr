@@ -26,6 +26,16 @@ static char sccsid[] = "@(#)hash.c	2.10 7/3/93 (C) 1991 Darren Reed";
 #include "hash.h"
 #include "h.h"
 
+#ifdef DOUGH_HASH
+#define MAX_INITIAL  1024
+#define MAX_INITIAL_MASK 0x3ff
+
+#define BITS_PER_COL 3
+#define BITS_PER_COL_MASK 0x7
+#define MAX_SUB     (1<<BITS_PER_COL)
+#define MAX_NEW (MAX_INITIAL*MAX_SUB)
+#endif
+
 #ifdef	DEBUGMODE
 static	aHashEntry	*clientTable = NULL;
 static	aHashEntry	*channelTable = NULL;
@@ -34,7 +44,11 @@ static	int	chhits, chmiss;
 int	HASHSIZE = 2003;
 int	CHANNELHASHSIZE = 607;
 #else
+#ifdef DOUGH_HASH
+static  aHashEntry      clientTable[MAX_NEW];
+#else
 static	aHashEntry	clientTable[HASHSIZE];
+#endif
 static	aHashEntry	channelTable[CHANNELHASHSIZE];
 #endif
 
@@ -73,6 +87,29 @@ static	int	hash_mult[] = { 173, 179, 181, 191, 193, 197,
  * is moved to the top of the chain.
  */
 
+#ifdef DOUGH_HASH
+unsigned int hash_nick_name(nname)
+char *nname;
+{
+	Reg1 unsigned int hash = 0;
+	Reg2 int hash2 = 0;
+	Reg3 int ret;
+	Reg4 char lower;
+
+	while (*nname)
+	{
+		lower = tolower(*nname);
+		hash = (hash << 1) + lower;
+		hash2 = (hash2 >> 1) + lower;
+		nname++;
+	}
+	ret = ((hash & MAX_INITIAL_MASK) << BITS_PER_COL) +
+		(hash2 & BITS_PER_COL_MASK);
+	return ret;
+}
+
+#else
+
 /*
  * hash_nick_name
  *
@@ -94,6 +131,8 @@ char	*nname;
 	hash %= HASHSIZE;
 	return (hash);
 }
+
+#endif
 
 /*
  * hash_channel_name
@@ -660,8 +699,8 @@ char	*parv[];
 		l = atoi(parv[2]);
 		if (l < 256)
 			return 0;
-		(void)free((char *)clientTable);
-		clientTable = (aHashEntry *)malloc(sizeof(aHashEntry) * l);
+		(void)MyFree((char *)clientTable);
+		clientTable = (aHashEntry *)MyMalloc(sizeof(aHashEntry) * l);
 		HASHSIZE = l;
 		clear_client_hash_table();
 		for (acptr = client; acptr; acptr = acptr->next)
@@ -681,8 +720,8 @@ char	*parv[];
 		l = atoi(parv[2]);
 		if (l < 256)
 			return 0;
-		(void)free((char *)channelTable);
-		channelTable = (aHashEntry *)malloc(sizeof(aHashEntry) * l);
+		(void)MyFree((char *)channelTable);
+		channelTable = (aHashEntry *)MyMalloc(sizeof(aHashEntry) * l);
 		CHANNELHASHSIZE = l;
 		clear_channel_hash_table();
 		for (acptr = channel; acptr; acptr = acptr->nextch)

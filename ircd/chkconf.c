@@ -154,11 +154,11 @@ int	opt;
 		if (aconf)
 		    {
 			if (aconf->host)
-				(void)free(aconf->host);
+				(void)MyFree(aconf->host);
 			if (aconf->passwd)
-				(void)free(aconf->passwd);
+				(void)MyFree(aconf->passwd);
 			if (aconf->name)
-				(void)free(aconf->name);
+				(void)MyFree(aconf->name);
 		    }
 		else
 			aconf = (aConfItem *)malloc(sizeof(*aconf));
@@ -437,7 +437,7 @@ int	opt;
 				len += strlen(aconf->host);
 				newhost = (char *)MyMalloc(len);
 				(void)irc_sprintf(newhost, "*@%s", aconf->host);
-				(void)free(aconf->host);
+				(void)MyFree(aconf->host);
 				aconf->host = newhost;
 			    }
 
@@ -503,9 +503,9 @@ int	cn;
 {
 	numclasses++;
 	if (classarr)
-		classarr = (int *)realloc(classarr, sizeof(int) * numclasses);
+		classarr = (int *)MyRealloc(classarr, sizeof(int) * numclasses);
 	else
-		classarr = (int *)malloc(sizeof(int));
+		classarr = (int *)MyMalloc(sizeof(int));
 	classarr[numclasses-1] = cn;
 }
 

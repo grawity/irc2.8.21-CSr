@@ -17,6 +17,10 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifdef DOG3
+# define RPL_LOAD2HI 263
+#endif
+
 #ifdef TOPIC_INFO
 # define RPL_TOPICWHOTIME 333
 #endif

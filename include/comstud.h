@@ -1,6 +1,19 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/* DOG3             - define this if you want to use 'leet
+                      dog3 super stuff
+*/
+
+#define DOG3
+
+/* DOUGH_HASH	    - define this if you want to use no_nick's
+		      hashing routines...(suggested)
+*/
+
+#define DOUGH_HASH
+
+
 /* DBUF_TAIL        - define this if you'd like to use improved
                       performance dealing with dbufs...
 */
@@ -158,7 +171,7 @@
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr8/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr9/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -242,7 +255,7 @@
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr8/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr9/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

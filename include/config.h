@@ -26,6 +26,11 @@
 
 #define COMSTUD_DEBUG
 
+#ifdef DOG3
+#include "dog3.h"
+#endif
+
+
 /* Type of host. These should be made redundant somehow. -avalon */
 
 /*     	BSD			Nothing Needed 4.{2,3} BSD, SunOS 3.x, 4.x */
@@ -102,8 +107,8 @@
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/home/irc/irc2.8.21+CSr8/lib"	/* dir where all ircd stuff is */
-#define	SPATH	"/home/irc/irc2.8.21+CSr8/lib/ircd"
+#define	DPATH	"/home/irc/irc2.8.21+CSr9/lib"	/* dir where all ircd stuff is */
+#define	SPATH	"/home/irc/irc2.8.21+CSr9/lib/ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
 #define	LPATH	"ircd.log" /* Where the debug file lives, if DEBUGMODE */
@@ -117,8 +122,8 @@
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
 
-#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr8/logs/users.log" /* */
-#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr8/logs/opers.log" /* */
+#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr9/logs/users.log" /* */
+#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr9/logs/opers.log" /* */
 
 /* CHROOTDIR
  *

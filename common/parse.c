@@ -487,10 +487,42 @@ static	int	cancel_clients(cptr, sptr, cmd)
 aClient	*cptr, *sptr;
 char	*cmd;
 {
+	/* Basically let's just ignore everything...nothing
+	   will get passed on, so it's most likely safe to do this
+	   - Comstud
+	*/
+	if (IsServer(sptr) || IsMe(sptr))
+	{ 
+		sendto_ops("Message from %s came from wrong direction",
+			sptr->name);
+		sendto_ops("Not dropping link: %s", cptr->name);
+		return -1;
+	}
+	if (IsServer(cptr))
+	{
+		sendto_ops("Message from %s!%s@%s came from wrong direction",
+			sptr->name,
+			sptr->user ? sptr->user->username : "unknown",
+			sptr->user ? sptr->user->host : "unknown");
+		sendto_ops("Not killing client: %s", sptr->name);
+		return -1;
+	}
+	/* Fake prefix came from a client of mine...something is screwed
+	   with it, so we can exit this one
+	*/
+	return exit_client(cptr, cptr, &me, "Fake prefix");
+}
+
+static	int	av_cancel_clients(cptr, sptr, cmd)
+aClient	*cptr, *sptr;
+char	*cmd;
+{
 	/*
 	 * kill all possible points that are causing confusion here,
 	 * I'm not sure I've got this all right...
 	 * - avalon
+	 * No, i don't think you do
+	 * - comstud
 	 */
 	sendto_ops("Message (%s) for %s[%s!%s@%s] from %s", cmd,
 		   sptr->name, sptr->from->name, sptr->from->username,
@@ -502,7 +534,7 @@ char	*cmd;
 	 */
 	if (IsServer(sptr) || IsMe(sptr))
 	    {
-		sendto_ops("Dropping server %s", cptr->name);
+		sendto_ops("Fake Direction: Not dropping: %s", cptr->name);
 		return exit_client(cptr, cptr, &me, "Fake Direction");
 	    }
 	/*
@@ -533,6 +565,8 @@ char	*sender;
 	 */
 	if (!IsServer(cptr))
 		return;
+	sendto_ops("Unknown sender %s came from %s", sender,
+		get_client_name(cptr, TRUE));
 	/*
 	 * Do kill if it came from a server because it means there is a ghost
 	 * user on the other server which needs to be removed. -avalon

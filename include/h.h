@@ -26,6 +26,15 @@
 
 #include "comstud.h"
 
+#ifdef DOG3
+#include "fdlist.h"
+extern fdlist serv_fdlist;
+extern fdlist busycli_fdlist; /* high-priority clients */
+extern fdlist default_fdlist; /* just the number of the entry */
+extern fdlist auth_fdlist;
+extern int lifesux;
+#endif
+
 #ifdef CLONE_CHECK
 extern aClone *Clones;
 extern      aClone  *make_clone PROTO(());
@@ -106,7 +115,11 @@ extern	void	get_my_name PROTO((aClient *, char *, int));
 extern	int	get_sockerr PROTO((aClient *));
 extern	int	inetport PROTO((aClient *, char *, int));
 extern	void	init_sys PROTO(());
+#ifdef DOG3
+extern	int	read_message PROTO((time_t, fdlist *));
+#else
 extern	int	read_message PROTO((time_t));
+#endif
 extern	void	report_error PROTO((char *, aClient *));
 extern	void	set_non_blocking PROTO((int, aClient *));
 extern	int	setup_ping PROTO(());
@@ -167,6 +180,9 @@ extern	int	parse PROTO((aClient *, char *, char *, struct Message *));
 extern	int	do_numeric PROTO((int, aClient *, aClient *, int, char **));
 extern	int hunt_server PROTO((aClient *,aClient *,char *,int,int,char **));
 extern	aClient	*next_client PROTO((aClient *, char *));
+#ifdef DOG3
+extern	aClient	*next_client_double PROTO((aClient *, char *));
+#endif
 #ifndef	CLIENT_COMPILE
 extern	int	m_umode PROTO((aClient *, aClient *, int, char **));
 extern	int	m_names PROTO((aClient *, aClient *, int, char **));

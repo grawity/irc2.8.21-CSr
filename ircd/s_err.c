@@ -225,7 +225,7 @@ static	Numeric	numeric_replies[] = {
 /* 202 */	RPL_TRACEHANDSHAKE, "H.S. %d %s",
 /* 203 */	RPL_TRACEUNKNOWN, "???? %d %s",
 /* 204 */	RPL_TRACEOPERATOR, "Oper %d %s",
-/* 205 */	RPL_TRACEUSER, "User %d %s",
+/* 205 */	RPL_TRACEUSER, "User %d %s %d %d",
 /* 206 */	RPL_TRACESERVER, "Serv %d %dS %dC %s %s!%s@%s",
 /* 207 */	RPL_TRACESERVICE, "Service %d %s",
 /* 208 */	RPL_TRACENEWTYPE, "<newtype> 0 %s",
@@ -277,7 +277,8 @@ static	Numeric	numeric_replies[] = {
 /* 259 */	RPL_ADMINEMAIL, ":%s",
 		0, (char *)NULL,
 /* 261 */	RPL_TRACELOG, "File %s %d",
-		0, (char *)NULL
+		0, (char *)NULL,
+/* 263 */	RPL_LOAD2HI, ":Server load too high, try again in a while"
 };
 
 char	*err_str(numeric)
