@@ -221,7 +221,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr18/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr19/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -296,7 +296,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr18/lib/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr19/lib/logs/clones.log"
 
 /*  THE REST OF THIS STUFF IS TO CONFIGURE CLONE CHECKING */
 

@@ -1992,7 +1992,7 @@ char    *parv[];
 	DupString(aconf->host, host);
 	if (parv[2])
 		sprintf(buffer, "%s", parv[2]); 
-	DupString(aconf->passwd, parv[2] ? buffer : NULL);
+	DupString(aconf->passwd, parv[2] ? buffer : "");
 	DupString(aconf->name, user);
 	aconf->port = 0;
 	Class(aconf) = find_class(0);

@@ -1,6 +1,10 @@
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
 
+New in CSr19:
+
+1) Oops, fixed how klining with no reason will core the server =(
+
 New in CSr18:
 
 1) Fix from Philippe for dich_conf K: line matching and so forth...
