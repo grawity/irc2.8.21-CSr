@@ -24,6 +24,10 @@
  * -avalon
  */
 
+/*
+**  $Id: h.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
+*/
+
 #include "comstud.h"
 #include "dich_conf.h"
 
@@ -31,14 +35,45 @@
 extern        void    check_max_count();
 #endif /* HIGHEST_CONNECTION */
 
+#ifdef G_LINES
+	aGlineConf GlineConf;
+#endif
 
 #ifdef BETTER_MOTD
 	extern aMotd *motd;
 	extern struct tm motd_tm;
 #endif
 
+#ifdef SHOW_HEADERS
+#define REPORT_DO_DNS   "NOTICE AUTH :*** Looking up your hostname...\n"
+#define REPORT_FIN_DNS  "NOTICE AUTH :*** Found your hostname\n"
+#define REPORT_FIN_DNSC "NOTICE AUTH :*** Found your hostname, cached\n"
+#define REPORT_FAIL_DNS2 "NOTICE AUTH :*** Couldn't look up your hostname1\n"
+#define REPORT_FAIL_DNS1 "NOTICE AUTH :*** Couldn't look up your hostname2\n"
+#define REPORT_DO_ID    "NOTICE AUTH :*** Checking Ident\n"
+#define REPORT_FIN_ID   "NOTICE AUTH :*** Got Ident response\n"
+#define REPORT_FAIL_ID  "NOTICE AUTH :*** No Ident response\n"
 
-extern int test_kline_userhost PROTO((aClient *, aConfList *, char *, char *));
+extern int R_do_dns, R_fin_dns, R_fin_dnsc, R_fail_dns,
+	R_do_id, R_fin_id, R_fail_id;
+
+#endif
+
+#ifdef E_LINES
+#define find_eline(__x, __y, __z) find_dichconf(Elines, (__z), \
+		(__x), (__y), NULL, 0, NULL)
+#endif
+
+#ifdef D_LINES
+#define find_dline(__x)	find_dichconf(Dlines, NULL, (__x), NULL, 0, NULL)
+#endif /* D_LINES */
+
+#ifdef J_LINES
+#define find_jline(__x)	find_dichconf(Jlines, NULL, (__x), NULL, 0, NULL)
+#endif /* J_LINES */
+
+
+extern int test_kline_userhost PROTO((aClient *, aDichConf *, char *, char *));
 
 extern int idlelimit;
 extern int s_count, c_count, ch_count, u_count, i_count;
@@ -49,45 +84,21 @@ extern void compute_lusers();
 #include "dich_conf.h"
 #endif
 
-extern aConfList       KList1;   /* ordered */
-extern aConfList       KList2;   /* ordered, reversed */
-extern aConfList       KList3;   /* what we can't sort */
+extern aDichConf	*Ilines;
+extern aDichConf	*Klines;
+extern aDichConf	*Blines;
+extern aDichConf	*Dlines;
+extern aDichConf	*Elines;
+extern aDichConf	*Glines;
+extern aDichConf	*Jlines;
 
-#ifdef B_LINES
-extern aConfList       BList1;   /* ordered */
-extern aConfList       BList2;   /* ordered, reversed */
-extern aConfList       BList3;   /* what we can't sort */
-#endif /* B_LINES */
-
-#ifdef E_LINES
-extern aConfList       EList1;   /* ordered */
-extern aConfList       EList2;   /* ordered, reversed */
-extern aConfList       EList3;   /* what we can't sort */
-#endif /* E_LINES */
-
-#ifdef D_LINES
-extern aConfList       DList1;   /* ordered */
-extern aConfList       DList2;   /* ordered, reversed */
-extern aConfList       DList3;   /* what we can't sort */
-#endif /* D_LINES */
-
-#ifdef J_LINES
-extern aConfList       JList1;   /* ordered */
-extern aConfList       JList2;   /* ordered, reversed */
-extern aConfList       JList3;   /* what we can't sort */
-#endif /* J_LINES */
-
-#ifdef DOG3
 #include "fdlist.h"
 
-extern float currentrate;
-extern fdlist serv_fdlist;
-extern fdlist busycli_fdlist; /* high-priority clients */
-extern fdlist default_fdlist; /* just the number of the entry */
+extern fdlist new_servfdlist;
+extern fdlist new_miscfdlist;
+extern fdlist new_operfdlist;
+extern fdlist new_fdlists[32];
 extern int lifesux;
-extern int dog3loadcfreq;
-extern int dog3loadrecv;
-#endif
 
 #ifdef CLONE_CHECK
 extern aClone *Clones;
@@ -109,6 +120,24 @@ extern	aChannel *channel;
 extern	struct	stats	*ircstp;
 extern	int	bootopt;
 
+extern	int	rule_allow PROTO((aRule *, char *, int));
+extern	void	remove_rules PROTO((aRule **));
+
+#ifdef B_LINES
+extern	int	find_bline PROTO((aClient *));
+#endif
+#ifdef G_LINES
+extern	int	find_gline PROTO((aClient *, int, char **));
+extern	int	init_glineconf PROTO((char *));
+extern	void	clear_glineconf	PROTO((void));
+extern	void	report_gline_rules PROTO((aClient *));
+#endif
+#ifdef D_LINES
+extern	int	find_dline PROTO((char *));
+#endif
+
+extern	char	*loadfile PROTO((char *));
+extern	char	*get_token PROTO((char **, char *));
 extern	char	*canonize PROTO((char *, int *));
 extern	int	read_packet PROTO((aClient *, int));
 extern	aChannel *find_channel PROTO((char *, aChannel *));
@@ -143,13 +172,19 @@ extern	aConfItem *find_conf_exact PROTO((char *, char *, char *, int));
 extern	aConfItem *find_conf_host PROTO((Link *, char *, int));
 extern	aConfItem *find_conf_ip PROTO((Link *, char *, char *, int));
 extern	aConfItem *find_conf_name PROTO((char *, int));
-extern	int	find_kill PROTO((aClient *, int, char **));
+extern	int	find_kill PROTO((aClient *, int, int, char **));
+extern	int 	find_kline PROTO((aClient *, char *, char *, char *, int, int, char **));
 extern	int	find_restrict PROTO((aClient *));
 extern	int	rehash PROTO((aClient *, aClient *, int));
 extern	int	initconf PROTO((int, char *));
 
+/*
 extern	char	*MyMalloc PROTO((int)), *MyRealloc PROTO((char *, int));
-extern	char	*debugmode, *configfile, *klinefile, *sbrk0;
+*/
+extern	char	*debugmode, *configfile, *sbrk0;
+#ifndef PUT_KLINES_IN_IRCD_CONF
+extern	char	*klinefile;
+#endif
 extern	char	*getfield PROTO((char *));
 extern	void	get_sockhost PROTO((aClient *, char *));
 extern	char	*rpl_str PROTO((int)), *err_str PROTO((int));
@@ -172,13 +207,9 @@ extern	void	close_listeners PROTO(());
 extern	int connect_server PROTO((aConfItem *, aClient *, struct hostent *));
 extern	void	get_my_name PROTO((aClient *, char *, int));
 extern	int	get_sockerr PROTO((aClient *));
-extern	int	inetport PROTO((aClient *, char *, int));
+extern	int	inetport PROTO((aClient *, char *, char *, int));
 extern	void	init_sys PROTO(());
-#ifdef DOG3
 extern	int	read_message PROTO((time_t, fdlist *));
-#else
-extern	int	read_message PROTO((time_t));
-#endif
 extern	void	report_error PROTO((char *, aClient *));
 extern	void	set_non_blocking PROTO((int, aClient *));
 extern	int	setup_ping PROTO(());
@@ -204,16 +235,20 @@ extern	void	sendto_one();
 extern	void	sendto_channel_butone();
 /*VARARGS2*/
 extern	void	sendto_serv_butone();
+
+#ifndef TS_ONLY
 /*VARARGS2*/
 extern	void	sendto_TS_serv_butone();
+/*VARARGS3*/
+extern	void	sendto_match_TS_servs();
+#endif
+
 /*VARARGS2*/
 extern	void	sendto_common_channels();
 /*VARARGS3*/
 extern	void	sendto_channel_butserv();
 /*VARARGS3*/
 extern	void	sendto_match_servs();
-/*VARARGS3*/
-extern	void	sendto_match_TS_servs();
 /*VARARGS5*/
 extern	void	sendto_match_butone();
 /*VARARGS3*/
@@ -222,12 +257,16 @@ extern	void	sendto_all_butone();
 extern	void	sento_flagops();
 /*VARARGS1*/
 extern	void	sendto_ops();
+/*VARARGS1*/
+extern	void	ts_warn();
 /*VARARGS3*/
 extern	void	sendto_ops_butone();
 /*VARARGS3*/
 extern	void	sendto_wallops_butone();
 /*VARARGS3*/
 extern	void	sendto_prefix_one();
+
+extern	void	sendto_operwall();
 
 extern	int	writecalls, writeb[];
 extern	int	deliver_it PROTO((aClient *, char *, int));
@@ -272,6 +311,9 @@ extern	Link	*find_channel_link PROTO((Link *, aChannel *));
 extern	void	add_client_to_list PROTO((aClient *));
 extern	void	checklist PROTO(());
 extern	void	remove_client_from_list PROTO((aClient *));
+extern  void    add_client_to_llist PROTO((aClient **, aClient *));
+extern  void    del_client_from_llist PROTO((aClient **, aClient *));
+extern  void    del_stuff PROTO((aClient *));
 extern	void	initlists PROTO(());
 
 extern	void	add_class PROTO((int, int, int, int, long));

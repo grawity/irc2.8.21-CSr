@@ -17,69 +17,110 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+
+/*
+**  $Id: sys.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
+*/
+
 #ifndef	__sys_include__
 #define __sys_include__
-#ifdef ISC202
-#include <net/errno.h>
-#else
-#include <sys/errno.h>
-#endif
 
 #include "setup.h"
+
 #include <stdio.h>
+#include <fcntl.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/file.h>
+#include <sys/ioctl.h>
 #include <sys/param.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <pwd.h>
 
-#ifdef	UNISTDH
-#include <unistd.h>
-#endif
-#ifdef	STDLIBH
-#include <stdlib.h>
+#ifdef HAVE_SYS_FILIO_H
+#include <sys/filio.h>
 #endif
 
-#ifdef	STRINGSH
-#include <strings.h>
+#ifdef USE_POLL
+#include <stropts.h>
+#include <poll.h>
+#define pollfd_t struct pollfd
+#endif /* USE_POLL_ */
+
+#ifdef HAVE_ERRNO_H
+# include <errno.h>
 #else
-# ifdef	STRINGH
-# include <string.h>
+# ifdef HAVE_SYS_ERRNO_H
+#  include <sys/errno.h>
+# else
+#  ifdef HAVE_NET_ERRNO_H
+#   include <net/errno.h>
+#  endif
 # endif
 #endif
-#define	strcasecmp	mycmp
-#define	strncasecmp	myncmp
-#ifdef NOINDEX
-#define   index   strchr
-#define   rindex  strrchr
-/*
-extern	char	*index PROTO((char *, char));
-extern	char	*rindex PROTO((char *, char));
-*/
+
+#ifdef HAVE_SYS_CDEFS_H
+# include <sys/cdefs.h>
+#else
+# include "cdefs.h"
+#endif
+#ifdef HAVE_SYS_BITYPES_H
+# include <sys/bitypes.h>
+#else
+# if (!defined(BSD)) || (BSD < 199306)
+# ifdef NEED_BITYPES_
+#  include "bitypes.h"
+# endif
+# endif
 #endif
 
-#ifdef AIX
+#ifdef	HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef	HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_STRINGS_H
+#include <strings.h>
+#endif
+#ifdef	HAVE_STRING_H
+#include <string.h>
+#endif
+
+#ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif
-#if defined(HPUX )|| defined(AIX)
+
+#ifdef HAVE_TIME_H
 #include <time.h>
-#ifdef AIX
+#endif
+
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-#else
-#include <sys/time.h>
+
+
+#ifdef HAVE_SYS_UN_H
+#include <sys/un.h>
 #endif
 
-#if !defined(DEBUGMODE) || defined(CLIENT_COMPILE)
-#define MyFree(x)       if ((x) != NULL) free(x)
+#define	strcasecmp	mycmp
+#define	strncasecmp	myncmp
+
+#ifdef NEED_INDEX
+#define   index   strchr
+#define   rindex  strrchr
 #else
-#define	free(x)		MyFree(x)
+#if !defined(HAVE_STRINGS_H) && !defined(HAVE_STRING_H)
+extern  char    *index __P((char *, char));
+extern  char    *rindex __P((char *, char));
+#endif
 #endif
 
-#ifdef NEXT
-#define VOIDSIG int	/* whether signal() returns int of void */
-#else
-#define VOIDSIG void	/* whether signal() returns int of void */
-#endif
-
-extern	VOIDSIG	dummy();
+extern	RETSIGTYPE	dummy();
 
 #ifdef	DYNIXPTX
 #define	NO_U_TYPES
@@ -94,6 +135,35 @@ typedef	unsigned int	u_int;
 
 #ifdef	USE_VARARGS
 #include <varargs.h>
+#endif
+
+#ifndef SYS_ERRLIST_DECLARED
+extern char *sys_errlist[];
+extern  int     sys_nerr;
+#endif
+
+#ifdef NEED_BCOPY
+void bcopy(const void *, const void *, size_t);
+#else
+#ifdef HAVE_MEMMOVE
+#define bcopy(__x,__y,__z) memmove(__y,__x,__z)
+#endif
+#endif
+
+#ifdef NEED_BCMP
+int bcmp(const void *s1, const void *s2, size_t n);
+#endif
+
+#ifdef NEED_BZERO
+void bzero(void *s, size_t n);
+#endif
+
+#ifdef NEED_DNSKIPNAME
+#define dn_skipname __dn_skipname
+#endif
+
+#if defined(__hpux)
+# include "inet.h"
 #endif
 
 #endif /* __sys_include__ */

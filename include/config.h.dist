@@ -21,28 +21,17 @@
 #define	__config_include__
 
 #include "setup.h"
+#include "comstud.h"
 
-/* Type of host. These should be made redundant somehow. -avalon */
+#undef COMSTUD_DEBUG
 
-/*	BSD			Nothing Needed 4.{2,3} BSD, SunOS 3.x, 4.x */
-/*	HPUX			Nothing needed (A.08/A.09) */
-/*	ULTRIX			Nothing needed (4.2) */
-/*	OSF			Nothing needed (1.2) */
-#undef	AIX			/* IBM ugly so-called Unix, AIX */
-#undef	MIPS			/* MIPS Unix */
-/*	SGI			Nothing needed (IRIX 4.0.4) */
-#undef 	SVR3			/* SVR3 stuff - being worked on where poss. */
-#undef	DYNIXPTX		/* Sequents Brain-dead Posix implement. */
-#undef	SOL20			/* Solaris2 */
-#undef	ESIX			/* ESIX */
-#undef	NEXT			/* NeXTStep */
-#undef        SVR4
+#define FDLISTCHKFREQ 10
 
-/* Do these work? I dunno... */
+#ifdef HAVE_POLL
 
-#undef	VMS			/* Should work for IRC client, not server */
-#undef	MAIL50			/* If you're running VMS 5.0 */
-#undef	PCS			/* PCS Cadmus MUNIX, use with BSD flag! */
+#define USE_POLL                /* Define this if you want to use poll() */
+
+#endif
 
 /*
  * NOTE: On some systems, valloc() causes many problems.
@@ -84,25 +73,17 @@
 #define	HAVECURSES		/* If you have curses, and want to use it.  */
 #undef	HAVETERMCAP		/* If you have termcap, and want to use it. */
 
-#ifdef notdef
-/* Define NPATH if you want to run NOTE system. Be sure that this file is
- * either not present or non empty (result of previous size). If it is empty,
- * then remove it before starting the server.
- * The file is for request save/backup.
- */
-#define NPATH "/usr/lib/irc/.ircdnote"
-#endif
-
 /*
  * Full pathnames and defaults of irc system's support files. Please note that
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/usr/local/lib/ircd"	/* dir where all ircd stuff is */
-#define	SPATH	"/usr/local/bin/ircd"	/* path to server executeable */
+#define	DPATH	"./"	/* dir where all ircd stuff is */
+#define	SPATH	"./ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
+#define KPATH	"klines/klines.conf"	/* config file containing K: lines */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
-#define	LPATH	"/tmp/ircd.log" /* Where the debug file lives, if DEBUGMODE */
+#define	LPATH	"ircd.log" /* Where the debug file lives, if DEBUGMODE */
 #define	PPATH	"ircd.pid"	/* file for server pid */
 
 /*
@@ -112,8 +93,9 @@
  * FNAME_USERLOG just logs user connections, FNAME_OPERLOG logs every
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
-/* #define FNAME_USERLOG "/usr/local/lib/ircd/users" /* */
-/* #define FNAME_OPERLOG "/usr/local/lib/ircd/opers" /* */
+
+#define FNAME_USERLOG "./logs/users.log"
+#define FNAME_OPERLOG "./logs/opers.log"
 
 /* CHROOTDIR
  *
@@ -125,16 +107,6 @@
  * You may want to define IRC_UID and IRC_GID
  */
 #undef CHROOTDIR
-
-/* ENABLE_SUMMON
- *
- * The SUMMON command requires the ircd to be run as group tty in order
- * to work properly in many cases.  If you are on a machine where it
- * won't work, or simply don't want local users to be summoned, undefine
- * this.
- */
-#undef	ENABLE_SUMMON	/* local summon */
-#undef	ENABLE_USERS	/* enables local /users (same as who/finger output) */
 
 /* SHOW_INVISIBLE_LUSERS
  *
@@ -150,7 +122,26 @@
  * mode "i" (i == invisible). Invisibility means people dont showup in
  * WHO or NAMES unless they are on the same channel as you.
  */
-#undef	NO_DEFAULT_INVISIBLE
+#define	NO_DEFAULT_INVISIBLE
+
+/* TS_ONLY
+ *
+ * When defined, the server will refuse to directly link to non-TS servers.
+ * Remote servers can still be non-TS, although that basically keeps channel
+ * TS's to 0 so it's not a good idea.  Defining TS_ONLY speeds the server
+ * up by removing some compatibility code.
+ */
+#define TS_ONLY
+
+/* TS_WARNINGS
+ *
+ * When defined, +s users are warned of some things that should never
+ * happen on an all-TS net.  Currently these are: server-generated MODE +o,
+ * new nicks without a TS, and remote JOINs for non-existing channels.
+ * This is useful to track down anomalies;  undefine it on a mixed TS/nonTS
+ * net or you'll get a lot of warnings!
+ */
+#define TS_WARNINGS
 
 /* OPER_KILL
  *
@@ -167,11 +158,11 @@
  * The 'LOCOP_' #defines are for making the respective commands available
  * to 'local' operators.
  */
-#undef	OPER_KILL
-#undef	OPER_REHASH
+#define	OPER_KILL
+#define	OPER_REHASH
 #undef	OPER_RESTART
-#undef	OPER_DIE
-#undef	OPER_REMOTE
+#define OPER_DIE
+#define	OPER_REMOTE
 #undef	LOCOP_REHASH
 #undef	LOCOP_RESTART
 #undef	LOCOP_DIE
@@ -203,7 +194,7 @@
  * a server is in class 0 (the default class if none is set).
  *
  */
-#define MAXIMUM_LINKS 1
+#define MAXIMUM_LINKS 10
 
 /*
  * If your server is running as a a HUB Server then define this.
@@ -211,7 +202,7 @@
  * to a leaf which just has 1 server (typically the uplink). Define this
  * correctly for performance reasons.
  */
-#undef	HUB
+#define	HUB
 
 /* R_LINES:  The conf file now allows the existence of R lines, or
  * restrict lines.  These allow more freedom in the ability to restrict
@@ -252,7 +243,7 @@
  * The server will then call m4 each time it reads the ircd.conf file,
  * reading m4 output as the server's ircd.conf file.
  */
-#define	M4_PREPROC
+#undef	M4_PREPROC
 
 /*
  * If you wish to have the server send 'vital' messages about server
@@ -279,7 +270,7 @@
  * If you want to log to a different facility than DAEMON, change
  * this define.
  */
-#define LOG_FACILITY LOG_DAEMON
+#define LOG_FACILITY LOG_LOCAL1
 #endif /* USE_SYSLOG */
 
 /*
@@ -297,12 +288,6 @@
 #undef	CRYPT_LINK_PASSWORD
 
 /*
- * define this if you enable summon and if you want summon to look for the
- * least idle tty a user is logged in on.
- */
-#define	LEAST_IDLE
-
-/*
  * IDLE_FROM_MSG
  *
  * Idle-time nullified only from privmsg, if undefined idle-time
@@ -314,13 +299,13 @@
 /*
  * Max amount of internal send buffering when socket is stuck (bytes)
  */
-#define MAXSENDQLENGTH 100000    /* Recommended value: 100000 for leaves */
-                                 /*                    900000 for backbones */
+#define MAXSENDQLENGTH 4000000    /* Recommended value: 100000 for leaves */
+                                 /*                    700000 for backbones */
 /*
  *  BUFFERPOOL is the maximum size of the total of all sendq's.
  *  Recommended value is 2 * MAXSENDQLENGTH, for hubs, 5 *.
  */
-#define	BUFFERPOOL     (2 * MAXSENDQLENGTH)
+#define	BUFFERPOOL     (10 * MAXSENDQLENGTH)
 
 /*
  * use these to setup a Unix domain socket to connect clients/servers to.
@@ -349,7 +334,7 @@
  * send to the server without processing before disconnecting the client for
  * flooding it.  Values greater than 8000 make no difference to the server.
  */
-#define	CLIENT_FLOOD	1024
+#define	CLIENT_FLOOD	2024
 
 /* Default server for standard client */
 #define	UPHOST	"coombs.anu.edu.au"
@@ -375,7 +360,7 @@
  *	 of KILL for non-local clients should be punished by removal of the
  *	 server's links (if only for ignoring this warning!).
  */
-#define	LOCAL_KILL_ONLY
+#undef	LOCAL_KILL_ONLY
 #endif
 /*
  * Port where ircd resides. NOTE: This *MUST* be greater than 1024 if you
@@ -394,13 +379,13 @@
  * 1 server = 1 connection, 1 user = 1 connection.
  * This should be at *least* 3: 1 listen port, 1 dns port + 1 client
  */
-#define MAXCONNECTIONS	50
+#define MAXCONNECTIONS	3000
 
 /*
- * This defines the length of the nickname history.  each time a user changes
+ * this defines the length of the nickname history.  each time a user changes
  * nickname or signs off, their old nickname is added to the top of the list.
  */
-#define NICKNAMEHISTORYLENGTH 4096
+#define NICKNAMEHISTORYLENGTH 15000
 
 /*
  * Time interval to wait and if no messages have been received, then check for
@@ -431,8 +416,8 @@
  * (HANGONRETRYDELAY). This latter has to be long enough that the
  * other end of the connection has time to notice it broke too.
  */
-#define HANGONRETRYDELAY 10	/* Recommended value: 10 seconds */
-#define HANGONGOODLINK 300	/* Recommended value: 5 minutes */
+#define HANGONRETRYDELAY 20	/* Recommended value: 20 seconds */
+#define HANGONGOODLINK 1800	/* Recommended value: 30 minutes */
 
 /*
  * Number of seconds to wait for write to complete if stuck.
@@ -472,6 +457,7 @@
 #define	MYNAME SPATH
 #define	CONFIGFILE CPATH
 #define	IRCD_PIDFILE PPATH
+#define KLINEFILE KPATH
 
 #ifdef	__osf__
 #define	OSF
@@ -502,7 +488,6 @@
 
 #ifdef	CLIENT_COMPILE
 #undef	SENDQ_ALWAYS
-#undef	NPATH		/* _dl */
 #endif
 
 #ifdef DEBUGMODE
@@ -516,10 +501,6 @@ extern	void	debug();
 # else
 #	define LOGFILE "/dev/null"
 # endif
-#endif
-
-#ifndef ENABLE_SUMMON
-#  undef LEAST_IDLE
 #endif
 
 #if defined(mips) || defined(PCS)

@@ -1,6 +1,68 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/*
+**  $Id: comstud.h,v 1.2 1997/07/23 19:21:59 cbehrens Exp $
+*/
+
+
+/* OLD_Y_LIMIT     - CSr30 now makes Y: limits the GLOBAL limit.
+                     See README.CS.  If you prefer the old way (WHY?),
+                     define this.
+*/
+
+#undef OLD_Y_LIMIT
+
+
+/* G_LINES         - Define this if you want to listen to GLines
+                     See README.CS
+*/
+
+#define G_LINES
+
+
+/* FNAME_GLINELOG  - Logfile for glines
+*/
+
+#define FNAME_GLINELOG "logs/gline.log"
+
+
+/* I_LINES         - Treed I: lines.  Yes, that's right.  Some of
+                     you might have to redo your I: lines if you wish
+                     to use this.  This code will not help those with
+                     very few I: lines.
+
+                     The format in ircd.conf is:
+                     I:user@host:password:user@host:port:class
+                     This will add 2 entries, unless they are both
+                     identical.  Ip numbers are supported on either
+                     side.  Also note, if for "user@host" you have "X"
+                     or "NOMATCH" or "NOMATCHME", that entry will be
+                     ignored.
+
+                     (The format of I:'s may change in the future to be
+                     exactly like K:'s)
+*/
+
+#undef I_LINES
+
+
+/* SHOW_NICKCHANGES - I'm not a real fan of this, but it shows
+                      *LOCAL* nick changes in umode +n.  This
+                      information can be obtained from /trace anyway.
+*/
+
+#undef SHOW_NICKCHANGES
+
+
+/* SHOW_HEADERS
+		   - Taner's code for seeing what the server is doing
+		     when you connect to it.
+*/
+
+#undef SHOW_HEADERS
+ 
+
 /* D_LINES
 		   - Define this for .conf lines that basically
                      ignore a site.  If they try to connect to your
@@ -19,13 +81,6 @@
 #define FNAME_DLINE_LOG "./logs/dlines.log"
 
 
-/* STRICT_USERNAMES
-                   - Define this if you only want letters, numbers,
-                     -, and _ to be allowed in usernames...
-*/
-
-#define STRICT_USERNAMES
-
 /* RESTRICT_STATSK
                    - Define this if you want to restrict /stats k so
                      that it will only show if a certain spec is banned.
@@ -36,32 +91,6 @@
 
 #define RESTRICT_STATSK
 
-/* PASS_KLINES
-                   - This will pass klines to up/downlinks for them
-                     to deal with as they want..
-*/
-
-#undef  PASS_KLINES
-
-/* ALLOW_KLINES_FROM_SERVERS
-                   - Define this if you want to accept K-lines from
-                     other servers.  Use #define ALLOWED_KLINES to
-                     pick which servers you want to accept them from
-*/
-
-#define ALLOW_KLINES_FROM_SERVERS
-
-/* ALLOWED_KLINES
-                   - This defines which servers you want to accept
-                     klines from.  For example:
-        #define ALLOWED_KLINES "*.netcom.com *.cerf.net"
-                     If you get a KLINE from those servers, it'll
-                     put them in.
-         Note:       This is only if ALLOW_KLINES_FROM_SERVERS is
-                     #defined.
-*/
-
-#define ALLOWED_KLINES "*.cris.com"
 
 /* NO_REDUNDANT_KLINES
                    - This will check the kline that you try and put in
@@ -71,6 +100,7 @@
 
 #define NO_REDUNDANT_KLINES
 
+
 /* PUT_KLINES_IN_IRCD_CONF
                    - Starting in CSr25, klines can now be stored in a file
                      separated from ircd.conf.  The file name is chosen
@@ -79,10 +109,11 @@
                      new K: lines in the kline.conf file instead of ircd.conf
                      This can be used as a way to separate the millions
                      of K: lines that you may have.
-
 *** If you do not like the idea of separate files, define this ***
-#define PUT_KLINES_IN_IRCD_CONF
 */
+
+#undef PUT_KLINES_IN_IRCD_CONF
+
 
 /* SEPARATE_QUOTE_KLINES_BY_DATE
 		   - If PUT_KLINES_IN_IRCD_CONF is #undefined, you may
@@ -102,6 +133,7 @@
 */
 
 #define SEPARATE_QUOTE_KLINES_BY_DATE
+
 
 /* LIMIT_UH        - Use this if you want to use the connect frequency
 		     field in the Y: lines to limit that class to a
@@ -129,11 +161,13 @@
 
 #define BETTER_MOTD
 
+
 /* NO_NICK_FLOODS   - define this to limit local users to 3 nick changes
                       in 60 seconds
 */
 
 #define NO_NICK_FLOODS
+
 
 /* RESTRICT         - define this if using dog3 stuff, and wish to
                       disallow /LIST and other CPU intensive commands
@@ -142,6 +176,7 @@
 
 #undef RESTRICT
 
+
 /* B_LINES          - Define this if you wish to ignore ip#'s or hosts
                       from being tested for bots or clonebots...
                       B:*eskimo.com::* will not check for bots or
@@ -149,6 +184,7 @@
 */
 
 #define B_LINES
+
 
 /* E_LINES          - Define this if you wish to have lines that bypass
                       K: line checking...ie for example:
@@ -159,6 +195,7 @@
 */
 
 #define E_LINES 
+
 
 /* MAXBUFFERS       - make receive socket buffers the maximum
                       size they can be...up to 64K
@@ -176,12 +213,6 @@ they are increased!
 
 #endif
 
-/* DOG3             - define this if you want to use 'leet
-                      dog3 super stuff
-*/
-
-#define DOG3
-
 /* DBUF_INIT        - define this if you want to pre-allocate
                       4 megs of dbufs...this should help in
                       the long run according to dog3 =)
@@ -191,6 +222,7 @@ they are increased!
 
 /* #define DBUF_INIT 1000 */
 #undef DBUF_INIT
+
 
 /* IDENTD_ONLY      - define this if you only want people running
                       identd to connect
@@ -204,6 +236,7 @@ they are increased!
 
 #undef IDENTD_ONLY
 
+
 /* QUOTE_KLINE      - define this if you want /QUOTE KLINE
 */
 
@@ -215,11 +248,22 @@ they are increased!
 
 #undef NO_LOCAL_KLINE
 
+/* DOG3             - define this if you want dog3's lifesux stuff.
+                      Checks the amt of data coming in...and if it
+                      is high, clients are checked a little less often
+*/
+#define DEFAULT_LOADRECV	110
+#define DEFAULT_LOADCFREQ	5
+
+#define DOG3
+
+
 /* USE_UH           - define this if you want to use n!u@h
                       for BAN_INFO
 */
 
 #define USE_UH
+
 
 /* BAN_INFO         - define this if you want to see who did bans
                       and when they were done
@@ -227,11 +271,13 @@ they are increased!
 
 #define BAN_INFO
 
+
 /* TOPIC_INFO       - define this if you want to see who did topics
                       and when they were done
 */
 
 #define TOPIC_INFO
+
 
 /* SIGNON_TIME      - define this if you want to see when a user
                       signed into irc when doing /whois
@@ -239,11 +285,13 @@ they are increased!
 
 #define SIGNON_TIME
 
+
 /* HIGHEST_CONNECTION - define this if you want to keep track
                         of your max connections
 */
 
 #define HIGHEST_CONNECTION
+
 
 /* NO_RED_MODES    - define this if you don't want redundant modes
                      i.e., if someone is opped they can't be opped
@@ -252,6 +300,7 @@ they are increased!
 */
 
 #undef NO_RED_MODES
+
 
 /* IP_BAN_ALL      - define this if you want a really cool ban
                      system
@@ -270,17 +319,29 @@ they are increased!
 
 #define IP_BAN_ALL
 
+
 /* NO_MIXED_CASE   - define this if you wish to reject usernames
                      like: FuckYou which don't have all one case
 */
 
+
 #undef NO_MIXED_CASE
+
+
+/* STRICT_USERNAMES
+                   - Define this if you only want letters, numbers,
+                     -, and _ to be allowed in usernames...
+*/
+
+#define STRICT_USERNAMES
+
 
 /* IGNORE_FIRST_CHAR - define this for NO_MIXED_CASE
                        if you wish to ignore the first character
 */
 
 #undef IGNORE_FIRST_CHAR
+
 
 /* NO_SPECIAL      - define this if you want no "special" characters
                      in usernames.  A character is "special" if
@@ -290,10 +351,6 @@ they are increased!
 
 #define NO_SPECIAL
 
-/* REJECT_IPHONE   - define if you want to reject I-phoners
-*/
-
-#undef REJECT_IPHONE
 
 /* REJECT_BOTS     - Performs minimal checking to see if a client
                      which is trying to connect is a bot...
@@ -302,6 +359,7 @@ they are increased!
 */
 
 #define REJECT_BOTS
+
 
 /* BOTS_NOTICE     - Performs minimal checking to see if a client
                      which is trying to connect is a bot...
@@ -312,6 +370,7 @@ they are increased!
 
 #define BOTS_NOTICE
 
+
 /* STATS_NOTICE    - send a notice to /opers on the server when
                      someone does /stats requests
                      (Non-useful...just used to see who's spying ;)
@@ -319,11 +378,13 @@ they are increased!
 
 #define STATS_NOTICE
 
+
 /* FAILED_OPER_NOTICE - send a notice to all opers when someone
                         tries to /oper and uses an incorrect pw
 */
 
 #define FAILED_OPER_NOTICE
+
 
 /* FNAME_FAILED_OPER - define this as a filename of a logfile
                        if you wish to log when someone tries
@@ -336,11 +397,13 @@ they are increased!
 
 #define FNAME_FAILED_OPER "./logs/failed.log"
 
+
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
 */
 
 #define CLIENT_NOTICES
+
 
 /* DONT_SEND_FAKES - define this if you don't want Fake: notices
                      sent to users...there are tons of fakes all
@@ -349,6 +412,7 @@ they are increased!
 */
 
 #define DONT_SEND_FAKES
+
 
 /* FK_USERMODES  - define this if you want +f and +k usermodes
                    +f would then show fakes and serverkills
@@ -363,6 +427,7 @@ they are increased!
 */
 
 #define FK_USERMODES
+
 
 /* RESETIDLEONNOTICE - define this if idletimes should
                        be /reset on notice as well as /msg
@@ -383,6 +448,7 @@ they are increased!
 
 #define USERNAMES_IN_TRACE
 
+
 /* IDLE_CHECK     - define this if you wish to have an idle checker
                     built into the server
              Note:  Idletime is not reset on msgs to invalid nicks
@@ -398,6 +464,7 @@ they are increased!
 
 #define IDLE_CHECK
 
+
 /* KLINE_CHECK    - this is how often (in seconds) that K: lines
                     should be checked.  Every fifteen minutes is
                     a good number (900 seconds).  This reduces
@@ -407,6 +474,7 @@ they are increased!
 */
 
 #define KLINE_CHECK 900
+
 
 /* CLONE_CHECK    - define this if you wish to enable clonebot
                     checking
@@ -420,11 +488,13 @@ they are increased!
 
 #define CLONE_CHECK                    
 
+
 /* FNAME_CLONELOG - define this if you have CLONE_CHECK defined
                     and you wish to log clones
 */
 
 #define FNAME_CLONELOG "./logs/clones.log"
+
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client
@@ -451,12 +521,14 @@ Note: good numbers to use are 5 bots joining with no more than
 
 #define NUM_CLONES 5
 
+
 /* CLONE_RESET - after this # of seconds of no connects from
                  a machine, the # of clones (NUM_CLONES) is reset
                  to 0
 */
 
 #define CLONE_RESET 4
+
 
 /* KILL_CLONES - define this if you wish to have previous clients
                  from the machine in question to be exited
@@ -465,6 +537,7 @@ Note: good numbers to use are 5 bots joining with no more than
 */
 
 #undef  KILL_CLONES
+
 
 /* CLONE_TIME - If KILL_CLONES is defined, this is the # of
                 seconds ago the clones had to be loaded before
@@ -484,6 +557,10 @@ Note: good numbers to use are 5 bots joining with no more than
 #ifdef B_LINES
 #undef B_LINES
 #endif
+#endif
+
+#ifdef G_LINES
+#define GLINE_CONFFILE "gline.conf"
 #endif
 
 #endif /* COMSTUD_H */

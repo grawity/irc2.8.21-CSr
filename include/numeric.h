@@ -235,6 +235,8 @@
 #define RPL_LISTEND          323
 #define RPL_CHANNELMODEIS    324
 
+#define RPL_CREATIONTIME     329
+
 #define RPL_NOTOPIC          331
 #define RPL_TOPIC            332
 
@@ -302,7 +304,7 @@
 #define RPL_STATSBLINE       222
 #define RPL_STATSELINE       223
 #define RPL_STATSDLINE       224
-#define RPL_STATSJLINE       225
+#define RPL_STATSGLINE       225
  
 #define RPL_SERVICEINFO      231
 #define RPL_ENDOFSERVICES    232

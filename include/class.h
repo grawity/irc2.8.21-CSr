@@ -17,6 +17,10 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+**  $Id: class.h,v 1.1.1.1 1997/07/23 18:02:01 cbehrens Exp $
+*/
+
 #ifndef	__class_include__
 #define __class_include__
 

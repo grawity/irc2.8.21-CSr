@@ -1,0 +1,8 @@
+INSTALLATION
+
+1) ./configure
+2) edit include/config.h
+3) edit include/comstud.h
+4) make
+5) copy everything into appropriate directories.
+   (I know "make install" fails...this is a clue-check)

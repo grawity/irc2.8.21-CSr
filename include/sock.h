@@ -19,9 +19,12 @@
  */
 
 /*
- * $Id: sock.h,v 6.1 1991/07/04 21:04:35 gruner stable gruner $
+ * $Id: sock.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
  *
  * $Log: sock.h,v $
+ * Revision 1.1.1.1  1997/07/23 18:02:02  cbehrens
+ * CSr30
+ *
  * Revision 6.1  1991/07/04  21:04:35  gruner
  * Revision 2.6.1 [released]
  *

@@ -55,7 +55,7 @@
 
 /*
  *	@(#)cdefs.h	8.1 (Berkeley) 6/2/93
- *	$Id: cdefs.h,v 4.9.1.3 1993/09/08 00:00:07 vixie Exp $
+ *	$Id: cdefs.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
  */
 
 #ifndef	_CDEFS_H_

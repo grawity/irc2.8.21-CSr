@@ -17,6 +17,10 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+**  $Id: channel.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
+*/
+
 #ifndef	__channel_include__
 #define __channel_include__
 #define CREATE 1	/* whether a channel should be

@@ -1,0 +1,155 @@
+#************************************************************************
+#*   IRC - Internet Relay Chat, Makefile
+#*   Copyright (C) 1990, Jarkko Oikarinen
+#*
+#*   This program is free software; you can redistribute it and/or modify
+#*   it under the terms of the GNU General Public License as published by
+#*   the Free Software Foundation; either version 1, or (at your option)
+#*   any later version.
+#*
+#*   This program is distributed in the hope that it will be useful,
+#*   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#*   GNU General Public License for more details.
+#*
+#*   You should have received a copy of the GNU General Public License
+#*   along with this program; if not, write to the Free Software
+#*   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+#*
+#*   $Id: Makefile.in,v 1.1.1.1 1997/07/23 18:02:01 cbehrens Exp $
+#*
+#*/
+
+#
+#  $Id: Makefile.in,v 1.1.1.1 1997/07/23 18:02:01 cbehrens Exp $
+#
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+
+CC = @CC@
+DEFS = @DEFS@
+LIBS = @LIBS@
+
+INCLUDEDIR = -I. -I../include
+CFLAGS = @CFLAGS@ $(DEFS) $(INCLUDEDIR) @CPPFLAGS@
+LDFLAGS = @LDFLAGS@
+
+IRCDLIBS = $(LIBS)
+
+RM=/bin/rm
+
+# IRCDMODE is the mode you want the binary to be.
+# The 4 at the front is important (allows for setuidness)
+#
+# WARNING: if you are making ircd SUID or SGID, check config.h to make sure
+#          you are not defining CMDLINE_CONFIG 
+IRCDMODE = 711
+
+# The following are from the time when autoconf wasn't used.
+# They are pretty useless but can be a good source of inspiration if you
+# have trouble compiling.
+#
+# use the following on MIPS:
+#CFLAGS= -systype bsd43 -DSYSTYPE_BSD43 $(INCLUDEDIR)
+# For IRIX (SGI) cc(1), use the following:
+#CFLAGS= -O -cckr $(INCLUDEDIR)
+#
+# on NEXT use:
+#CFLAGS=-bsd $(INCLUDEDIR)
+#on NeXT other than 2.0:
+#IRCDLIBS=-lsys_s
+#
+# AIX flags
+#CFLAGS=-D_BSD $(DEFS) $(INCLUDEDIR)
+#IRCDLIBS=-lm -lbsd
+#IRCLIBS=-lcurses -lcur
+#
+# Dynix/ptx V2.0.x
+#CFLAGS= $(INCLUDEDIR) -O -Xo
+#IRCDLIBS= -lsocket -linet -lnsl -lseq
+#IRCLIBS=-ltermcap -lcurses -lsocket -linet -lnsl -lseq
+# 
+# Dynix/ptx V1.x.x
+#IRCDLIBS= -lsocket -linet -lnsl -lseq
+#
+#use the following on SUN OS without nameserver libraries inside libc
+#IRCDLIBS= -lresolv
+#
+# Solaris 2/SVR4
+#IRCDLIBS= -lresolv -lsocket -lnsl
+#IRCLIBS=-lcurses -ltermcap -lsocket -lnsl
+#
+# ESIX
+#CFLAGS=-O $(INCLUDEDIR) -I/usr/ucbinclude
+#IRCDLIBS=-L/usr/ucblib -L/usr/lib -lsocket -lucb -lresolv -lns -lnsl
+#
+#CFLAGS= $(INCLUDEDIR) -traditional -Wall -Dlint -g -pedantic
+#
+# LDFLAGS - flags to send the loader (ld). SunOS users may want to add
+# -Bstatic here.
+#LDFLAGS=-Bstatic
+# HP-UX
+#LDFLAGS=-Wl,-a,archive -y
+
+SHELL=/bin/sh
+TARGETS=ircd irc
+BINDIR=$(IRCDDIR)
+MANDIR= $(prefix)/man
+INSTALL=bsdinstall
+
+MAKE=make 'CFLAGS=${CFLAGS}' 'CC=${CC}' 'IRCDLIBS=${IRCDLIBS}' \
+	'LDFLAGS=${LDFLAGS}' 'IRCDMODE=${IRCDMODE}' 'BINDIR=${BINDIR}' \
+	'INSTALL=${INSTALL}' 'IRCLIBS=${IRCLIBS}' 'INCLUDEDIR=${INCLUDEDIR}' \
+	'IRCDDIR=${IRCDDIR}' 'SHELL=${SHELL}' 'RM=${RM}'
+
+all:	ircd
+
+ircd:
+	@echo "Building ircd"
+	@cd source;\
+	${MAKE} ircd
+
+mkpasswd:
+	@echo "Building mkpasswd"
+	@cd util;\
+	${MAKE} mkpasswd
+
+chkconf:
+	@echo "Building chkconf"
+	@cd util;\
+	${MAKE} chkconf
+
+config configure:
+	${SHELL} ./configure ${CONFIGARGS}
+
+clean:
+	${RM} -f *.o *~ #* core *.bak
+	@cd source;\
+	${MAKE} clean
+
+cleanall:
+	${RM} -f *.o *~ #* core *.bak
+	@cd source;\
+	${MAKE} clean
+	@cd util;\
+	${MAKE} clean
+
+
+distclean realclean: clean
+	${RM} -f config.log config.cache config.status include/setup.h Makefile util/mkpasswd util/sums source/version.c.SH
+	@echo "Run sh ./configure to reconfigure"
+
+depend:
+	@echo "Making dependencies"
+	${MAKE} depend
+
+install: all
+	-@chmod +x ${INSTALL}
+	@echo "Installing ircd"
+	@cd source;\
+	${MAKE} 'INSTALL=${INSTALL}' install
+	-${INSTALL} -c -m 644 doc/ircd.8 ${MANDIR}/man8
+	-${INSTALL} -c -m 644 doc/irc.1 ${MANDIR}/man1
+
+

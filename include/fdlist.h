@@ -1,13 +1,19 @@
-#ifndef _IRCD_DOG3_FDLIST
-#define _IRCD_DOG3_FDLIST
+#ifndef FDLIST_H
+#define FDLIST_H
 
-typedef struct fdstruct {
-  int entry [MAXCONNECTIONS+2];
-  int last_entry;
-} fdlist;
 /*
-void addto_fdlist( int a, fdlisttype *b);
-void delfrom_fdlist( int a, fdlisttype *b);
-void init_fdlist(fdlisttype *b);
+**  $Id: fdlist.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
 */
-#endif /* _IRCD_DOG3_FDLIST */
+
+typedef struct fdstruct
+{
+	int entry [MAXCONNECTIONS+2];
+	int last_entry;
+} fdlist;
+
+void add_to_fdlist( int a, fdlist *b);
+void del_from_fdlist( int a, fdlist *b);
+
+#define init_fdlist(__x)  bzero((char *)(__x), sizeof(fdlist));
+
+#endif /* FDLIST_H */

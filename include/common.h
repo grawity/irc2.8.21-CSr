@@ -17,21 +17,23 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+**  $Id: common.h,v 1.1.1.1 1997/07/23 18:02:01 cbehrens Exp $
+*/
+
 #ifndef	__common_include__
 #define __common_include__
 
-#if defined(HPUX )|| defined(AIX)
+#include "setup.h"
+
+#ifdef HAVE_TIME_H
 #include <time.h>
-#ifdef AIX
-#include <sys/time.h>
 #endif
-#else
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 
-#ifdef	PARAMH
 #include <sys/param.h>
-#endif
 
 #ifndef PROTO
 #if __STDC__
@@ -147,8 +149,12 @@ extern unsigned char char_atribs[];
 #define isgraph(c) ((char_atribs[(u_char)(c)]&PRINT) && ((u_char)(c) != 0x32))
 #define ispunct(c) (!(char_atribs[(u_char)(c)]&(CNTRL|ALPHA|DIGIT)))
 
-extern char *MyMalloc();
 extern void flush_connections();
 extern struct SLink *find_user_link(/* struct SLink *, struct Client * */);
+#ifndef DOUGH_MALLOC
+char *MyMalloc();
+char *MyRealloc();
+void MyFree();
+#endif
 
 #endif /* __common_include__ */

@@ -21,45 +21,17 @@
 #define	__config_include__
 
 #include "setup.h"
-
 #include "comstud.h"
 
 #undef COMSTUD_DEBUG
 
-#ifdef DOG3
-#include "dog3.h"
-#endif
+#define FDLISTCHKFREQ 10
 
-/* Type of host. These should be made redundant somehow. -avalon */
+#ifdef HAVE_POLL
 
-/*     	BSD			Nothing Needed 4.{2,3} BSD, SunOS 3.x, 4.x */
-/*	HPUX			Nothing needed (A.08/A.09) */
-/*	ULTRIX			Nothing needed (4.2) */
-/*	OSF			Nothing needed (1.2) */
-#undef	AIX			/* IBM ugly so-called Unix, AIX */
-#undef	MIPS			/* MIPS Unix */
-/*	SGI			Nothing needed (IRIX 4.0.4) */
-#undef 	SVR3			/* SVR3 stuff - being worked on where poss. */
-#undef	DYNIXPTX		/* Sequents Brain-dead Posix implement. */
-#define SOL20			/* Solaris2 */
-#undef	ESIX			/* ESIX */
-#undef	NEXT			/* NeXTStep */
-#undef        SVR4
-#undef	DGUX
-
-/* Do these work? I dunno... */
-
-#undef	VMS			/* Should work for IRC client, not server */
-#undef	MAIL50			/* If you're running VMS 5.0 */
-#undef	PCS			/* PCS Cadmus MUNIX, use with BSD flag! */
-
-#ifdef SOL20
-
-#define USE_POLL                /* Define this if you want to use poll()
-                                   on lame Solaris */
+#define USE_POLL                /* Define this if you want to use poll() */
 
 #endif
-
 
 /*
  * NOTE: On some systems, valloc() causes many problems.
@@ -101,15 +73,6 @@
 #define	HAVECURSES		/* If you have curses, and want to use it.  */
 #undef	HAVETERMCAP		/* If you have termcap, and want to use it. */
 
-#ifdef notdef
-/* Define NPATH if you want to run NOTE system. Be sure that this file is
- * either not present or non empty (result of previous size). If it is empty,
- * then remove it before starting the server.
- * The file is for request save/backup.
- */
-#define NPATH "/usr/lib/irc/.ircdnote"
-#endif
-
 /*
  * Full pathnames and defaults of irc system's support files. Please note that
  * these are only the recommened names and paths. Change as needed.
@@ -145,16 +108,6 @@
  */
 #undef CHROOTDIR
 
-/* ENABLE_SUMMON
- *
- * The SUMMON command requires the ircd to be run as group tty in order
- * to work properly in many cases.  If you are on a machine where it
- * won't work, or simply don't want local users to be summoned, undefine
- * this.
- */
-#undef	ENABLE_SUMMON	/* local summon */
-#undef	ENABLE_USERS	/* enables local /users (same as who/finger output) */
-
 /* SHOW_INVISIBLE_LUSERS
  *
  * As defined this will show the correct invisible count for anyone who does
@@ -170,6 +123,25 @@
  * WHO or NAMES unless they are on the same channel as you.
  */
 #define	NO_DEFAULT_INVISIBLE
+
+/* TS_ONLY
+ *
+ * When defined, the server will refuse to directly link to non-TS servers.
+ * Remote servers can still be non-TS, although that basically keeps channel
+ * TS's to 0 so it's not a good idea.  Defining TS_ONLY speeds the server
+ * up by removing some compatibility code.
+ */
+#define TS_ONLY
+
+/* TS_WARNINGS
+ *
+ * When defined, +s users are warned of some things that should never
+ * happen on an all-TS net.  Currently these are: server-generated MODE +o,
+ * new nicks without a TS, and remote JOINs for non-existing channels.
+ * This is useful to track down anomalies;  undefine it on a mixed TS/nonTS
+ * net or you'll get a lot of warnings!
+ */
+#define TS_WARNINGS
 
 /* OPER_KILL
  *
@@ -298,7 +270,7 @@
  * If you want to log to a different facility than DAEMON, change
  * this define.
  */
-#undef LOG_FACILITY LOG_LOCAL1
+#define LOG_FACILITY LOG_LOCAL1
 #endif /* USE_SYSLOG */
 
 /*
@@ -314,12 +286,6 @@
  * right password in the opposite line.  See INSTALL doc for more details.
  */
 #undef	CRYPT_LINK_PASSWORD
-
-/*
- * define this if you enable summon and if you want summon to look for the
- * least idle tty a user is logged in on.
- */
-#define	LEAST_IDLE
 
 /*
  * IDLE_FROM_MSG
@@ -522,7 +488,6 @@
 
 #ifdef	CLIENT_COMPILE
 #undef	SENDQ_ALWAYS
-#undef	NPATH		/* _dl */
 #endif
 
 #ifdef DEBUGMODE
@@ -536,10 +501,6 @@ extern	void	debug();
 # else
 #	define LOGFILE "/dev/null"
 # endif
-#endif
-
-#ifndef ENABLE_SUMMON
-#  undef LEAST_IDLE
 #endif
 
 #if defined(mips) || defined(PCS)

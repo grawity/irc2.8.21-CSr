@@ -39,38 +39,51 @@
  *
  */
 
-#ifndef __dich_conf_h__
-#define __dich_conf_h__
+/*
+**  $Id: dich_conf.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
+*/
+
+#ifndef DICH_CONF_H
+#define DICH_CONF_H
 
 #include "struct.h"
 
-typedef struct ConfList aConfList;
-typedef	struct ConfEntry aConfEntry;
-
-struct ConfList
+typedef struct ConfList
 {
 	unsigned int	length;
-	aConfEntry	*conf_list;
-};
+	unsigned int	size;
+	struct ConfEntry *conf_list;
+} aConfList;
 
-struct ConfEntry
+typedef struct DichConf
 {
-	char		*pattern;
-	aConfItem	*conf;
-	aConfEntry	*next;
-	aConfList	*sub;
-};
+	struct ConfList	Forward;
+	struct ConfList	Backward;
+	struct ConfList	Unsorted;
+} aDichConf;
 
-extern	void		addto_conf_list();
-extern	void		clear_conf_list();
-extern	aConfItem	*find_matching_conf();
-extern	void		l_addto_conf_list();
-extern	aConfItem	*l_find_matching_conf();
-extern	char		*host_field();
-extern	char		*name_field();
-extern	char		*rev_host_field();
-extern	char		*rev_name_field();
-extern	int		sortable();
-extern	void		report_conf_links();
+typedef struct ConfEntry
+{
+	char			*pattern;
+	time_t			expires;
+	struct ConfItem		*conf;
+	struct ConfEntry	*next;
+	struct ConfList		*sub;
+} aConfEntry;
 
-#endif
+extern	void		memory_dichconf();
+extern	void		flush_dichconf();
+extern	void		mark_dichconf();
+extern	void		init_dichconf();
+extern	void		clear_dichconf();
+extern	void		addto_dichconf();
+extern	void		report_dichconf_links();
+extern	aConfItem	*find_dichconf(/*
+				aDichConf *dconf,
+				char *username,
+				char *host;
+				char *ip,
+				int best,
+				char *reply */);
+
+#endif /* DICH_CONF_H */

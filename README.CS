@@ -1,16 +1,80 @@
 ---
+$Id: README.CS,v 1.1.1.1 1997/07/23 18:02:01 cbehrens Exp $
+---
 
-This is the README for irc2.8.21+CSr29.  Basically, this is just a list
+This is the README for irc2.8.21+CSr30.  Basically, this is just a list
 of changes...more information can be found in include/comstud.h.
 
 Any questions or comments can be directed to cbehrens@concentric.net
 The newest versions of +CS ircds can be found at:
+     ftp://pain.concentric.net/pub/cbehrens/ircd
+                   or
      http://www.concentric.net/~Cbehrens/ircd
 
 ---
 
-NOTE: Please change values in comstud.h and dog3.h to your liking...
+NOTE: Please change values in comstud.h to your liking...
       The default values are probably less than ideal for you! 
+
+New in CSr30:
+
+1) Fixed problem of bind() failing before connect() for identd.
+2) Fixed a change that I missed in r29 dealing with the '$' prefix in I:
+3) Changed the appearance of /stats ?
+4) Added /stats p to see what opers are on the server.
+5) fixed stupid FASTCONNECT define in s_bsd.c
+6) Added timestamps to /quote klines (Murray)
+7) Problem where SERVER message gets dropped fixed.  Fix actually came
+   from krys, in 2.9.3b14.
+8) Fixed a weird bug in sendto_common_chan*()...only seemed to crash
+   when -O was used...but should crash no matter what.
+9) Auto-killing ghosted users that have invalid servernames...(I thought this
+   made it into CSr28...but I guess it didn't.)
+10) Changed some of the Idle and Clone rejection stuff...Should reduce
+    memory and CPU (although it might not be enough to be noticable)
+11) Totally new priority system, replaces dog3's.
+12) Improvements to m_whois, should help CPU.
+13) Improvements to get_client_ping, etc, should help CPU.
+14) Treed I: line support (just for Rogue_F)
+15) Removed AWAY from /whowas
+16) Nick propogation bug fixed (fix is also in TSora3, but is not really
+      a TS bug)
+17) Added TSora3
+18) Even if a client matches an I: with an ip, it lets the client resolve
+19) Fixed a TS bug in s_user.c which is not fixed in TSora3
+20) configure script built by autoconf.  configure.in heavily ripped from
+      2.9.x, but modified for +CS
+21) s_serv.c buffer overflow fix
+22) res.c buffer overflow fix
+23) Added s_serv.c changes from Dianora for converting bogus server names
+      and stats requests to printable chars.
+24) weird channel.c code replaced
+25) added dich_conf stuff to /stats z
+26) made /stats z oper-only, since it has to do a lot of computing.
+27) OPERWALL command...this is the new command for passing wallops
+      done by opers.  Too bad folks...I'm no longer passing WALLOPS
+      done by non-servers...upgrade.
+28) umode +z is for oper wallops (+w is only for server wallops)
+29) EXT command...currently unused...but is there for future phasing
+      in of things.  EXT command passes everything to all servers.
+30) umode +n (nick change notices)...I don't like this one, but I guess
+      the information is available in /trace anyway.
+31) Glines, /quote GLINE
+32) #ifdef HAVE_FD_ALLOC for BSD/OS 3.0 and those OS's that have
+     dynamicly sized fd_set
+33) ->ipstr added to client struct for local connetions.  Replaced
+     few inet_ntoa's with ->ipstr
+34) Changed IP# Mismatch messages to show ip string instead of hex value.
+35) Y: limit is now global, and not a per-I: limit.  Ie, if you have
+    an I: for *.com and *.edu that are both in class '1' and class '1' is
+    limited to 20 clients...then *.com + *.edu will not go over 20.  The
+    old way lets 20 *.com and 20 *.edu clients on.  If you want that, you
+    can make 2 different Y: lines or #define OLD_Y_LIMIT in comstud.h
+36) various strncat()s and strncpy()s fixed in case.
+37) timezone fix for date() from Rodder.
+38) resolving problem on startup fixed?
+39) _local_ kills don't have flood protection.
+
 
 New in CSr29:
 

@@ -17,6 +17,10 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+**  $Id: hash.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
+*/
+
 #ifndef	__hash_include__
 #define __hash_include__
 

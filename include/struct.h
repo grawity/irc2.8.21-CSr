@@ -18,36 +18,43 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+**  $Id: struct.h,v 1.1.1.1 1997/07/23 18:02:02 cbehrens Exp $
+*/
+
 #ifndef	__struct_include__
 #define __struct_include__
 
 #include "config.h"
+#include "setup.h"
 
 #include <stdio.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#ifdef HAVE_NETDB_H
 #include <netdb.h>
-#ifdef STDDEFH
+#endif
+#ifdef HAVE_STDDEF_H
 # include <stddef.h>
 #endif
 
+#ifdef HAVE_TIME_H
 #include <time.h>
+#endif
 
-#ifdef ORATIMING
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 
 #ifdef USE_SYSLOG
 # include <syslog.h>
-# ifdef SYSSYSLOGH
+# ifdef HAVE_SYS_SYSLOG_H
 #  include <sys/syslog.h>
 # endif
 #endif
-#ifdef	pyr
-#include <sys/time.h>
-#endif
 
 #include "hash.h"
+#include "fdlist.h"
 
 typedef	struct	ConfItem aConfItem;
 typedef	struct 	Client	aClient;
@@ -90,6 +97,10 @@ typedef struct commandlog
 #define UFLAGS_UMODE 6
 #define UFLAGS_DMODE 7
 #define UFLAGS_LMODE 8
+#ifdef G_MODE
+#define UFLAGS_GMODE 9
+#endif
+#define UFLAGS_NMODE 10
 /* */
 
 
@@ -182,74 +193,112 @@ typedef struct commandlog
 #define	SetLog(x)		((x)->status = STAT_LOG)
 #define	SetService(x)		((x)->status = STAT_SERVICE)
 
-/* aConfItem->flags ... */
+/* aConfItem->flags  */
 
 #define FLAGS_LIMIT_IP		0x0001
 #define FLAGS_NO_TILDE		0x0002
 #define FLAGS_NEED_IDENTD	0x0004
 #define FLAGS_PASS_IDENTD	0x0008
+#define FLAGS_NOMATCH_IP	0x0010
 
-/* aClient->flags? ... */
+/* aClient->flags */
 
 #define	FLAGS_PINGSENT   0x0001	/* Unreplied ping sent */
 #define	FLAGS_DEADSOCKET 0x0002	/* Local socket is dead--Exiting soon */
 #define	FLAGS_KILLED     0x0004	/* Prevents "QUIT" from being sent for this */
-#define	FLAGS_OPER       0x0008	/* Operator */
-#define	FLAGS_LOCOP      0x0010 /* Local operator -- SRB */
-#define	FLAGS_INVISIBLE  0x0020 /* makes user invisible */
-#define	FLAGS_WALLOP     0x0040 /* send wallops to them */
-#define	FLAGS_SERVNOTICE 0x0080 /* server notices such as kill */
-#define	FLAGS_BLOCKED    0x0100	/* socket is in a blocked condition */
-#define	FLAGS_UNIX	 0x0200	/* socket is in the unix domain, not inet */
-#define	FLAGS_CLOSING    0x0400	/* set when closing to suppress errors */
-#define	FLAGS_LISTEN     0x0800 /* used to mark clients which we listen() on */
-#define	FLAGS_CHKACCESS  0x1000 /* ok to check clients access if set */
-#define	FLAGS_DOINGDNS	 0x2000 /* client is waiting for a DNS response */
-#define	FLAGS_AUTH	 0x4000 /* client is waiting on rfc931 response */
-#define	FLAGS_WRAUTH	 0x8000	/* set if we havent writen to ident server */
-#define	FLAGS_LOCAL	0x10000 /* set for local clients */
-#define	FLAGS_GOTID	0x20000	/* successful ident lookup achieved */
-#define	FLAGS_BLAHBLAH	0x40000	/* Not used */ 
-#define	FLAGS_NONL	0x80000 /* No \n in buffer */
-#define FLAGS_FMODE	0x100000 /* +f usermode */
-#define FLAGS_CMODE	0x200000 /* +c usermode */
-#define FLAGS_KMODE	0x400000 /* +k usermode */
-#define FLAGS_UMODE	0x800000 /* +u usermode */
-#define FLAGS_BMODE	0x1000000 /* +b usermode */
-#define FLAGS_DMODE	0x2000000 /* +d usermode */
-#define FLAGS_LMODE	0x4000000 /* +l usermode */
+#define FLAGS_NORMALEX	 0x0008 /* Normal exit */
+#define	FLAGS_BLOCKED    0x0010	/* socket is in a blocked condition */
+#define	FLAGS_UNIX	 0x0020	/* socket is in the unix domain, not inet */
+#define	FLAGS_CLOSING    0x0040	/* set when closing to suppress errors */
+#define	FLAGS_LISTEN     0x0080 /* used to mark clients which we listen() on */
+#define	FLAGS_CHKACCESS  0x0100 /* ok to check clients access if set */
+#define	FLAGS_DOINGDNS	 0x0200 /* client is waiting for a DNS response */
+#define	FLAGS_AUTH	 0x0400 /* client is waiting on rfc931 response */
+#define	FLAGS_WRAUTH	 0x0800	/* set if we havent writen to ident server */
+#define	FLAGS_LOCAL	 0x1000 /* set for local clients */
+#define	FLAGS_GOTID	 0x2000	/* successful ident lookup achieved */
+#define	FLAGS_NONL	 0x4000 /* No \n in buffer */
+
+/* aClient->extraflags */
+
+#define	FLAGS_OPER		0x0001	/* Operator */
+#define	FLAGS_LOCOP		0x0002 /* Local operator -- SRB */
+#define	FLAGS_INVISIBLE		0x0004 /* makes user invisible */
+#define	FLAGS_WALLOP		0x0008 /* send wallops to them */
+#define	FLAGS_SERVNOTICE	0x0010 /* server notices such as kill */
+#define FLAGS_FMODE		0x0020 /* +f usermode */
+#define FLAGS_CMODE		0x0040 /* +c usermode */
+#define FLAGS_KMODE		0x0080 /* +k usermode */
+#define FLAGS_UMODE		0x0100 /* +u usermode */
+#define FLAGS_BMODE		0x0200 /* +b usermode */
+#define FLAGS_DMODE		0x0400 /* +d usermode */
+#define FLAGS_LMODE		0x0800 /* +l usermode */
+#define FLAGS_ZMODE		0x1000 /* +z usermode */
+#define FLAGS_GMODE		0x2000 /* +g usermode */
 
 #define	SEND_UMODES	(FLAGS_INVISIBLE|FLAGS_OPER|FLAGS_WALLOP)
-#define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_LMODE|FLAGS_DMODE|FLAGS_BMODE)
+
+
+/* ARGH...THIS IS UGLY...I'M SURE THERES SOMETHING EASIER,
+   BUT MY BRAIN CANT THINK RIGHT NOW -CS
+*/
+
+#ifdef G_MODE
+# ifdef SHOW_NICKCHANGES
+# define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_LMODE|FLAGS_DMODE|FLAGS_BMODE|FLAGS_ZMODE|FLAGS_GMODE|FLAGS_NMODE)
+# else
+# define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_LMODE|FLAGS_DMODE|FLAGS_BMODE|FLAGS_ZMODE|FLAGS_GMODE)
+#endif /* SHOW_NICKCHANGES */
+#else
+# ifdef SHOW_NICKCHANGES
+# define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_LMODE|FLAGS_DMODE|FLAGS_BMODE|FLAGS_ZMODE|FLAGS_NMODE)
+# else
+# define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_LMODE|FLAGS_DMODE|FLAGS_BMODE|FLAGS_ZMODE)
+# endif
+#endif /* G_MODE */
 
 /*
- * flags macros.
+ * aClient->extraflags macros.
  */
-#define	IsOper(x)		((x)->flags & FLAGS_OPER)
-#define	IsLocOp(x)		((x)->flags & FLAGS_LOCOP)
-#define	IsInvisible(x)		((x)->flags & FLAGS_INVISIBLE)
-#define	IsAnOper(x)		((x)->flags & (FLAGS_OPER|FLAGS_LOCOP))
-#define IsFMode(x)		((x)->flags & FLAGS_FMODE)
-#define IsCMode(x)		((x)->flags & FLAGS_CMODE)
-#define IsUMode(x)		((x)->flags & FLAGS_UMODE)
-#define IsKMode(x)		((x)->flags & FLAGS_KMODE)
-#define IsLMode(x)		((x)->flags & FLAGS_LMODE)
-#define IsBMode(x)		((x)->flags & FLAGS_BMODE)
-#define IsDMode(x)		((x)->flags & FLAGS_DMODE)
+#define	IsOper(x)		((x)->extraflags & FLAGS_OPER)
+#define	IsLocOp(x)		((x)->extraflags & FLAGS_LOCOP)
+#define	IsInvisible(x)		((x)->extraflags & FLAGS_INVISIBLE)
+#define	IsAnOper(x)		((x)->extraflags & (FLAGS_OPER|FLAGS_LOCOP))
+#define IsFMode(x)		((x)->extraflags & FLAGS_FMODE)
+#define IsCMode(x)		((x)->extraflags & FLAGS_CMODE)
+#define IsUMode(x)		((x)->extraflags & FLAGS_UMODE)
+#define IsKMode(x)		((x)->extraflags & FLAGS_KMODE)
+#define IsLMode(x)		((x)->extraflags & FLAGS_LMODE)
+#define IsBMode(x)		((x)->extraflags & FLAGS_BMODE)
+#define IsDMode(x)		((x)->extraflags & FLAGS_DMODE)
+#define IsGMode(x)		((x)->extraflags & FLAGS_GMODE)
+#define IsZMode(x)		((x)->extraflags & FLAGS_ZMODE)
+
+#define	SendWallops(x)		((x)->extraflags & FLAGS_WALLOP)
+#define	SendServNotice(x)	((x)->extraflags & FLAGS_SERVNOTICE)
+
+#define	SetOper(x)		((x)->extraflags |= FLAGS_OPER)
+#define	SetLocOp(x)    		((x)->extraflags |= FLAGS_LOCOP)
+#define	SetInvisible(x)		((x)->extraflags |= FLAGS_INVISIBLE)
+#define	SetWallops(x)  		((x)->extraflags |= FLAGS_WALLOP)
+
+#define	ClearOper(x)		((x)->extraflags &= ~FLAGS_OPER)
+#define ClearLocOp(x)		((x)->extraflags &= ~FLAGS_LOCOP)
+#define	ClearInvisible(x)	((x)->extraflags &= ~FLAGS_INVISIBLE)
+#define	ClearWallops(x)		((x)->extraflags &= ~FLAGS_WALLOP)
+
+/*
+ * aClient->flags macros
+*/
+
 #define	IsPerson(x)		((x)->user && IsClient(x))
 #define	IsPrivileged(x)		(IsAnOper(x) || IsServer(x))
-#define	SendWallops(x)		((x)->flags & FLAGS_WALLOP)
-#define	SendServNotice(x)	((x)->flags & FLAGS_SERVNOTICE)
 #define	IsUnixSocket(x)		((x)->flags & FLAGS_UNIX)
 #define	IsListening(x)		((x)->flags & FLAGS_LISTEN)
 #define	DoAccess(x)		((x)->flags & FLAGS_CHKACCESS)
 #define	IsLocal(x)		((x)->flags & FLAGS_LOCAL)
 #define	IsDead(x)		((x)->flags & FLAGS_DEADSOCKET)
 
-#define	SetOper(x)		((x)->flags |= FLAGS_OPER)
-#define	SetLocOp(x)    		((x)->flags |= FLAGS_LOCOP)
-#define	SetInvisible(x)		((x)->flags |= FLAGS_INVISIBLE)
-#define	SetWallops(x)  		((x)->flags |= FLAGS_WALLOP)
 #define	SetUnixSock(x)		((x)->flags |= FLAGS_UNIX)
 #define	SetDNS(x)		((x)->flags |= FLAGS_DOINGDNS)
 #define	DoingDNS(x)		((x)->flags & FLAGS_DOINGDNS)
@@ -257,9 +306,6 @@ typedef struct commandlog
 #define	DoingAuth(x)		((x)->flags & FLAGS_AUTH)
 #define	NoNewLine(x)		((x)->flags & FLAGS_NONL)
 
-#define	ClearOper(x)		((x)->flags &= ~FLAGS_OPER)
-#define	ClearInvisible(x)	((x)->flags &= ~FLAGS_INVISIBLE)
-#define	ClearWallops(x)		((x)->flags &= ~FLAGS_WALLOP)
 #define	ClearDNS(x)		((x)->flags &= ~FLAGS_DOINGDNS)
 #define	ClearAuth(x)		((x)->flags &= ~FLAGS_AUTH)
 #define	ClearAccess(x)		((x)->flags &= ~FLAGS_CHKACCESS)
@@ -276,7 +322,7 @@ typedef struct commandlog
 #define	DEBUG_SEND   7	/* everything that is sent out */
 #define	DEBUG_DEBUG  8	/* anything to do with debugging, ie unimportant :) */
 #define	DEBUG_MALLOC 9	/* malloc/free calls */
-#define	DEBUG_LIST  10	/* debug list use */
+#define	DEBUG_L10   10	/* debug level 10 */
 
 /*
  * defines for curses in client
@@ -285,16 +331,47 @@ typedef struct commandlog
 #define	CURSES_TERM	1
 #define	TERMCAP_TERM	2
 
+#ifdef G_LINES
+typedef	struct _glineconf
+{
+	time_t	seconds; /* length of ban */
+	struct _rule *fromoper;
+	struct _rule *fromserver;
+	struct _rule *foruser;
+} aGlineConf;
+#endif
+
+/* aRule flags */
+#define FLAGS_ALLOW             0x001
+#define FLAGS_DENY              0x002
+
+#define IsAllow(x)              ((x)->flags & FLAGS_ALLOW)
+#define IsDeny(x)               ((x)->flags & FLAGS_DENY)
+
+typedef struct _rule
+{
+        char *string;
+        int flags;
+        struct _except *excepts;
+        struct _rule *next;
+} aRule;
+
+typedef struct _except
+{
+        char *string;
+        struct _except *next;
+} anExcept;
+
 struct	IdleItem	{
 	char	username[USERLEN+1];
-	char	hostname[HOSTLEN+1];
+	struct	in_addr	ip;
 	long	last;
 	struct IdleItem *prev;
 	struct IdleItem *next;
 };
 
 struct  CloneItem       {
-        char    hostname[HOSTLEN+1];
+	struct	in_addr	ip;
         int     num;
         long    last;
         struct CloneItem *prev;
@@ -333,6 +410,7 @@ struct	ConfItem	{
 	int	port;
 	int	flags;  /* Special flags... */
 	time_t	hold;	/* Hold action until this time (calendar time) */
+	time_t	expires; /* Expire time (glines */
 #ifndef VMSP
 	aClass	*class;  /* Class of connection */
 #endif
@@ -362,6 +440,7 @@ struct	ConfItem	{
 #define CONF_ELINE		0x10000
 #define CONF_DLINE		0x20000
 #define CONF_JLINE		0x40000
+#define CONF_GLINE		0x80000
 
 #define	CONF_OPS		(CONF_OPERATOR | CONF_LOCOP)
 #define	CONF_SERVER_MASK	(CONF_CONNECT_SERVER | CONF_NOCONNECT_SERVER)
@@ -379,6 +458,7 @@ struct	User	{
 	Link	*invited;	/* chain of invite pointer blocks */
 	char	*away;		/* pointer to away message */
 	time_t	last;
+	time_t  last2;		/* for new priority stuff... */
 	int	refcnt;		/* Number of times this block is referenced */
 	int	joined;		/* number of channels joined */
 	char	username[USERLEN+1];
@@ -403,15 +483,24 @@ struct	Server	{
 	char	up[HOSTLEN+1];	/* uplink for this server */
 	char	by[NICKLEN+1];
 	aConfItem *nline;	/* N-line pointer for this server */
+	aClient	*servers;	/* Servers on this server */
+	aClient *users;		/* Users on this server */
 #ifdef	LIST_DEBUG
 	aClient	*bcptr;
 #endif
 };
 
-struct Client	{
-	struct	Client *next,*prev, *hnext;
+struct Client
+{
+	struct	Client *next;	/* Next client */
+	struct	Client *prev;	/* Previous client */
+	struct	Client *hnext;	/* Next client in this hash bucket */
+	struct	Client *lnext;	/* Used for Server->servers/users */
+	struct	Client *lprev;	/* Used for Server->servers/users */
+
 	anUser	*user;		/* ...defined, if this is a User */
 	aServer	*serv;		/* ...defined, if this is a server */
+	aClient	*servptr;	/* Points to server this Client is on */
 	aWhowas *whowas;	/* Pointers to whowas structs */
 #ifdef USE_SERVICES
 	aService *service;
@@ -421,10 +510,12 @@ struct Client	{
 	time_t	firsttime;	/* time client was created */
 	time_t	since;		/* last time we parsed something */
 	ts_val	tsinfo;		/* TS on the nick, SVINFO on servers */
-	long	flags;		/* client flags */
+	unsigned long flags;	/* client flags */
+	unsigned long extraflags;	/* client extra flags */
 	aClient	*from;		/* == self, if Local Client, *NEVER* NULL! */
 	int	fd;		/* >= 0, for local clients */
 	int	hopcount;	/* number of servers to this 0 = local */
+	int	ping;		/* max ping...holder for get_client_ping() */
 	short	status;		/* Client type */
 	char	nicksent;
 	char	name[HOSTLEN+1]; /* Unique name of the client, nick or host */
@@ -438,6 +529,7 @@ struct Client	{
 	** these fields, if (from != self).
 	*/
 	int	count;		/* Amount of data in buffer */
+	fdlist	*fdlist;
 	char	buffer[BUFSIZE]; /* Incoming message buffer */
 	short	lastsq;		/* # of 2k blocks when sendqueued called last*/
 	dbuf	sendQ;		/* Outgoing message queue--if socket full */
@@ -447,7 +539,6 @@ struct Client	{
 	long	receiveM;	/* Statistics: protocol messages received */
 #ifdef DOG3
 	long lastrecvM;		/* to check for activity --Mika */
-	int priority;
 #endif 
 #ifdef NO_NICK_FLOODS
 	long	lastnick;
@@ -459,6 +550,7 @@ struct Client	{
 	aClient	*acpt;		/* listening client which we accepted from */
 	Link	*confs;		/* Configuration record associated */
 	int	authfd;		/* fd for rfc931 authentication */
+	struct	in_addr	bindip;	/* for listeners */
 	struct	in_addr	ip;	/* keep real ip# too */
 	unsigned short	port;	/* and the remote port# too :-) */
 	struct	hostent	*hostp;
@@ -469,6 +561,7 @@ struct Client	{
 				  ** and after which the connection was
 				  ** accepted.
 				  */
+	char	ipstr[HOSTLEN+1];
 	char	passwd[PASSWDLEN+1];
 };
 
@@ -567,7 +660,7 @@ struct Channel	{
 	char	chname[1];
 };
 
-#define	TS_CURRENT	1	/* current TS protocol version */
+#define	TS_CURRENT	3	/* current TS protocol version */
 #define	TS_MIN		1	/* minimum supported TS protocol version */
 #define	TS_DOESTS	0x20000000
 #define	DoesTS(x)	((x)->tsinfo == TS_DOESTS)
@@ -614,6 +707,7 @@ struct Channel	{
 #define IsNoTilde(x)		((x)->flags & FLAGS_NO_TILDE)
 #define IsNeedIdentd(x)		((x)->flags & FLAGS_NEED_IDENTD)
 #define IsPassIdentd(x)		((x)->flags & FLAGS_PASS_IDENTD)
+#define IsNoMatchIp(x)		((x)->flags & FLAGS_NOMATCH_IP)
 
 #define	HoldChannel(x)		(!(x))
 /* name invisible */
