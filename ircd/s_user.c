@@ -1370,6 +1370,10 @@ char	*parv[];
 #else
 		wilds = (index(nick, '?') || index(nick, '*'));
 #endif
+		/* No longer sending replies to remote clients
+                   when wildcards are given */
+		if (!MyConnect(sptr) && wilds)
+			continue;
 		for (acptr = client; (acptr = next_client(acptr, nick));
 		     acptr = acptr->next)
 		    {
@@ -1383,9 +1387,6 @@ char	*parv[];
 			/*
 			 * 'Rules' established for sending a WHOIS reply:
 			 *
-			 * - only allow a remote client to get replies for
-			 *   local clients if wildcards are being used;
-			 *
 			 * - if wildcards are being used dont send a reply if
 			 *   the querier isnt any common channels and the
 			 *   client in question is invisible and wildcards are
@@ -1394,8 +1395,6 @@ char	*parv[];
 			 * - only send replies about common or public channels
 			 *   the target user(s) are on;
 			 */
-			if (!MyConnect(sptr) && !MyConnect(acptr) && wilds)
-				continue;
 			user = acptr->user ? acptr->user : &UnknownUser;
 			name = (!*acptr->name) ? "?" : acptr->name;
 
