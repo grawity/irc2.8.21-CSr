@@ -1027,10 +1027,15 @@ va_dcl
 			 ((flag == UFLAGS_CMODE) && IsAnOper(cptr) && IsCMode(cptr)) ||
 			((flag == UFLAGS_KMODE) && IsKMode(cptr)) ||
 			((flag == UFLAGS_FMODE) && IsFMode(cptr)) ||
+#ifdef BOT_NOTICE_OPERS_ONLY
+			((flag == UFLAGS_BMODE) && IsAnOper(cptr) && IsBMode(cptr)) ||
+#else
 			((flag == UFLAGS_BMODE) && IsBMode(cptr)) ||
+#endif
 			((flag == UFLAGS_UMODE) && IsUMode(cptr)) ||
 			((flag == UFLAGS_DMODE) && IsDMode(cptr)) ||
-			((flag == UFLAGS_LMODE) && IsLMode(cptr))))
+			((flag == UFLAGS_LMODE) && IsLMode(cptr)) ||
+			((flag == UFLAGS_NMODE) && IsAnOper(cptr) && IsNMode(cptr))))
                     {
                         (void)irc_sprintf(nbuf, ":%s NOTICE %s :*** Notice -- ",
                                         me.name, cptr->name);
@@ -1153,7 +1158,7 @@ va_dcl
 		if (!SendWallops(cptr))
 			continue;
 		if (MyClient(cptr) && !(IsServer(from) || IsMe(from)))
-			continue;
+			continue; 	
 		i = cptr->from->fd;	/* find connection oper is on */
 		if (sentalong[i])	/* sent message along it already ? */
 			continue;

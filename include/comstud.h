@@ -101,7 +101,7 @@
                      kline.conf.
 */
 
-#define SEPARATE_QUOTE_KLINES_BY_DATE
+#undef SEPARATE_QUOTE_KLINES_BY_DATE
 
 /* LIMIT_UH        - Use this if you want to use the connect frequency
 		     field in the Y: lines to limit that class to a
@@ -213,7 +213,7 @@ they are increased!
                       using /QUOTE KLINE
 */
 
-#undef NO_LOCAL_KLINE
+#define NO_LOCAL_KLINE
 
 /* USE_UH           - define this if you want to use n!u@h
                       for BAN_INFO
@@ -334,7 +334,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "./logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc2.8.21+CSr27/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -424,7 +424,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "./logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr27/lib/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client
@@ -476,6 +476,37 @@ Note: good numbers to use are 5 bots joining with no more than
 
 #define CLONE_TIME 30
 
+
+/***********************************************************************/
+/*                          +LT #DEFINES                               */
+/***********************************************************************/
+
+#define STATS_L_OPER_ONLY
+
+/* STATS_L_OPER_ONLY - set this and only opers (local or remote) can
+                       receive /STATS L data on your server.  This may
+                       help the synflooder problem a tiny bit.
+
+*/
+
+/* *** STATS_K_OPER_ONLY has been removed.  Use RESTRICT_STATSK instead 
+   (see above)
+*/
+
+#define BOT_NOTICE_OPERS_ONLY
+
+/* BOT_NOTICE_OPERS_ONLY - this #define will restrict the bot notices that
+                           are part of the +r usermode to operators.  I
+                           recommend using this to make detecting the
+                           detectors a little harder on the botrunners.
+*/
+
+/* FLOODNET_LOCAL_ONLY - Only yell about floodnet beasties on your server.
+                         If you turn this off, expect a LOT of scroll.
+*/
+
+#define FLOODNET_LOCAL_ONLY
+
 /***********************************************************************/
 /*             DO NOT CHANGE ANYTHING AFTER THIS POINT                 */
 /***********************************************************************/
@@ -487,4 +518,5 @@ Note: good numbers to use are 5 bots joining with no more than
 #endif
 
 #endif /* COMSTUD_H */
+
 

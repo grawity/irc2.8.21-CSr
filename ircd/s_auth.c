@@ -83,11 +83,14 @@ Reg1	aClient	*cptr;
 
 	if (me.ip.s_addr != INADDR_ANY)
 	{
+		bzero((char *)&sock, sizeof(sock));	/* JE */
 		sock.sin_addr = me.ip;
 		sock.sin_port = 0;
 		sock.sin_family = AF_INET;
 		(void)bind(cptr->authfd,(struct sockaddr *)&sock,sizeof(sock));
 	}
+
+	bzero((char *)&sock, sizeof(sock));		/* JE */
 	bcopy((char *)&cptr->ip, (char *)&sock.sin_addr,
 		sizeof(struct in_addr));
 	sock.sin_port = htons(113);

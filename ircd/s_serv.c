@@ -1074,6 +1074,14 @@ char	*parv[];
 
 	if (hunt_server(cptr,sptr,":%s INFO :%s",1,parc,parv) == HUNTED_ISME)
 	    {
+                if (!IsServer(sptr)) 
+                    sendto_flagops(UFLAGS_BMODE,"INFO requested by %s [%s@%s]", sptr->name, sptr->user->username, sptr->user->host);
+                else /* naughty naughty */
+                    {
+		    sendto_flagops(1,"Possible hacked server link: Server %s requested INFO", sptr->name);
+                    return 0;
+                    }
+
 		while (*text)
 			sendto_one(sptr, rpl_str(RPL_INFO),
 				   me.name, parv[0], *text++);
@@ -1110,6 +1118,11 @@ char	*parv[];
 
 	if (check_registered_user(sptr))
 		return 0;
+
+        /* LT3 - helps find LL bots */
+        if (MyConnect(sptr)) {
+                sendto_flagops(UFLAGS_BMODE,"LINKS requested by %s [%s@%s]", sptr->name, sptr->user->username, sptr->user->host);
+        }
     
 	if (parc > 2)
 	    {
@@ -1480,53 +1493,67 @@ char	*parv[];
 		 * are invisible not being visible to 'foreigners' who use
 		 * a wild card based search to list it.
 		 */
-		acptr = NULL;
-		if (parc > 2)
-			acptr = find_chasing(NULL, parv[2], NULL);
-		if (acptr && IsPerson(acptr))
-		{
+
+#ifdef STATS_L_OPER_ONLY
+                /*
+                 * LT4: Don't allow non-opers to query L lines for security
+                 * LT6: married with comstud's /stats l mods
+                 */
+                if (!IsOper(sptr))
+                        {
+                        sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
+                        return 0;
+                        }
+#endif
+
+                acptr = NULL;
+                if (parc > 2)
+                        acptr = find_chasing(NULL, parv[2], NULL);
+                if (acptr && IsPerson(acptr))
+                {
 gohere:
-			if (MyConnect(acptr))
-			sendto_one(sptr, Lformat, me.name, RPL_STATSLINKINFO,
-				parv[0], isupper(stat) ?
-					get_client_name(acptr, TRUE) :
-					get_client_name(acptr, FALSE),
-				(int)DBufLength(&cptr->sendQ),
-				(int)acptr->sendM, (int)acptr->sendK,
-				(int)acptr->receiveM, (int)acptr->receiveK,
-				NOW - acptr->firsttime);
-			break;
-		}
-		acptr = find_chasing(NULL, me.name, NULL);
-		if (acptr && IsPerson(acptr))
-			goto gohere;
-		for (i = 0; i <= highest_fd; i++)
-		    {
-			if (!(acptr = local[i]))
-				continue;
-			if (IsPerson(acptr) &&
-				!IsAnOper(acptr) && !IsAnOper(sptr) &&
-				(acptr != sptr))
-				continue;
-			if (IsInvisible(acptr) && (doall || wilds) &&
-			    !(MyConnect(sptr) && IsOper(sptr)) &&
-			    !IsAnOper(acptr) && (acptr != sptr))
-				continue;
-			if (!doall && wilds && matches(name, acptr->name))
-				continue;
-			if (!(doall || wilds) && mycmp(name, acptr->name))
-				continue;
-			sendto_one(sptr, Lformat, me.name,
-				   RPL_STATSLINKINFO, parv[0],
-				   (isupper(stat)) ?
-				   get_client_name(acptr, TRUE) :
-				   get_client_name(acptr, FALSE),
-				   (int)DBufLength(&acptr->sendQ),
-				   (int)acptr->sendM, (int)acptr->sendK,
-				   (int)acptr->receiveM, (int)acptr->receiveK,
-				   NOW - acptr->firsttime);
-		    }
-		break;
+                        if (MyConnect(acptr))
+                        sendto_one(sptr, Lformat, me.name, RPL_STATSLINKINFO,
+                                parv[0], isupper(stat) ?
+                                        get_client_name(acptr, TRUE) :
+                                        get_client_name(acptr, FALSE),
+                                (int)DBufLength(&cptr->sendQ),
+                                (int)acptr->sendM, (int)acptr->sendK,
+                                (int)acptr->receiveM, (int)acptr->receiveK,
+                                NOW - acptr->firsttime);
+                        break;
+                }
+                acptr = find_chasing(NULL, me.name, NULL);
+                if (acptr && IsPerson(acptr))
+                        goto gohere;
+                for (i = 0; i <= highest_fd; i++)
+                    {
+                        if (!(acptr = local[i]))
+                                continue;
+                        if (IsPerson(acptr) &&
+                                !IsAnOper(acptr) && !IsAnOper(sptr) &&
+                                (acptr != sptr))
+                                continue;
+                        if (IsInvisible(acptr) && (doall || wilds) &&
+                            !(MyConnect(sptr) && IsOper(sptr)) &&
+                            !IsAnOper(acptr) && (acptr != sptr))
+                                continue;
+                        if (!doall && wilds && matches(name, acptr->name))
+                                continue;
+                        if (!(doall || wilds) && mycmp(name, acptr->name))
+                                continue;
+                        sendto_one(sptr, Lformat, me.name,
+                                   RPL_STATSLINKINFO, parv[0],
+                                   (isupper(stat)) ?
+                                   get_client_name(acptr, TRUE) :
+                                   get_client_name(acptr, FALSE),
+                                   (int)DBufLength(&acptr->sendQ),
+                                   (int)acptr->sendM, (int)acptr->sendK,
+                                   (int)acptr->receiveM, (int)acptr->receiveK,
+                                   NOW - acptr->firsttime);
+                    }
+                break;
+
 #ifdef B_LINES
 	case 'B' : case 'b' :
 		report_conf_links(sptr, &BList1, RPL_STATSBLINE, 'B',
@@ -1578,61 +1605,62 @@ gohere:
 	break;
 #endif 
 	case 'K' : case 'k' :
-		tmpptr = NULL;
-		user = host = NULL;
+                tmpptr = NULL;
+                user = host = NULL;
 #ifdef RESTRICT_STATSK
-		if (name == me.name)
-		{
-			if (!IsAnOper(sptr))
-				tmpptr = sptr;
-				
-			else
-				tmpptr = NULL;
-		}
-		else if (!strchr(name, '@') && !strchr(name, '.'))
-		{
-			if (!(tmpptr = find_chasing(sptr, name, NULL)))
-				return 0;
-		}
-		if (!tmpptr && (me.name != name))
-		{
-			char *ptr;
+                if (name == me.name)
+                {
+                        if (!IsAnOper(sptr))
+                                tmpptr = sptr;
 
-			strcpy(buffer, name);
-			ptr = strchr(buffer, '@');
-			if (!ptr)
-			{
-				user = "*";
-				host = buffer;
-			}
-			else
-			{
-				*ptr = (char) 0;
-				user = buffer;
-				host = ptr+1;
-			}
-		}			
-		if (tmpptr && tmpptr->user)
-		{
-			user = tmpptr->user->username;
-			host = tmpptr->user->host;
-		}
-		if (user)
-		sendto_one(sptr, ":%s NOTICE %s :Finding bans matching %s@%s",
-			me.name, parv[0], user, host);
+                        else
+                                tmpptr = NULL;
+                }
+                else if (!strchr(name, '@') && !strchr(name, '.'))
+                {
+                        if (!(tmpptr = find_chasing(sptr, name, NULL)))
+                                return 0;
+                }
+                if (!tmpptr && (me.name != name))
+                {
+                        char *ptr;
+
+                        strcpy(buffer, name);
+                        ptr = strchr(buffer, '@');
+                        if (!ptr)
+                        {
+                                user = "*";
+                                host = buffer;
+                        }
+                        else
+                        {
+                                *ptr = (char) 0;
+                                user = buffer;
+                                host = ptr+1;
+                        }
+                }
+                if (tmpptr && tmpptr->user)
+                {
+                        user = tmpptr->user->username;
+                        host = tmpptr->user->host;
+                }
+                if (user)
+                sendto_one(sptr, ":%s NOTICE %s :Finding bans matching %s@%s",
+                        me.name, parv[0], user, host);
 #endif
-		report_conf_links(sptr, &KList1, RPL_STATSKLINE, 'K',
-			user, host, &num);
+                report_conf_links(sptr, &KList1, RPL_STATSKLINE, 'K',
+                        user, host, &num);
                 report_conf_links(sptr, &KList2, RPL_STATSKLINE, 'K',
-			user, host, &num);
+                        user, host, &num);
                 report_conf_links(sptr, &KList3, RPL_STATSKLINE, 'K',
-			user, host, &num);
+                        user, host, &num);
 #ifdef RESTRICT_STATSK
-		if (!num && user)
-		   sendto_one(sptr,":%s NOTICE %s :No bans for %s@%s found.",
-			me.name, parv[0], user, host);
+                if (!num && user)
+                   sendto_one(sptr,":%s NOTICE %s :No bans for %s@%s found.",
+                        me.name, parv[0], user, host);
 #endif
-		break;
+                break;
+
 	case 'M' : case 'm' :
 		for (mptr = msgtab; mptr->cmd; mptr++)
 			if (mptr->count)
@@ -1784,6 +1812,9 @@ int	parc;
 char	*parv[];
     {
 	int i;
+
+        if (check_registered_user(sptr))
+                return 0;                       /* LT6 */
 
 	for (i = 0; msgtab[i].cmd; i++)
 		sendto_one(sptr,":%s NOTICE %s :%s",
@@ -2003,7 +2034,9 @@ char	*parv[];
 		return 0;
 	    }
 
-	if (!IsServer(sptr) && MyConnect(sptr) && !IsOper(sptr))
+	/* LT6: +th style WALLOPS - lets opers communicate in them */
+
+ 	if (!IsServer(sptr) && MyConnect(sptr) && !IsAnOper(sptr))
 	    {
 		pv[0] = parv[0];
 		pv[1] = "#wallops";
@@ -2011,8 +2044,10 @@ char	*parv[];
 		pv[3] = NULL;
 		return m_private(cptr, sptr, 3, pv);
 	    }
+
 	sendto_wallops_butone(IsServer(cptr) ? cptr : NULL, sptr,
-			":%s WALLOPS :%s", parv[0], message);
+		":%s WALLOPS :%s", parv[0], message);
+
 #ifdef	USE_SERVICES
 	check_services_butone(SERVICE_WANT_WALLOP, sptr, ":%s WALLOP :%s",
 				parv[0], message);
@@ -2058,14 +2093,24 @@ char	*parv[];
 		return 0;
 	if ((aconf = find_admin()))
 	    {
-		sendto_one(sptr, rpl_str(RPL_ADMINME),
-			   me.name, parv[0], me.name);
-		sendto_one(sptr, rpl_str(RPL_ADMINLOC1),
-			   me.name, parv[0], aconf->host);
-		sendto_one(sptr, rpl_str(RPL_ADMINLOC2),
-			   me.name, parv[0], aconf->passwd);
-		sendto_one(sptr, rpl_str(RPL_ADMINEMAIL),
-			   me.name, parv[0], aconf->name);
+                if (!IsServer(sptr)) 
+                     {
+                     sendto_flagops(UFLAGS_BMODE,"ADMIN requested by %s [%s@%s]", sptr->name, sptr->user->username, sptr->user->host);
+
+		     sendto_one(sptr, rpl_str(RPL_ADMINME),
+		  	        me.name, parv[0], me.name);
+		     sendto_one(sptr, rpl_str(RPL_ADMINLOC1),
+			        me.name, parv[0], aconf->host);
+	 	     sendto_one(sptr, rpl_str(RPL_ADMINLOC2),
+			        me.name, parv[0], aconf->passwd);
+		     sendto_one(sptr, rpl_str(RPL_ADMINEMAIL),
+			        me.name, parv[0], aconf->name);
+                     }
+		else /* naughty naughty, servers shouldn't do this... */
+                     {
+                     sendto_flagops(1,"Possible hacked server link: Server %s requested ADMIN", sptr->name);
+                     }
+                
 	    }
 	else
 		sendto_one(sptr, err_str(ERR_NOADMININFO),

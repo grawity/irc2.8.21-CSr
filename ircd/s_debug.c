@@ -318,7 +318,7 @@ char	*nick;
 
 	if (getrusage(RUSAGE_SELF, &rus) == -1)
 	    {
-		extern char *sys_errlist[];
+/*		extern char *sys_errlist[]; */		/* JE */
 		sendto_one(cptr,":%s NOTICE %s :Getruseage error: %s.",
 			   me.name, nick, sys_errlist[errno]);
 		return;

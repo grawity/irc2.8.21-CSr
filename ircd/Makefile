@@ -27,7 +27,7 @@ INSTALL=/usr/bin/install
 # IRCDMODE given in top level Makefile, but added here to make sure
 # compilation works if started in ircd subdirectory
 
-IRCDMODE=771
+IRCDMODE=711
 INCLUDEDIR=../include
 
 # CFLAGS/IRCDLIBS used in ../Makefile should also be used here.  The list
@@ -208,12 +208,14 @@ s_misc.o: s_misc.c ../include/struct.h ../include/config.h ../include/dbuf.h \
 
 s_user.o: s_user.c ../include/struct.h ../include/config.h ../include/sys.h \
 	  ../include/common.h ../include/dbuf.h ../include/channel.h \
-	  ../include/msg.h ../include/numeric.h ../include/comstud.h
+	  ../include/msg.h ../include/numeric.h ../include/whowas.h \
+	  ../include/comstud.h
 	$(CC) $(CFLAGS) -c s_user.c
 
 s_serv.o: s_serv.c ../include/struct.h ../include/config.h ../include/sys.h \
 	  ../include/common.h ../include/dbuf.h ../include/channel.h \
-	  ../include/msg.h ../include/numeric.h ../include/comstud.h
+	  ../include/msg.h ../include/numeric.h ../include/whowas.h \
+	../include/comstud.h
 	$(CC) $(CFLAGS) -c s_serv.c
 
 s_numeric.o: s_numeric.c ../include/config.h ../include/sys.h \
@@ -223,7 +225,7 @@ s_numeric.o: s_numeric.c ../include/config.h ../include/sys.h \
 
 whowas.o: ../include/struct.h ../include/config.h ../include/sys.h \
 	  ../include/common.h ../include/dbuf.h ../include/numeric.h \
-	  ../include/comstud.h whowas.c
+	  ../include/whowas.h ../include/comstud.h whowas.c
 	$(CC) $(CFLAGS) -c whowas.c
 
 hash.o: ../include/struct.h ../include/sys.h ../include/hash.h hash.c \
@@ -263,14 +265,14 @@ s_conf.o: ../include/struct.h ../include/config.h ../include/numeric.h
 s_conf.o: ../include/comstud.h ../include/dbuf.h ../include/sys.h s_conf.c
 s_user.o: ../include/comstud.h ../include/struct.h ../include/config.h
 s_user.o: ../include/dbuf.h ../include/sys.h ../include/channel.h
-s_user.o: ../include/msg.h ../include/numeric.h s_user.c
+s_user.o: ../include/msg.h ../include/numeric.h ../include/whowas.h s_user.c
 s_serv.o: ../include/comstud.h ../include/struct.h ../include/config.h
 s_serv.o: ../include/dbuf.h ../include/sys.h ../include/channel.h
-s_serv.o: ../include/msg.h ../include/numeric.h s_serv.c
+s_serv.o: ../include/msg.h ../include/numeric.h ../include/whowas.h s_serv.c
 s_numeric.o: ../include/config.h ../include/sys.h ../include/struct.h
 s_numeric.o: ../include/comstud.h ../include/dbuf.h ../include/numeric.h s_numeric.c
 whowas.o: ../include/comstud.h ../include/struct.h ../include/config.h ../include/dbuf.h
-whowas.o: ../include/comstud.h ../include/numeric.h ../include/sys.h whowas.c
+whowas.o: ../include/comstud.h ../include/numeric.h ../include/whowas.h ../include/sys.h whowas.c
 class.o: ../include/struct.h ../include/class.h ../include/numeric.h
 class.o: ../include/comstud.h ../include/common.h ../include/config.h class.c
 hash.o: ../include/config.h ../include/sys.h ../include/hash.h

@@ -26,6 +26,9 @@ static  char sccsid[] = "@(#)res.c	2.38 4/13/94 (C) 1992 Darren Reed";
 
 extern	int	dn_expand PROTO((char *, char *, char *, char *, int));
 extern	int	dn_skipname PROTO((char *, char *));
+#if defined(__bsdi__) || defined(BSD)			/* +JE */
+#define dn_skipname __dn_skipname
+#endif
 extern	int	res_mkquery PROTO((int, char *, int, int, char *, int,
 				   struct rrec *, char *, int));
 

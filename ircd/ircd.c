@@ -24,7 +24,9 @@ Computing Center and Jarkko Oikarinen";
 #endif
 
 #include <sys/time.h>
+#ifndef __bsdi__
 #include <sys/resource.h>
+#endif
 #include "struct.h"
 #include "common.h"
 #include "sys.h"
@@ -618,7 +620,7 @@ char	*argv[];
 	int	portarg = 0;
 	uid_t	uid, euid;
 	time_t	delay = 0;
-#if !defined(AIX) && !defined(ULTRIX)
+#if !defined(AIX) && !defined(ULTRIX) && !defined (__bsdi__)
         struct rlimit r;
 #endif
 #ifdef DOG3
@@ -630,7 +632,7 @@ char	*argv[];
 #ifdef DBUF_INIT
         dbuf_init(); /* set up some dbuf stuff to control paging */
 #endif
-#if !defined(AIX) && !defined(ULTRIX)
+#if !defined(AIX) && !defined(ULTRIX) && !defined (__bsdi__)
         r.rlim_cur = MAXCONNECTIONS;
         r.rlim_max = MAXCONNECTIONS;
         setrlimit(RLIMIT_NOFILE, &r);

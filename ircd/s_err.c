@@ -40,9 +40,9 @@ static	Numeric	local_replies[] = {
 /* 002 */	RPL_YOURHOST, ":Your host is %s, running version %s",
 /* 003 */	RPL_CREATED, ":This server was created %s",
 #ifdef FK_USERMODES
-/* 004 */	RPL_MYINFO, "%s %s oiwsfcukbdl biklmnopstv",
+/* 004 */	RPL_MYINFO, "%s %s oiwsfcukbdln biklmnopstv",
 #else
-/* 004 */       RPL_MYINFO, "%s %s oiwsucbdl biklmnopstv",
+/* 004 */       RPL_MYINFO, "%s %s oiwsucbdln biklmnopstv",
 #endif
 		0, (char *)NULL
 };

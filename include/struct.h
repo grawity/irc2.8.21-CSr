@@ -90,6 +90,7 @@ typedef struct commandlog
 #define UFLAGS_UMODE 6
 #define UFLAGS_DMODE 7
 #define UFLAGS_LMODE 8
+#define UFLAGS_NMODE 9
 /* */
 
 
@@ -218,9 +219,11 @@ typedef struct commandlog
 #define FLAGS_BMODE	0x1000000 /* +b usermode */
 #define FLAGS_DMODE	0x2000000 /* +d usermode */
 #define FLAGS_LMODE	0x4000000 /* +l usermode */
+#define FLAGS_NMODE	0x8000000 /* +n usermode */
 
 #define	SEND_UMODES	(FLAGS_INVISIBLE|FLAGS_OPER|FLAGS_WALLOP)
-#define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_LMODE|FLAGS_DMODE|FLAGS_BMODE)
+#define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_LMODE|FLAGS_DMODE|FLAGS_BMODE|FLAGS_NMODE)
+#define	FLAGS_ID	(FLAGS_DOID|FLAGS_GOTID)
 
 /*
  * flags macros.
@@ -236,6 +239,7 @@ typedef struct commandlog
 #define IsLMode(x)		((x)->flags & FLAGS_LMODE)
 #define IsBMode(x)		((x)->flags & FLAGS_BMODE)
 #define IsDMode(x)		((x)->flags & FLAGS_DMODE)
+#define IsNMode(x)		((x)->flags & FLAGS_NMODE)
 #define	IsPerson(x)		((x)->user && IsClient(x))
 #define	IsPrivileged(x)		(IsAnOper(x) || IsServer(x))
 #define	SendWallops(x)		((x)->flags & FLAGS_WALLOP)

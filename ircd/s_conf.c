@@ -730,7 +730,7 @@ char *set_conf_flags(aconf, tmp)
 aConfItem *aconf;
 char *tmp;
 {
-	while(strchr("!-+#", *tmp))
+	while(strchr("!-+$", *tmp))		/* JE */
 	{
 		switch(*tmp)
 		{
@@ -1382,10 +1382,13 @@ matched:
 		sendto_one(cptr, reply,
 			   me.name, ERR_YOUREBANNEDCREEP, cptr->name);
 	else if (tmp)
+		{
+                sendto_one(cptr, ":%s NOTICE %s :%s@%s has been banned from this server.", me.name, cptr->name, tmp->name, tmp->host);
 		sendto_one(cptr, err_str(ERR_YOUREBANNEDCREEP),
 			me.name, cptr->name,
 			(BadPtr(tmp->passwd) || !is_comment(tmp->passwd)) ?
 			"<No reason>" : tmp->passwd);
+		}
 
 /* Oh, what the fuck...let's put the user@host limit check right here.
    I'm not sure that I actually like this patch since you have to loop

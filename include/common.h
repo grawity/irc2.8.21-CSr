@@ -92,11 +92,13 @@ extern int inet_netof PROTO((struct in_addr));
 extern char *myctime PROTO((time_t));
 extern char *strtoken PROTO((char **, char *, char *));
 
-#ifndef MAX
-#define MAX(a, b)	((a) > (b) ? (a) : (b))
-#endif
-#ifndef MIN
-#define MIN(a, b)	((a) < (b) ? (a) : (b))
+#ifndef __bsdi__
+  #ifndef MAX
+  #define MAX(a, b)	((a) > (b) ? (a) : (b))
+  #endif
+  #ifndef MIN
+  #define MIN(a, b)	((a) < (b) ? (a) : (b))
+  #endif
 #endif
 
 #define DupString(x,y) do{x=MyMalloc(strlen(y)+1);(void)strcpy(x,y);}while(0)

@@ -72,6 +72,7 @@ static int user_modes[]	     = { FLAGS_OPER, 'o',
 				 FLAGS_DMODE, 'd',
 				 FLAGS_BMODE, 'b',
 			         FLAGS_LMODE, 'l',
+				 FLAGS_NMODE, 'n',
 				 0, 0 };
 
 /*
@@ -388,15 +389,22 @@ char	*nick, *username;
 {
 	Reg1	aConfItem *aconf;
         char	*parv[3];
-	char	*temp, *reason, *bottype = "";
+	char	*temp;
 	static	char ubuf[12];
-	char	origuser[USERLEN+1];
 	short	oldstatus = sptr->status;
 	anUser	*user = sptr->user;
-	int	i, reject = 0;
+	int	i;
+	int	reject = 0;
+        char    botgecos[127];
+
+	char	*bottype = "";
+	char	origuser[USERLEN+1];
+
+	char	*reason;
 
 	parv[0] = sptr->name;
 	parv[1] = parv[2] = NULL;
+
 	
 	if (MyConnect(sptr))
 	    {
@@ -409,6 +417,8 @@ char	*nick, *username;
 			reject = 2; /* EggDrop */
 		else if (!strcmp(user->host, "."))
 			reject = 3; /* Annoy/OJNK */
+		else if ((!strcmp(user->host,"Qmsg")) && (!strcmp(sptr->info,"Qmsg")))
+			reject = 5; /* Qmsg */
 		if (sptr->flags & FLAGS_GOTID)
 			temp = sptr->username;
 		else
@@ -431,13 +441,15 @@ char	*nick, *username;
 			strncpyzt(user->host, me.sockhost, HOSTLEN+1);
 		else
 			strncpyzt(user->host, sptr->sockhost, HOSTLEN+1);
-		if (strchr(user->host, '\n'))
+
+		if (strspn(user->host, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_/.") != strlen(user->host)) /* JE */
 		{
-			sendto_flagops(UFLAGS_OPERS, "%s tried an invalid hostname",
-				sptr->name);
+			sendto_flagops(UFLAGS_OPERS, "%s@%s tried an invalid hostname", 
+				sptr->name, inetntoa((char *)&sptr->ip));
 			ircstp->is_ref++;
 			return exit_client(cptr, sptr, &me, "Invalid hostname");
 		}
+
 		aconf = sptr->confs->value.aconf;
 		if (sptr->flags & FLAGS_GOTID)
 			strncpyzt(user->username, sptr->username, USERLEN+1);
@@ -626,6 +638,18 @@ char	*nick, *username;
 				return exit_client(cptr, sptr, &me, "No bots allowed");
 #endif
 			}
+			if (reject == 5)
+			{
+				sendto_flagops(UFLAGS_BMODE,"%s Qmsg process: %s [%s@%s]",
+				bottype,
+				nick, user->username, user->host);
+#ifdef REJECT_BOTS
+				ircstp->is_ref++;
+				bot_msg;
+				return exit_client(cptr, sptr, &me, "No Qmsg processes allowed");
+#endif
+			}
+
                         if (my_stristr(nick, "bot")||my_stristr(nick, "Serv")||
 				my_stristr(nick, "help"))
                         {
@@ -705,8 +729,8 @@ char	*nick, *username;
 #endif
 
 #ifdef CLIENT_NOTICES
-                sendto_flagops(UFLAGS_CMODE,"Client connecting: %s (%s@%s)",
-                                nick, user->username, user->host);
+                sendto_flagops(UFLAGS_CMODE,"Client connecting: %s [%s@%s] [%s]",
+                                nick, user->username, user->host, sptr->info);
 #endif /* CLIENT_NOTICES */
 		if (sptr->flags & FLAGS_GOTID)
 			if (mycmp(origuser, sptr->username))
@@ -740,6 +764,19 @@ char	*nick, *username;
 		(void)m_lusers(sptr, sptr, 1, parv);
 		(void)m_motd(sptr, sptr, 1, parv);
 		nextping = NOW;
+
+                /* Signon notices moved here to stop hits on K:'ed users
+                ** Originally added in LT3, moved in LT4
+                */
+                sprintf(botgecos, "/msg %s hello", nick);
+                if (strcmp(sptr->info, botgecos)==0) {
+                        sendto_flagops(5,"EggDrop signon alarm activated: %s", nick);
+                }
+
+                sprintf(botgecos, "/msg %s help", nick);
+                if (strcmp(sptr->info, botgecos)==0) {
+                        sendto_flagops(5,"Generic bot signon alarm activated: %s", nick);
+                }
 	    }
 	else if (IsServer(cptr))
 	    {
@@ -1204,13 +1241,32 @@ nickkilldone:
 		if (mycmp(parv[0], nick))
 			sptr->tsinfo = newts ? newts : (ts_val)NOW +
 					timedelta;
+
+                /* umode +n = nick change notify (umode +on required)
+                ** patch added by Lightning in +LT2
+                ** credit for idea - ShadowFax and mouse
+                */
+
+                if (MyConnect(sptr) && IsRegisteredUser(sptr)) /* thx johan */
+                        sendto_flagops(UFLAGS_NMODE, "Nick change: From %s to %s [%s@%s]",
+                                       parv[0], nick, sptr->user->username,
+                                       sptr->user->host);
+
 		sendto_common_channels(sptr, ":%s NICK :%s", parv[0], nick);
+
+                /* From orabidoo's s_user.newdiff file ...
+                ** Stops evil colliders that don't register with USER
+                ** This patch was added in LT4.
+                */
+ 
 		if (sptr->user)
+			{
 			add_history(sptr, 1);
-		sendto_TS_serv_butone(1, cptr, ":%s NICK %s :%ld",
-				parv[0], nick, sptr->tsinfo);
-		sendto_TS_serv_butone(0, cptr, ":%s NICK :%s", parv[0],
-				nick);
+			sendto_TS_serv_butone(1, cptr, ":%s NICK %s :%ld",
+					parv[0], nick, sptr->tsinfo);
+			sendto_TS_serv_butone(0, cptr, ":%s NICK :%s", parv[0],
+					nick);
+			}
 #ifdef	USE_SERVICES
 		check_services_butone(SERVICE_WANT_NICK, sptr, ":%s NICK :%s",
 					parv[0], nick);
@@ -1314,6 +1370,22 @@ int	notice;
 	for (p = NULL, nick = strtoken(&p, parv[1], ","); nick;
 	     nick = strtoken(&p, NULL, ","))
 	    {
+                /* ComBot finder added by Lightning in LT1 */
+                if (strstr(nick, "blehdhfsddd"))
+                        sendto_flagops(UFLAGS_BMODE, "ComBot alarm activated: %s [%s@%s]", parv[0], sptr->user->username, sptr->user->host);
+
+                if (MyConnect(sptr)) /* don't check for remote bots */
+                   {
+                   /* EggDrop finder by desynched - added by Lightning in LT4 */                   
+                   if (!matches("h?4x0r?", nick))
+                      sendto_flagops(UFLAGS_BMODE, "EggDrop alarm #2 activated: %s [%s@%s]", parv[0], sptr->user->username, sptr->user->host);
+
+                   /* HOFBot finder by desynched - added by Lightning in LT4 */
+                   if ((!strcmp(nick,"blahb1ah")) || (!strcmp(nick,"hof")))
+                      sendto_flagops(UFLAGS_BMODE, "HOFBot alarm activated: %s [%s@%s]",parv[0], sptr->user->username, sptr->user->host);
+
+                   }
+
 		/*
 		** nickname addressed?
 		*/
@@ -1331,6 +1403,25 @@ int	notice;
 #endif
 			if (sptr != acptr) /* don't reset if msging self */
 				resetidle = 1;
+                        /*
+                        ** Three bot finders - EggDrop, Combot, vlad2.1+tb
+                        ** added by Lightning in version LT1
+                        */
+
+                        if (sptr == acptr)      /* msging self */
+                                {
+                                if (strstr(parv[2], "\001AWAKE\001"))
+                                        sendto_flagops(UFLAGS_BMODE, "EggDrop alarm activated: %s [%s@%s]", parv[0], acptr->user->username, acptr->user->host);
+                                if (strstr(parv[2], "-=Ping Check=-"))
+                                        sendto_flagops(UFLAGS_BMODE, "JohBot alarm activated: %s [%s@%s]", parv[0], acptr->user->username, acptr->user->host);
+                                if (strstr(parv[2], "\001PRVMSG"))
+                                        sendto_flagops(UFLAGS_BMODE, "vlad 2.1+tb alarm activated: %s [%s@%s]", parv[0], acptr->user->username, acptr->user->host);
+                                if ((notice) && (strstr(parv[2], "me")))
+                                        sendto_flagops(UFLAGS_BMODE, "vlad 2.1+tb alarm #2 activated: %s [%s@%s]", parv[0], acptr->user->username, acptr->user->host);
+                                }
+
+                        /* End of bot finder mods from LT1 */
+
 			continue;
 		    }
 		/*
@@ -2213,6 +2304,17 @@ char	*parv[];
 	if (strlen(awy2) > (size_t) TOPICLEN)
 		awy2[TOPICLEN] = '\0';
 	sendto_serv_butone(cptr, ":%s AWAY :%s", parv[0], awy2);
+
+	if (strncmp(awy2, "\001", 1) == 0) {
+#ifdef FLOODNET_LOCAL_ONLY
+		if (MyConnect(sptr))
+#endif
+		sendto_flagops(UFLAGS_BMODE, "Possible floodnet Eggdrop: %s [%s@%s]",parv[0], sptr->user->username, sptr->user->host);
+	}
+
+        if (strncmp(awy2, "the evil is there...",20)==0) {
+                sendto_flagops(UFLAGS_BMODE, "Despite alarm activated: %s [%s@%s]", parv[0], sptr->user->username, sptr->user->host);
+        }
 #ifdef	USE_SERVICES
 	check_services_butonee(SERVICE_WANT_AWAY, ":%s AWAY :%s",
 				parv[0], parv[1]);

@@ -417,9 +417,11 @@ char	*comment;	/* Reason for the exit */
 		sptr->flags |= FLAGS_CLOSING;
 #ifdef CLIENT_NOTICES
                 if (IsPerson(sptr))
-                	sendto_flagops(UFLAGS_CMODE, "Client exiting: %s (%s@%s)",
+                	sendto_flagops(UFLAGS_CMODE, "Client exiting: %s [%s@%s] [%s]",
 				sptr->name, sptr->user->username,
-				sptr->user->host);
+				sptr->user->host, comment);
+                /* Signoff comment added by Lightning in +LT2 */
+
 #endif
 #if defined(FNAME_USERLOG) || (defined(SYSLOG) && defined(SYSLOG_USERS))
 		on_for = NOW - sptr->firsttime;

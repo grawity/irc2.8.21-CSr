@@ -1,0 +1,215 @@
+New in LT6:
+
+This ircd is based on comstud's CSr29, and as such has many new things
+worth using.  Be sure to check out the README.CS for his additions.
+
+1. Stealth Eggdrop finder ripped.  It had an annoying way of going off on
+   humans constantly, and we (nol opers) never found a single Stealth Egg
+   with it.
+
+2. New finder added to detect floodnet bots running certain lame TCL 
+   scripts.  If you want this to find these suckers all over the net,
+   tweak the #define in the comstud.h down at the bottom.
+
+3. Local opers can now do /stats l and /stats k when the #defines restricting
+   them to oper-only are set.  
+
+4. The /stats l restriction (opers only) is still available.  Note that
+   comstud has changed it a bit to not include ports (so as to thwart
+   so-called snukes).  I still believe that letting /lusers access that
+   quantity of data is unacceptable. Spoofclones have been known to
+   assault servers and sometimes even fill their sendQ, causing them to
+   dump their links.  My solution is just to not let anyone get that much
+   data from my server.
+
+5. STATS_K_OPER_ONLY is gone, since I believe comstud's RESTRICT_STATSK is
+   an acceptable solution.  His mod shows nonoper people k-lines matching
+   their u@h only.  The entire list is not sent unless you are an oper.
+
+6. +th style WALLOPS added.  Opers may now use /WALLOPS to transmit messages
+   to everyone that's +w without those messages about toplevel domains 
+   and #wallops.  Be aware that servers out there that don't support this
+   will break the chain so to speak, and your message won't cross it.
+  
+   Please use this responsibly.  I've seen how this has been used so far
+   on the net, and I'm not quite sure I want it anymore.  Don't ruin it 
+   for everyone.
+
+7. ADMIN and INFO requests are now brought to the attention of opers.
+   Also added some sanity checking to those as far as what is allowed to
+   request that kind of info.
+
+8. CHANTS #channel will return a channel's TS in the same format that
+   the TS debugging feature uses.  If your channel TS is 0, it's important
+   to know since you aren't being protected.
+
+   Feeding the number returned to ircII's stime() is a nice way to get
+   something meaningful back.  Saying "disabled" when the TS is 0 is also
+   a good idea.
+
+9. A small patch related to # and $ being broken in conf lines has already
+   been applied to the s_conf.c.  This will inevitably be patched in the
+   next CSr release, but we have it now.  You can thank johan for this one.
+
+10. Bot alarms tweaked somewhat to find more things and hopefully reduce
+    some instances of false alarms.
+
+11. Lots of other things from johan:
+
+    - IP mismatch messages are now in a meaningful format in the oper notice
+    - IP mismatches will also notice the offending user with helpful info
+    - Minor tweaks to the #ifdefs to make FreeBSD compiles happier
+    - Virtual host identd patch
+    - Identd single character fix
+    - Bad characters in hostname handling (dns spoofs, ahem)
+
+Notes for BSD/OS compiles:
+
+I've personally compiled it on BSD/OS 2.1 and 3.0 using the tweaks below...
+
+- In include/config.h:
+  - lose the SOL20
+  - lose the USE_POLL
+  - fix MAXCONNECTIONS
+
+- In include/setup.h
+  - BSD_RELIABLE_SIGNALS, not SYSV_UNRELIABLE_SIGNALS
+  - lose NEED_STRTOK
+  - lose NEED_INET_NETOF
+
+- Makefile: IRCDLIBS=-L/usr/lib -lresolv
+
+Notes on Linux installs:
+
+This works for me on my 2.1.x development machine, and others have 
+reported success with these as well.  If you encounter a lot of bizarre
+const errors during your compile, your ircd may not perform as expected
+when linked to a network.
+
+- include/setup.h:
+  - lose NEED_STRTOK
+  - lose bcmp
+  - lose NEED_INET_NETOF
+
+- include/config.h:
+  - lose USE_POLL
+  - lose SOL20
+
+- Makefile: IRCDLIBS=-L/usr/lib
+
+New in LT5:
+
+First of all, this is now based on CSr25.  All of the previous patches have
+been grafted onto a fresh source tree, except where comstud has already
+implemented them in some form.  There are many new things that have been
+acquired in these CSr releases, so be sure to check out README.CS too.
+
+1. Added the ircname ("gecos") information to the "Client connecting:" line.
+
+New in LT4:
+
+Note: comstud.h has picked up some new #defines.  Please examine them
+to suit your tastes after checking out their explanations below.
+
+1. For those of you keeping track, the following diffs/patches from 
+   orabidoo's page are included (some from CSr20, some added in LTx)
+
+ - channel.diff - fixes "spurious server deops with multiple splits"
+ 
+ - s_user.diff - fixes a "race condition in NICK handling"
+
+ - channel.newdiff - fixes a "desynch when all ops get nick killed"
+
+ - s_user.newdiff - fixes "lurking nick" problems:
+
+   orabidoo's "lurking NICK" patch has been installed in s_user.c.
+   In short, it keeps (ab)users that haven't registered with USER from
+   doing evil things like nick colliding.  Without this patch, you
+   could even collide from TS servers.  Even if you don't install LT4,
+   PLEASE get this patch and install it on whatever you DO run.
+
+ - channel.diff-keybug - this is the infamous +k fix.
+
+2. Unregistered clients can't do NAMES any more.  This keeps naughty people
+   from loading the server if they are banned or whatnot.
+
+3. 3 bot finders from desynched: Another eggdrop finder, a HOFBot
+   finder, and a Stealth Eggdrop finder.  Thanks for the contribution!
+
+4. The 2 signon bot finders introduced in LT3 had an annoying way of 
+   going off even when a user was K: lined.  These checks are now
+   performed after the user has passed all the other criteria for signon,
+   so it will only hit on clients that are connected.
+
+5. Following some evil attacks on various irc servers, I have decided to
+   make STATS L an operator-only function.  Hopefully this will help things
+   a bit.  This is controllable via #define in the .h files.
+
+6. match.c modded slightly to fix some hostmasking problems.  :)
+
+7. Usermode +r bot notices are now oper-only by default.  This is also
+   controllable with a #define.
+
+8. After being on the receiving end of spoofed stats flooders recently,
+   I have decided to make STATS K operator-only, with a #define option
+   just like STATS L above.  To keep the users clued in on why they are
+   banned from a server, it will now send them a notice before the
+   standard message.
+
+   -server.name- user@host has been banned from this server.
+   *** You are banned from this server:  reason
+
+New in LT3:
+
+1. Even more bot finders.  They are scattered throughout, as bots do
+   many different things.
+
+   Credit to vidiot for one of them.
+
+2. Mere mortals can now see "(oper) added K-Line for ...".  Previously, it
+   was sent to opers only.
+
+3. Extra notices added to help find people running link looker programs.
+
+I'd also like to thank johan for helping me out with some annoying problems
+during development of LT3.
+
+New in LT2:
+
+1. usermode +n.  This modification allows you, as oper, to see the nick
+   changes that occur on your server only.  Nick changes arriving from
+   any other servers will be ignored.  This, like usermode +c, may end
+   up flooding your screen, so keep that in mind.  The intended use of
+   this patch is to find nick flooders, so u@h is given to track changes.
+
+   A suggestion to people running the TexasNet connection monitor bot is
+   to code it to use this data, so the nick lists it gives are always
+   fresh.
+
+   Credit for this patch belongs to mouse and ShadowFax, both opers
+   from irc.mo.net.  (Hi Dianora!)
+
+2. In the neverending quest to find and destroy bots, we now have a new
+   tool.  Usermode +c (connections) will now include details of QUIT
+   messages when a local client signs off.  Many bots give details about
+   changing servers and what not when they QUIT, and this will provide
+   another way to find them.  
+
+3. The +k patch has been implemented in channel.c to save everyone the 
+   trouble.
+
+New in LT1:
+
+1. Four new bot finders, based on idle killers.  
+   ComBots, JohBots, EggDrops, and vlad 2.1+tb type bots found.
+
+2. Users terminated for Excess Flood now generate a notice to all +s users.
+   This can help locate abusers or clients having difficulty on irc.
+
+---
+
+These patches are just the beginning of what I hope will be a new ircd
+distribution people look forward to.  If you like what you've seen,
+have comments, suggestions, or whatever, fire up your favorite mailer
+and shoot some to me at rkroll@harrison.k12.co.us.  
+

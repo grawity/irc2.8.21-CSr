@@ -82,6 +82,7 @@
 #ifdef	TSDEBUG
 #define	MSG_TS	     "TS"	/* TS */
 #endif
+#define MSG_CHANTS   "CHANTS"   /* CHANTS */
 #define	MSG_DIE	     "DIE"
 #define	MSG_HASH     "HSAH"	/* HASH */
 #define	MSG_DNS      "DNS"	/* DNS  -> DNSS */
@@ -128,6 +129,7 @@ extern int m_service(), m_servset(), m_servlist(), m_squery();
 #ifdef TSDEBUG
 extern int m_ts();
 #endif
+extern int m_chants();
 #ifdef SEPARATE_QUOTE_KLINES_BY_DATE 
 extern  int	m_addklines();
 #endif
@@ -194,6 +196,7 @@ struct Message msgtab[] = {
 #ifdef TSDEBUG
   { MSG_TS,      m_ts,       0, MAXPARA, 1, 0L },
 #endif
+  { MSG_CHANTS,  m_chants,   0, MAXPARA, 1, 0L },
 #ifdef DOG3
   { MSG_DOG3LOAD,    m_dog3load,     0, MAXPARA, 1 ,0L },
   { MSG_DOG3FREQ,    m_dog3freq,     0, MAXPARA, 1 ,0L },

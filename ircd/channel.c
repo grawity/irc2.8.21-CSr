@@ -1856,6 +1856,46 @@ int	count_channels()
 }
 
 /*
+** m_chants
+**	parv[0] = sender prefix
+**	parv[1] = channel to check TS
+*/
+int	m_chants(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int	parc;
+char	*parv[];
+    {
+	aChannel *chptr = NullChn;
+	char	*topic = NULL, *name, *p = NULL;
+	
+	if (check_registered(sptr))
+		return 0;
+
+	if (parc < 2)
+	    {
+		sendto_one(sptr, err_str(ERR_NEEDMOREPARAMS),
+			   me.name, parv[0], "CHANTS");
+		return 0;
+	    }
+
+	if (*parv[1] == '#' || *parv[1] == '&') {
+		chptr = get_channel(sptr, parv[1], 0);
+		if (!chptr) {
+			sendto_one(sptr, err_str(ERR_NOSUCHCHANNEL),
+				   me.name, parv[0], parv[1]);
+			return 0;
+		}
+
+		sendto_one(sptr, ":%s 999 %s: Channel - %s : %ld",
+			   me.name, sptr->name, chptr->chname,
+			   chptr->channelts);
+
+	}
+
+	return 0;
+}
+
+/*
 ** m_topic
 **	parv[0] = sender prefix
 **	parv[1] = topic text
@@ -2117,6 +2157,9 @@ char	*parv[];
 	if (parc > 1 &&
 	    hunt_server(cptr, sptr, ":%s NAMES %s %s", 2, parc, parv))
 		return 0;
+
+        if (check_registered_user(sptr))
+                return 0;                       /* LT4 */
 
 	mlen = strlen(me.name) + NICKLEN + 7;
 

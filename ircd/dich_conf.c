@@ -40,8 +40,8 @@
  */
 
 #include <string.h>
-#include "common.h"
 #include "struct.h"
+#include "common.h"
 
 #undef STDLIBH
 #include "sys.h"
