@@ -53,6 +53,7 @@ typedef	struct	SLink	Link;
 typedef	struct	SMode	Mode;
 typedef	long	ts_val;
 
+typedef struct	IdleItem anIdle;
 typedef struct  CloneItem aClone;
 
 #ifndef VMSP
@@ -240,6 +241,14 @@ typedef struct  CloneItem aClone;
 #define	CURSES_TERM	1
 #define	TERMCAP_TERM	2
 
+struct	IdleItem	{
+	char	username[USERLEN+1];
+	char	hostname[HOSTLEN+1];
+	long	last;
+	struct IdleItem *prev;
+	struct IdleItem *next;
+};
+
 struct  CloneItem       {
         char    hostname[HOSTLEN+1];
         int     num;
@@ -370,6 +379,10 @@ struct Client	{
 	long lastrecvM;		/* to check for activity --Mika */
 	int priority;
 #endif 
+#ifdef NO_NICK_FLOODS
+	long	lastnick;
+	int	numnicks;
+#endif
 	long	receiveK;	/* Statistics: total k-bytes received */
 	u_short	sendB;		/* counters to count upto 1-k lots of bytes */
 	u_short	receiveB;	/* sent and received. */

@@ -50,6 +50,10 @@ static char buf[BUFSIZE], buf2[BUFSIZE];
                 extern char clonekillhost[100];
 #endif
 
+#ifdef IDLE_CHECK
+		anIdle *blahidle;
+#endif
+
 static int user_modes[]	     = { FLAGS_OPER, 'o',
 				 FLAGS_LOCOP, 'O',
 				 FLAGS_INVISIBLE, 'i',
@@ -384,6 +388,7 @@ char	*nick, *username;
 	anUser	*user = sptr->user;
 	int	i;
 	int	reject = 0;
+	char	*bottype = "";
 
 	parv[0] = sptr->name;
 	parv[1] = parv[2] = NULL;
@@ -391,11 +396,12 @@ char	*nick, *username;
 	
 	if (MyConnect(sptr))
 	    {
-		if (!strcmp(user->host, "null"))
+		if (strstr(sptr->info, "^GuArDiAn^"))
+			reject = 4; /* Reject Guardian Bots */
+		else if (!strcmp(user->host, "null"))
 			reject = 1; /* Vlad/Com/Joh */
 		else if (!strcmp(user->host, "1"))
 			reject = 2; /* EggDrop */
-/*
 		else if (!strcmp(user->host, "."))
 			reject = 3; /* Annoy/OJNK */
 		if (sptr->flags & FLAGS_GOTID)
@@ -472,6 +478,56 @@ char	*nick, *username;
 		if (oldstatus == STAT_MASTER && MyConnect(sptr))
 			(void)m_oper(&me, sptr, 1, parv);
 
+#if defined(NO_MIXED_CASE) || defined(NO_SPECIAL)
+{
+                register char *tmpstr, c;
+                register int lower, upper, special;
+                char *Myptr, *Myptr2;
+
+                lower = upper = special = 0;
+#ifdef IGNORE_FIRST_CHAR
+                tmpstr = (username[0] == '~' ? &username[2] : &username[1]);
+#else
+                tmpstr = (username[0] == '~' ? &username[1] : username);
+#endif
+                while(*tmpstr)
+                  {
+                    c = *(tmpstr++);
+                    if (islower(c))
+                      lower++;
+                    if (isupper(c))
+                      upper++;
+                    if (!isalnum(c) && !strchr("-_.", c))
+                      special++;
+                  }
+#endif /* NO_MIXED_CASE || NO_SPECIAL */
+#ifdef NO_MIXED_CASE
+                if (lower && upper)
+                  {
+                    sendto_flagops(5, "Invalid username: %s [%s@%s]",
+                               nick, username, user->host);
+                    ircstp->is_ref++;
+                    return exit_client(cptr, sptr, &me, "Invalid username");
+                  }
+#endif /* NO_MIXED_CASE */
+#ifdef NO_SPECIAL
+                if (special)
+                  {
+                    sendto_flagops(5,"Invalid username: %s [%s@%s]",
+                               nick, user->username, user->host);
+                    ircstp->is_ref++;
+                    return exit_client(cptr, sptr, &me, "Invalid username");
+                  }
+#endif /* NO_SPECIAL */
+#if defined(NO_MIXED_CASE) || defined(NO_SPECIAL)
+}
+#endif
+
+#ifdef REJECT_BOTS
+	bottype = "Rejecting";
+#elif defined(BOTS_NOTICE)
+	bottype = "Possible";
+#endif
 #ifdef B_LINES
 		if (!find_bline(cptr))
 		{
@@ -479,45 +535,73 @@ char	*nick, *username;
 #if defined(BOTS_NOTICE) || defined(REJECT_BOTS)
 			if (reject == 1)
 			{
-                                ircstp->is_ref++;
-#ifdef BOTS_NOTICE
-                                sendto_flagops(5,"Possible vlad/joh/com bot: %s [%s@%s]",
-                                        nick, user->username, user->host);
-#endif
+                                sendto_flagops(5,"%s vlad/joh/com bot: %s [%s@%s]",
+					bottype, nick, user->username,
+                                        user->host);
 #ifdef REJECT_BOTS
+				ircstp->is_ref++;
                                 return exit_client(cptr, sptr, &me, "No bots allowed");
 #endif
 			} 
 			if ((reject == 2) || strstr(nick, "LameHelp"))
 			{
-                                ircstp->is_ref++;
-#ifdef BOTS_NOTICE
-                                sendto_flagops(5,"Possible eggdrop bot: %s [%s@%s]",
+                                sendto_flagops(5,"%s eggdrop bot: %s [%s@%s]",
+					bottype,
                                         nick, user->username, user->host);
-#endif
 #ifdef REJECT_BOTS
+				ircstp->is_ref++;
                                 return exit_client(cptr, sptr, &me, "No bots allowed");
 #endif
 			}
 			if (reject == 3)
 			{
-				ircstp->is_ref++;
-#ifdef BOTS_NOTICE
-				sendto_flagops(5,"Possible ojnk/annoy bot: %s [%s@%s]",
+				sendto_flagops(5,"%s ojnk/annoy bot: %s [%s@%s]",
+					bottype,
 					nick, user->username, user->host);
-#endif
 #ifdef REJECT_BOTS
+				ircstp->is_ref++;
+				return exit_client(cptr, sptr, &me, "No bots allowed");
+#endif
+			}
+			if (reject == 4)
+			{
+				sendto_flagops(5,"%s Guardian bot: %s [%s@%s]",
+				bottype,
+				nick, user->username, user->host);
+#ifdef REJECT_BOTS
+				ircstp->is_ref++;
 				return exit_client(cptr, sptr, &me, "No bots allowed");
 #endif
 			}
                         if (!matches("*bot*", nick)||!matches("*Serv*", nick)||
                                 !matches("*help*", nick))
                         {
-                                ircstp->is_ref++;
-                                sendto_flagops(5,"Possible bot: %s [%s@%s]",
+                                sendto_flagops(5,"%s bot: %s [%s@%s]",
+					bottype,
                                         nick, user->username, user->host);
+#ifdef REJECT_BOTS
+				ircstp->is_ref++;
+				return exit_client(cptr, sptr, &me, "No bots allowed");
+#endif
                         }
 #endif /* REJECT_BOTS || BOTS_NOTICE */
+
+#ifdef IDLE_CHECK
+		if ((blahidle=find_idle(cptr)) != NULL)
+		{
+			if (NOW <= (blahidle->last+60))
+			{
+				blahidle->last += 60; /* Add 60 seconds */
+				sendto_flagops(1,"Rejecting idle exceeder %s [%s@%s]",
+					nick, user->username, user->host);
+				ircstp->is_ref++;
+				return exit_client(cptr, sptr, &me, "No bots allowed");
+			}
+			else
+				remove_idle(blahidle);
+		}
+#endif
+
 #ifdef CLONE_CHECK
                 update_clones();
                 if ((clone = find_clone(user->host)) == NULL)
@@ -562,59 +646,7 @@ char	*nick, *username;
 #ifdef B_LINES
 		} /* end of check for ip# */
 #endif
-#if defined(NO_MIXED_CASE) || defined(NO_SPECIAL)
-{
-                register char *tmpstr, c;
-                register int lower, upper, special;
-                char *Myptr, *Myptr2;
 
-                lower = upper = special = 0;
-#ifdef IGNORE_FIRST_CHAR
-		tmpstr = (username[0] == '~' ? &username[2] : &username[1]);
-#else
-                tmpstr = (username[0] == '~' ? &username[1] : username);
-#endif
-                while(*tmpstr)
-                  {
-                    c = *(tmpstr++);
-                    if (islower(c))
-                      lower++;
-                    if (isupper(c))
-                      upper++;
-                    if (!isalnum(c) && !strchr("-_.", c))
-                      special++;
-                  }
-#endif /* NO_MIXED_CASE || NO_SPECIAL */
-#ifdef NO_MIXED_CASE
-                if (lower && upper)
-                  {
-                    sendto_flagops(5, "Invalid username: %s [%s@%s]",
-                               nick, username, user->host);
-                    ircstp->is_ref++;
-                    return exit_client(cptr, sptr, &me, "Invalid username");
-                  }
-#endif /* NO_MIXED_CASE */
-#ifdef NO_SPECIAL
-                if (special)
-                  {
-                    sendto_flagops(5,"Invalid username: %s [%s@%s]",
-                               nick, user->username, user->host);
-                    ircstp->is_ref++;
-                    return exit_client(cptr, sptr, &me, "Invalid username");
-                  }
-#endif /* NO_SPECIAL */
-#if defined(NO_MIXED_CASE) || defined(NO_SPECIAL)
-}
-#endif
-#ifdef REJECT_IPHONE
-                if (!matches("* vc:*", sptr->info))
-                {
-                        ircstp->is_ref++;
-                        sendto_flagops(5, "Rejecting IPhone user: [%s!%s@%s]",
-                                nick, user->username, user->host);
-                        return exit_client(cptr, sptr, &me, "No IPhone users");
-                }
-#endif /* REJECT_IPHONE */
 #ifdef CLIENT_NOTICES
                 sendto_flagops(2,"Client connecting: %s [%s@%s]",
                                 nick, user->username, user->host);
@@ -714,6 +746,7 @@ char	*parv[];
 	char	nick[NICKLEN+2], *s;
 	ts_val	newts = 0;
 	int	doests, sameuser = 0;
+	int	fromts;
 
 	if (parc < 2)
 	    {
@@ -727,10 +760,29 @@ char	*parv[];
 		newts = atol(parv[3]);
 	    	
 	doests = (IsServer(cptr) && DoesTS(cptr));
+	fromts = (parc > 6);
 
 	if (MyConnect(sptr) && (s = (char *)index(parv[1], '~')))
 		*s = '\0';
 	strncpyzt(nick, parv[1], NICKLEN+1);
+
+#ifdef NO_NICK_FLOODS
+	if (MyClient(sptr) && IsRegistered(sptr))
+	{
+		if (!sptr->lastnick || (NOW-sptr->lastnick > 60))
+			sptr->numnicks = 0;
+		sptr->lastnick = NOW;
+		sptr->numnicks++;
+		if (sptr->numnicks > 3)
+		{
+			sendto_flagops(1,"Nick flooding detected by: %s [%s@%s]",
+				sptr->name, sptr->user->username, sptr->user->host);
+			sendto_one(sptr, err_str(ERR_TOOMANYNICKS),
+                                   me.name, sptr->name);
+			return 0;
+		}
+	}
+#endif
 	/*
 	 * if do_nick_name() returns a null name OR if the server sent a nick
 	 * name and do_nick_name() changed it in some way (due to rules of nick
@@ -886,9 +938,12 @@ char	*parv[];
 	** A new NICK being introduced by a neighbouring
 	** server (e.g. message type "NICK new" received)
 	*/
-		sameuser = (parc > 6) && 
+		if (acptr->user)
+			sameuser = fromts && 
 			    mycmp(acptr->user->username, parv[5]) == 0 &&
 			    mycmp(acptr->user->host, parv[6]) == 0;
+		else
+			newts = 0;
 		if (!doests || !newts || !acptr->tsinfo
 		    || (newts == acptr->tsinfo))
 		    {
@@ -944,8 +999,11 @@ char	*parv[];
 	** must be killed from the incoming connection, and "old" must
 	** be purged from all outgoing connections.
 	*/
-	sameuser = mycmp(acptr->user->username, sptr->user->username) == 0 &&
+	if (acptr->user)
+		sameuser = mycmp(acptr->user->username, sptr->user->username) == 0 &&
 		   mycmp(acptr->user->host, acptr->user->host) == 0;
+	else
+		newts = 0;
 	if (!doests || !newts || !acptr->tsinfo || (newts == acptr->tsinfo))
 	    {
 	sendto_flagops(4,"Nick change collision from %s to %s(%s <- %s)(both killed)",
@@ -1759,6 +1817,12 @@ char	*nick, *username, *host, *server, *realname;
 	sptr->flags |= FLAGS_INVISIBLE;
 	i_count++;
 	m_invis++;
+#else
+	if (atoi(host) & FLAGS_INVISIBLE)
+	{
+		m_invis++;
+		i_count++;
+	}
 #endif
 	sptr->flags |= (UFLAGS & atoi(host));
 	strncpyzt(user->host, host, sizeof(user->host));

@@ -87,6 +87,9 @@
 #ifdef QUOTE_KLINE
 #define MSG_KLINE    "KLINE"    /* KLINE */
 #endif
+#ifdef IDLE_CHECK
+#define MSG_IDLE     "IDLE"     /* IDLE */
+#endif
 #define MAXPARA    15 
 
 #ifdef DOG3
@@ -95,6 +98,9 @@ extern int m_dog3freq();
 #endif
 #ifdef QUOTE_KLINE
 extern int m_kline();
+#endif
+#ifdef IDLE_CHECK
+extern int m_idle();
 #endif
 extern int m_private(), m_topic(), m_join(), m_part(), m_mode();
 extern int m_ping(), m_pong(), m_wallops(), m_kick();
@@ -182,6 +188,9 @@ struct Message msgtab[] = {
 #endif
 #ifdef QUOTE_KLINE
   { MSG_KLINE,   m_kline,    0, MAXPARA, 1 ,0L },
+#endif
+#ifdef IDLE_CHECK
+  { MSG_IDLE,    m_idle,     0, MAXPARA, 1 ,0L },
 #endif
 #if defined(NPATH) && !defined(CLIENT_COMPILE)
   { MSG_NOTE,    m_note,     0, 1, 1 ,0L },

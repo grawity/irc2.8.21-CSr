@@ -130,6 +130,8 @@ aClient	*from;
 	if (size == CLIENT_LOCAL_SIZE)
 	    {
 		cptr->since = cptr->lasttime = cptr->firsttime = NOW;
+		cptr->lastnick = 0;
+		cptr->numnicks = 0;
 		cptr->confs = NULL;
 		cptr->sockhost[0] = '\0';
 		cptr->buffer[0] = '\0';

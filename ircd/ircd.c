@@ -87,6 +87,11 @@ void send_high_sendq();
 	char clonekillhost[100];
 #endif
 
+#ifdef IDLE_CHECK
+	anIdle *Idles = NULL;
+	int idlelimit = DEFAULT_IDLELIMIT;
+#endif
+
 time_t	NOW;
 aClient me;			/* That's me */
 aClient *client = &me;		/* Pointer to beginning of Client list */
@@ -317,7 +322,19 @@ time_t	currenttime;
 	int	ping = 0, i, rflag = 0, checkit = 0;
 	time_t	oldest = 0, timeout;
 	static time_t  lastcheck = 0;
+#ifdef IDLE_CHECK
+	register int idleflag = 0, checkit2 = 0;
+	static	time_t	lastidlecheck = 0;
+#endif
 
+#ifdef IDLE_CHECK
+	if (currenttime-lastidlecheck > 120)
+	{
+		update_idles();
+		lastidlecheck = currenttime;
+		checkit2 = 1;
+	}
+#endif /* IDLE_CHECK */
 	if (rehashed || (currenttime-lastcheck > KLINE_CHECK))
 	{
 		int ch_ct;
@@ -372,6 +389,26 @@ time_t	currenttime;
 			(void)exit_client(cptr, cptr, &me, "Dead socket");
 			continue;
 		    }
+#ifdef IDLE_CHECK
+		if (checkit2 && IsPerson(cptr))
+		idleflag = (checkit2 && IsPerson(cptr)) ? (idlelimit && !IsAnOper(cptr) &&
+			(currenttime-cptr->user->last > idlelimit) &&
+			!find_eline(cptr)) : 0;
+		if (idleflag)
+		{
+			if (!find_idle(cptr))
+			{
+				anIdle *crap;
+				char *temp = cptr->user->username;
+
+				crap = make_idle();
+				if (*temp == '~')
+					temp++;
+				strcpy(crap->username, temp);
+				strcpy(crap->hostname, cptr->user->host);
+			}
+		}
+#endif
 		killflag = (checkit && IsPerson(cptr)) ?
 			find_kill(cptr) : 0;
 #ifdef R_LINES_OFTEN
@@ -387,6 +424,9 @@ time_t	currenttime;
 		 * is already indented enough so I think its justified. -avalon
 		 */
 		if (!killflag && !rflag &&
+#ifdef IDLE_CHECK
+			!idleflag &&
+#endif
 			IsRegistered(cptr) &&
 		    (ping >= currenttime - cptr->lasttime))
 			goto ping_timeout;
@@ -397,6 +437,9 @@ time_t	currenttime;
 		 * to be active, close this connection too.
 		 */
 		if (killflag || rflag ||
+#ifdef IDLE_CHECK
+			idleflag ||
+#endif
 		    ((currenttime - cptr->lasttime) >= (2 * ping) &&
 		     (cptr->flags & FLAGS_PINGSENT)) ||
 		    (!IsRegistered(cptr) &&
@@ -432,9 +475,14 @@ time_t	currenttime;
 			 * on them - send a messgae to the user being killed
 			 * first.
 			 */
-			if (killflag && IsPerson(cptr))
+			if (killflag) /* this is above: && IsPerson(cptr)) /*
 				sendto_ops("Kill line active for %s",
 					   get_client_name(cptr, FALSE));
+#ifdef IDLE_CHECK
+			if (idleflag)
+				sendto_ops("Idle time limit exceeded for %s",
+					get_client_name(cptr, FALSE));
+#endif
 #if defined(R_LINES) && defined(R_LINES_OFTEN)
 			if (IsPerson(cptr) && rflag)
 				sendto_ops("Restricting %s, closing link.",
@@ -443,6 +491,11 @@ time_t	currenttime;
                         if (killflag)
                                 (void)exit_client(cptr, cptr, &me,
                                 "K-Lined");
+#ifdef IDLE_CHECK
+                        else if (idleflag)
+                                (void)exit_client(cptr, cptr, &me,
+                                "Idle time limit exceeded");
+#endif
                         else
                                 (void)exit_client(cptr, cptr, &me, "Ping timeout");
 			i = 0;

@@ -1,6 +1,12 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/* NO_NICK_FLOODS   - define this to limit local users to 3 nick changes
+                      in 60 seconds
+*/
+
+#define NO_NICK_FLOODS
+
 /* RESTRICT         - define this if using dog3 stuff, and wish to
                       disallow /LIST and other CPU intensive commands
                       when in HIGH TRAFFIC MODE
@@ -68,7 +74,7 @@ they are increased!
                       if they aren't running identd
 */
 
-#define IDENTD_ONLY
+#undef IDENTD_ONLY
 
 /* QUOTE_KLINE      - define this if you want /QUOTE KLINE
 */
@@ -199,7 +205,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr20/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr21/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -248,6 +254,21 @@ they are increased!
 
 #define USERNAMES_IN_TRACE
 
+/* IDLE_CHECK     - define this if you wish to have an idle checker
+                    built into the server
+             Note:  Idletime is not reset on msgs to invalid nicks
+                    or channels
+             Note:  Idletime is not reset on msgs to self
+
+ *** *** *** Note:  A user will not be able to reconnect for 60 seconds
+                    until after they are knocked off.  If they try to connect
+                    before then, 60 more seconds are added to each attempt.
+ *** *** *** Note:  E: line u@h's are exempt from idle checking.
+
+*/
+
+#define IDLE_CHECK
+
 /* KLINE_CHECK    - this is how often (in seconds) that K: lines
                     should be checked.  Every fifteen minutes is
                     a good number (900 seconds).  This reduces
@@ -274,7 +295,17 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr20/lib/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr21/lib/logs/clones.log"
+
+/* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
+                        this value is the default # a client
+                        can be idle before being kicked off of
+                        IRC
+                 Note:  This value can be changed on IRC with
+                        /quote idle
+*/
+
+#define DEFAULT_IDLELIMIT  0
 
 /*  THE REST OF THIS STUFF IS TO CONFIGURE CLONE CHECKING */
 

@@ -877,6 +877,9 @@ char	*parv[], *mbuf, *pbuf;
 				fm = *curr;
 			else if (MyClient(sptr) && (*curr != fm))
 				break;
+			if (!ischop)
+				sendto_one(sptr, err_str(ERR_CHANOPRIVSNEEDED),
+					me.name, parv[0], chptr->chname);
 			if (whatt == MODE_ADD)
 			    {
 				lp = &chops[opcnt++];
@@ -969,6 +972,9 @@ char	*parv[], *mbuf, *pbuf;
 				break;
 			if (MyClient(sptr) && opcnt >= MAXMODEPARAMS)
 				break;
+			if (!ischop)
+				sendto_one(sptr, err_str(ERR_CHANOPRIVSNEEDED),
+					me.name, parv[0], chptr->chname);
 			if (whatt == MODE_ADD)
 			    {
 				lp = &chops[opcnt++];
@@ -990,6 +996,9 @@ char	*parv[], *mbuf, *pbuf;
 			 */
 			if (limitset || !ischop)
 			    {
+				if (!ischop)
+					sendto_one(sptr, err_str(ERR_CHANOPRIVSNEEDED),
+						me.name, parv[0], chptr->chname);
 				if (whatt == MODE_ADD && --parc > 0)
 					parv++;
 				break;
@@ -2398,7 +2407,30 @@ char	*parv[];
 	isnew = ChannelExists(parv[2]) ? 0 : 1;
 	chptr = get_channel(sptr, parv[2], CREATE);
 	oldts = chptr->channelts;
-	doesop = (parv[4+args][0] == '@' || parv[4+args][1] == '@');
+
+ 
+       /* we only look if any ops are introduced if we'll actually need
+        * to use the info
+        */
+       if (!isnew && newts > 0 && oldts > 0 && newts != oldts)
+           {
+               static char nicks[BUFSIZE];
+ 
+               strcpy(nicks, parv[4+args]);
+               for (s=strtoken(&p, nicks, " "); s; s=strtoken(&p, NULL, " "))
+                       if (*s == '@' || s[1] == '@')
+                           {
+                               while (*s == '@' || *s == '+')
+                                       s++;
+                               if (!(acptr = find_chasing(sptr, s, NULL)))
+                                       continue;
+                               if (acptr->from != cptr)
+                                       continue;
+                               doesop = 1;
+                               break;
+                           }
+           }
+
 
 	for (l = chptr->members; l && l->value.cptr; l = l->next)
 		if (l->flags & MODE_CHANOP)
@@ -2409,10 +2441,24 @@ char	*parv[];
 
 	oldmode = &chptr->mode;
 
+/* Enables TS */
+        if (newts == 0)
+                if (haveops || !doesop)
+                        tstosend = oldts;
+                else
+                        chptr->channelts = tstosend = 0;
+        else if (oldts == 0)
+                if (doesop || !haveops)
+                        chptr->channelts = tstosend = newts;
+                else
+                        tstosend = 0;
+/* */
+/* Disables TS:
 	if (isnew)
 		chptr->channelts = tstosend = newts;
 	else if (newts == 0 || oldts == 0)
 		chptr->channelts = tstosend = 0;
+*/
   	else if (newts == oldts)
 		tstosend = oldts;
 	else if (newts < oldts)

@@ -78,7 +78,12 @@ static	Numeric	numeric_errors[] = {
 /* 434 */	ERR_SERVICENAMEINUSE, (char *)NULL,
 /* 435 */	ERR_SERVICECONFUSED, (char *)NULL,
 /* 436 */	ERR_NICKCOLLISION, "%s :Nickname collision KILL",
-		0, (char *)NULL, 0, (char *)NULL,
+#ifdef NO_NICK_FLOODS
+/* 437 */	ERR_TOOMANYNICKS, ":Sorry, too many nick changes",
+#else
+		0, (char *)NULL,
+#endif
+		0, (char *)NULL,
 		0, (char *)NULL, 0, (char *)NULL,
 		ERR_USERNOTINCHANNEL, "%s %s :They aren't on that channel",
 		ERR_NOTONCHANNEL, "%s :You're not on that channel",

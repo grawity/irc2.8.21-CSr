@@ -1,6 +1,18 @@
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
 
+New in CSr21:
+
+1) Readded IDLE_CHECK, using ds2's idea of not allowing them to reconnect
+   after being kicked off.
+2) Added a NO_NICK_FLOODS define, disallowing users to change nicks after
+   3 times in 60 seconds.
+3) Added DWildstar's patches for "Non-chanop" messages..
+4) Fixed bugs in s_user.c dealing with TS (found by Taner)
+5) Hopefully fixed "Invis count off" notices...
+6) Reenabled channel TS stuff.
+7) Tried to fix a bug where the server sends "Odd Server Stuff" to clients
+
 New in CSr20:
 
 1) Removed an #ifdef from dbuf.c which causes some problems on some OS's

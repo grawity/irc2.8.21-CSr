@@ -252,6 +252,43 @@ char    *parv[];
 
 #endif /* DOG3 */
 
+#ifdef IDLE_CHECK
+
+int     m_idle(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int     parc;
+char    *parv[];
+{
+        int temp;
+
+        if (!MyClient(sptr) || !IsAnOper(sptr))
+        {
+                sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
+                return 0;
+        }
+        if (!parv[1] || !*parv[1])
+        {
+                sendto_one(sptr, ":%s NOTICE %s :The current idle limit is set at %i minutes",
+                        me.name, parv[0], idlelimit/60);
+                return 0;
+        }
+      temp = atoi(parv[1]);
+      if (temp && (temp < 10))
+      {
+              sendto_one(sptr, ":%s NOTICE %s :Hello???  Try a number > 10.",
+                      me.name, parv[0]);
+              return 0;
+      }
+      idlelimit = temp*60;
+      sendto_ops("%s has changed the idle time limit to %i minute(s).",
+              parv[0], idlelimit/60);
+      sendto_one(sptr, ":%s NOTICE %s :The idle limit is now set to %i minute(s)",
+              me.name, parv[0], idlelimit/60);
+      return 0;
+}
+
+#endif
+
 /*
 ** m_version
 **	parv[0] = sender prefix
@@ -2376,16 +2413,29 @@ char	*parv[];
 		return 0;
 	    }
 
+	if (parv[1] && *parv[1] && !matches(parv[1], "sdkjfkdsjf.aosidasdk.as02ks"))
+		return 0; 
 	for (i = highest_fd; i; i--)
 	    {
 		if (!(acptr = local[i]))
 			continue;
 		if (!IsUnknown(acptr) && !IsConnecting(acptr) &&
 		    !IsHandshake(acptr))
+		{
+			if (parv[1] && *parv[1] && acptr->user)
+			{
+				if (IsAnOper(acptr) ||
+					matches(parv[1], acptr->user->host))
+					continue;
+			}
+			else
+				continue;
+		}
+		else if (parv[1] && *parv[1])
 			continue;
 		sendto_one(sptr, rpl_str(RPL_CLOSING), me.name, parv[0],
 			   get_client_name(acptr, TRUE), acptr->status);
-		(void)exit_client(acptr, acptr, acptr, "Oper Closing");
+		(void)exit_client(acptr, acptr, acptr, "Closing connection");
 		closed++;
 	    }
 	sendto_one(sptr, rpl_str(RPL_CLOSEEND), me.name, parv[0], closed);

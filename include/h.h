@@ -30,9 +30,10 @@
 extern        void    check_max_count();
 #endif /* HIGHEST_CONNECTION */
 
-extern        int     s_count, c_count, ch_count, u_count, i_count;
-extern        int     o_count, m_clients, m_servers, m_invis;
-extern        void    compute_lusers();
+extern int idlelimit;
+extern int s_count, c_count, ch_count, u_count, i_count;
+extern int o_count, m_clients, m_servers, m_invis;
+extern void compute_lusers();
  
 #if defined(USE_DICH_CONF) || defined(B_LINES) || defined(E_LINES)
 #include "dich_conf.h"
@@ -69,6 +70,12 @@ extern int dog3loadrecv;
 extern aClone *Clones;
 extern      aClone  *make_clone PROTO(());
 extern      aClone  *find_clone PROTO(());
+#endif
+
+#ifdef IDLE_CHECK
+extern anIdle *Idles;
+extern	anIdle *make_idle PROTO(());
+extern	anIdle *find_idle PROTO(());
 #endif
 
 extern	time_t	NOW;

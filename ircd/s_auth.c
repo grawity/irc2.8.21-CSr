@@ -234,6 +234,7 @@ Reg1	aClient	*cptr;
 
 	if (!locp || !remp || !*ruser)
 	    {
+		*cptr->username = '\0';
 		ircstp->is_abad++;
 		return;
 	    }
