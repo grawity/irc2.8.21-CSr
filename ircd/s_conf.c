@@ -71,6 +71,17 @@ Computing Center and Jarkko Oikarinen";
 
 #include "h.h"
 
+#include "comstud.h"
+
+#ifdef USE_DICH_CONF
+#include "dich_conf.h"
+
+/* Lists to do K: line matching -Sol */
+aConfList	KList1 = { 0, NULL };	/* ordered */
+aConfList	KList2 = { 0, NULL };	/* ordered, reversed */
+aConfList	KList3 = { 0, NULL };	/* what we can't sort */
+#endif
+
 static	int	check_time_interval PROTO((char *, char *));
 static	int	lookup_confhost PROTO((aConfItem *));
 
@@ -619,6 +630,12 @@ int	sig;
 
 	if (sig != 2)
 		flush_cache();
+
+#ifdef USE_DICH_CONF
+	clear_conf_list(&KList1);
+	clear_conf_list(&KList2);
+	clear_conf_list(&KList3);
+#endif
 	(void) initconf(0);
 	close_listeners();
 
@@ -955,6 +972,29 @@ int	opt;
 			if (portnum < 0 && aconf->port >= 0)
 				portnum = aconf->port;
 		    }
+
+#ifdef USE_DICH_CONF
+		if ((aconf->status & CONF_KILL) && aconf->host)
+		{
+			char	*host = host_field(aconf);
+
+			switch (sortable(host))
+			{
+				case 0 :
+					l_addto_conf_list(&KList3, aconf, host_field);
+					break;
+				case 1 :
+					addto_conf_list(&KList1, aconf, host_field);
+					break;
+				case -1 :
+					addto_conf_list(&KList2, aconf, rev_host_field);
+					break;
+			}
+
+			free(host);
+		}
+#endif
+
 		(void)collapse(aconf->host);
 		(void)collapse(aconf->name);
 		Debug((DEBUG_NOTICE,
@@ -1037,6 +1077,10 @@ aClient	*cptr;
 {
 	char	reply[256], *host, *name;
 	aConfItem *tmp;
+#ifdef USE_DICH_CONF
+	char		*rev;
+	aConfList	*list;
+#endif /* USE_DICH_CONF */
 
 	if (!cptr->user)
 		return 0;
@@ -1050,6 +1094,78 @@ aClient	*cptr;
 
 	reply[0] = '\0';
 
+#ifdef USE_DICH_CONF
+	rev = (char *) malloc(strlen(host)+1);
+	strcpy(rev, host);
+	reverse(rev);
+
+	/* Start with hostnames of the form "*word" (most frequent) -Sol */
+	list = &KList2;
+	while ((tmp = find_matching_conf(list, rev)) != NULL)
+	{
+		if (tmp->name && (!name || !match(tmp->name, name)) &&
+		    (!tmp->port || (tmp->port == cptr->acpt->port)))
+		{
+                        if (BadPtr(tmp->passwd))
+                                goto matched;
+                        if (is_comment(tmp->passwd))
+                                goto matched;
+                        if (check_time_interval(tmp->passwd, reply))
+                                goto matched;
+		}
+		list = NULL;
+	}
+
+	/* Try hostnames of the form "word*" -Sol */
+	list = &KList1;
+	while ((tmp = find_matching_conf(list, host)) != NULL)
+	{
+		if (tmp->name && (!name || !match(tmp->name, name)) &&
+		    (!tmp->port || (tmp->port == cptr->acpt->port)))
+		{
+                        if (BadPtr(tmp->passwd))
+                                goto matched;
+                        if (is_comment(tmp->passwd))
+                                goto matched;
+                        if (check_time_interval(tmp->passwd, reply))
+                                goto matched;
+		}
+		list = NULL;
+	}
+
+	/* If none of the above worked, try non-sorted entries -Sol */
+	list = &KList3;
+	while ((tmp = l_find_matching_conf(list, host)) != NULL)
+	{
+		if (tmp->host && tmp->name && (!name || !match(tmp->name, name))
+		    && (!tmp->port || (tmp->port == cptr->acpt->port)))
+		{
+                        if (BadPtr(tmp->passwd))
+                                goto matched;
+                        if (is_comment(tmp->passwd))
+                                goto matched;
+                        if (check_time_interval(tmp->passwd, reply))
+                                goto matched;
+		}
+		list = NULL;
+	}
+
+matched:
+	free(rev);
+
+# ifdef DICH_CONF_DEBUG
+	if (reply[0] || tmp)
+		sendto_ops("%s matched line : K:%s:%s:%s:%d:%d",
+			   get_client_name(cptr, FALSE),
+			   tmp->host ? tmp->host : "",
+			   tmp->passwd ? tmp->passwd : "",
+			   tmp->name ? tmp->name : "",
+			   tmp->port, get_conf_class(tmp));
+# endif /* DICH_CONF_DEBUG */
+
+#endif /* USE_DICH_CONF */
+
+#if !defined(USE_DICH_CONF) || defined(DICH_CONF_DEBUG)
 	for (tmp = conf; tmp; tmp = tmp->next)
  		if ((tmp->status == CONF_KILL) && tmp->host && tmp->name &&
 		    (match(tmp->host, host) == 0) &&
@@ -1063,6 +1179,7 @@ aClient	*cptr;
 			if (check_time_interval(tmp->passwd, reply))
 	 			break;
 		}
+#endif /* !USE_DICH_CONF || DICH_CONF_DEBUG */
 	if (reply[0])
 		sendto_one(cptr, reply,
 			   me.name, ERR_YOUREBANNEDCREEP, cptr->name);

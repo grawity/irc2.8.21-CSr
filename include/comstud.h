@@ -1,6 +1,15 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/* USE_DICH_CONF    - define this to try a new code for K: line matching
+                    - Note: This is a lot cleaner than Roy's kline
+                      patches...as far as CPU usage...someone want to
+                      test it? =)
+                    - Also, this was written by Philippe Levan, not me =)
+*/
+
+#define USE_DICH_CONF
+ 
 /* MAXBUFFERS       - make receive socket buffers the maximum
                       size they can be...up to 64K
 NOTE: send buffers will remain at 8K as bad things will happen if
@@ -194,7 +203,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr15/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr16/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -278,7 +287,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr15/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr16/lib/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client
@@ -350,9 +359,6 @@ Note: good numbers to use are 5 bots joining with no more than
 #define CLONE_TIME 30
 
 /* END OF FILE */
-
-
-
 
 #endif /* COMSTUD_H */
 

@@ -27,8 +27,8 @@ static char sccsid[] = "@(#)hash.c	2.10 7/3/93 (C) 1991 Darren Reed";
 #include "h.h"
 
 #ifdef DOUGH_HASH
-#define MAX_INITIAL  1024
-#define MAX_INITIAL_MASK 0x3ff
+#define MAX_INITIAL  4096
+#define MAX_INITIAL_MASK (MAX_INITIAL-1)
 
 #define BITS_PER_COL 3
 #define BITS_PER_COL_MASK 0x7

@@ -455,6 +455,78 @@ va_dcl
 }
 
 /*
+ * sendto_TS_server_butone
+ *
+ * Send a message to all connected TS servers except the 'one', if ts==1,
+ * and to all connected non-TS servers except the 'one', if ts==0.
+ */
+# ifndef	USE_VARARGS
+/*VARARGS*/
+void	sendto_TS_serv_butone(ts, one, pattern, p1, p2, p3, p4, p5, p6, p7, p8)
+int	ts;
+aClient *one;
+char	*pattern, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8;
+{
+# else
+void	sendto_TS_serv_butone(ts, one, pattern, va_alist)
+int	ts;
+aClient	*one;
+char	*pattern;
+va_dcl
+{
+	va_list	vl;
+# endif
+	Reg1	int	i;
+	Reg2	aClient *cptr;
+#ifdef DOG3
+	register int j,k=0;
+	fdlist send_fdlist;
+#endif
+
+# ifdef	USE_VARARGS
+	va_start(vl);
+# endif
+
+# ifdef NPATH
+        check_command((long)2, pattern, p1, p2, p3);
+# endif
+
+#ifdef DOG3
+	for (i=serv_fdlist.entry[j=1];j<=serv_fdlist.last_entry;
+		i=serv_fdlist.entry[++j])
+#else 
+	for (i = 0; i <= highest_fd; i++)
+#endif
+	    {
+		if (!(cptr = local[i]) || (one && cptr == one->from))
+			continue;
+#ifdef DOG3
+		if ((DoesTS(cptr) != 0) == (ts != 0))
+#else
+		if (IsServer(cptr) && (DoesTS(cptr) != 0) == (ts != 0))
+#endif
+# ifdef	USE_VARARGS
+			sendto_one(cptr, pattern, vl);
+	    }
+	va_end(vl);
+# else
+#ifdef DOG3
+			send_fdlist.entry[++k] = i;
+#else
+			sendto_one(cptr, pattern, p1, p2, p3, p4,
+				   p5, p6, p7, p8);
+#endif /* DOG3 */
+	    }
+#ifdef DOG3
+	send_fdlist.last_entry = k;
+	if (k)
+		sendto_fdlist(&send_fdlist,pattern,p1,p2,p3,p4,p5,p6,p7,p8);
+#endif /* DOG3 */
+# endif
+	return;
+}
+
+/*
  * sendto_common_channels()
  *
  * Sends a message to all people (inclusing user) on local server who are
@@ -640,6 +712,99 @@ va_dcl
 		if (cptr == from)
 #else
 		if ((cptr == from) || !IsServer(cptr))
+#endif
+			continue;
+#ifdef DOG3
+		if (!BadPtr(mask) &&
+#else
+		if (!BadPtr(mask) && IsServer(cptr) &&
+#endif
+		    matches(mask, cptr->name))
+			continue;
+#ifdef	USE_VARARGS
+		sendto_one(cptr, format, vl);
+	    }
+	va_end(vl);
+#else
+#ifdef DOG3
+		send_fdlist.entry[++k] = i;
+#else 
+		sendto_one(cptr, format, p1, p2, p3, p4, p5, p6, p7, p8, p9);
+#endif
+	    }
+#ifdef DOG3
+	send_fdlist.last_entry=k;
+	if (k)
+		sendto_fdlist(&send_fdlist,format,p1,p2,p3,p4,p5,p6,p7,p8,p9);
+#endif /* DOG3 */
+#endif
+}
+
+/*
+ * sendto_match_TS_servs
+ *
+ * if ts==0, send to all non-TS servers matching the mask
+ * if ts==1, send to all TS servers matching the mask
+ * (or to all if no mask)
+ */
+#ifndef	USE_VARARGS
+/*VARARGS*/
+void	sendto_match_TS_servs(ts, chptr, from, format, 
+				p1,p2,p3,p4,p5,p6,p7,p8,p9)
+int	ts;
+aChannel *chptr;
+aClient	*from;
+char	*format, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9;
+{
+#else
+void	sendto_match_TS_servs(ts, chptr, from, format, va_alist)
+int	ts;
+aChannel *chptr;
+aClient	*from;
+char	*format;
+va_dcl
+{
+	va_list	vl;
+#endif
+	Reg1	int	i;
+	Reg2	aClient	*cptr;
+	char	*mask;
+#ifdef DOG3
+	register int j,k=0;
+	fdlist send_fdlist;
+#endif
+
+#ifdef	USE_VARARGS
+	va_start(vl);
+#endif
+
+# ifdef NPATH
+        check_command((long)3, format, p1, p2, p3);
+# endif
+	if (chptr)
+	    {
+		if (*chptr->chname == '&')
+			return;
+		if (mask = (char *)rindex(chptr->chname, ':'))
+			mask++;
+	    }
+	else
+		mask = (char *)NULL;
+
+#ifdef DOG3
+	for (i=serv_fdlist.entry[j=1];j<=serv_fdlist.last_entry;
+		i=serv_fdlist.entry[++j])
+#else 
+	for (i = 0; i <= highest_fd; i++)
+#endif
+	    {
+		if (!(cptr = local[i]))
+			continue;
+#ifdef DOG3
+		if ((cptr == from) || (DoesTS(cptr) != 0) != (ts != 0))
+#else
+		if ((cptr == from) || !IsServer(cptr) ||
+		    (DoesTS(cptr) != 0) != (ts != 0))
 #endif
 			continue;
 #ifdef DOG3

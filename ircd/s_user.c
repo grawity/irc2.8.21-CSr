@@ -37,15 +37,36 @@ Computing Center and Jarkko Oikarinen";
 #include <fcntl.h>
 #include "h.h"
 
-void	send_umode_out PROTO((aClient*, aClient *, int));
+void    send_umode_out PROTO((aClient*, aClient *, int, int));
 void	send_umode PROTO((aClient *, aClient *, int, int, char *));
+int     do_user PROTO((char *, aClient *, aClient*, char *, char *, char *, 
+			char *));
 
+extern	ts_val	timedelta;
 static char buf[BUFSIZE], buf2[BUFSIZE];
 
 #ifdef CLONE_CHECK
                 aClone *clone;
                 extern char clonekillhost[100];
 #endif
+
+static int user_modes[]	     = { FLAGS_OPER, 'o',
+				 FLAGS_LOCOP, 'O',
+				 FLAGS_INVISIBLE, 'i',
+				 FLAGS_WALLOP, 'w',
+				 FLAGS_SERVNOTICE, 's',
+#ifdef FK_USERMODES
+				 FLAGS_FMODE, 'f',
+#endif
+				 FLAGS_UMODE, 'u',
+#ifdef CLIENT_NOTICES
+				 FLAGS_CMODE, 'c',
+#endif
+#ifdef FK_USERMODES
+				 FLAGS_KMODE, 'k',
+#endif
+				 FLAGS_RMODE, 'r',
+				 0, 0 };
 
 /*
 ** m_functions execute protocol messages on this server:
@@ -337,6 +358,8 @@ char	*buffer;
 **	available. Doing it is not so simple though, would have
 **	to implement the following:
 **
+**	(actually it has been implemented already for a while) -orabidoo
+**
 **	1) user telnets in and gives only "NICK foobar" and waits
 **	2) another user far away logs in normally with the nick
 **	   "foobar" (quite legal, as this server didn't propagate
@@ -356,6 +379,7 @@ char	*nick, *username;
 	Reg1	aConfItem *aconf;
         char	*parv[3];
 	char	*temp;
+	static	char ubuf[12];
 	short	oldstatus = sptr->status;
 	anUser	*user = sptr->user;
 	int	i;
@@ -632,12 +656,20 @@ char	*nick, *username;
 		   }
 	    }
 
-	sendto_serv_butone(cptr, "NICK %s :%d", nick, sptr->hopcount+1);
-	sendto_serv_butone(cptr, ":%s USER %s %s %s :%s", nick,
+	send_umode(NULL, sptr, 0, SEND_UMODES, ubuf);
+	if (!*ubuf)
+		strcpy(ubuf, "+");
+
+	sendto_TS_serv_butone(0, cptr, "NICK %s :%d", nick, sptr->hopcount+1);
+	sendto_TS_serv_butone(0, cptr, ":%s USER %s %s %s :%s", nick,
 			   user->username, user->host,
 			   user->server, sptr->info);
-	if (MyConnect(sptr))
-		send_umode_out(cptr, sptr, 0);
+	sendto_TS_serv_butone(1, cptr, "NICK %s %d %ld %s %s %s %s :%s",
+			   nick, sptr->hopcount+1, sptr->tsinfo, ubuf,
+			   user->username, user->host, user->server,
+			   sptr->info);
+	if (ubuf[1])
+		send_umode_out(cptr, sptr, 0, 0);
 #ifdef	USE_SERVICES
 	check_services_butone(SERVICE_WANT_NICK, sptr, "NICK %s :%d",
 				nick, sptr->hopcount);
@@ -653,6 +685,13 @@ char	*nick, *username;
 ** m_nick
 **	parv[0] = sender prefix
 **	parv[1] = nickname
+**	parv[2]	= optional hopcount when new user; TS when nick change
+**	parv[3] = optional TS
+**	parv[4] = optional umode
+**	parv[5] = optional username
+**	parv[6] = optional hostname
+**	parv[7]	= optional server
+**	parv[8]	= optional ircname
 */
 int	m_nick(cptr, sptr, parc, parv)
 aClient *cptr, *sptr;
@@ -661,13 +700,25 @@ char	*parv[];
 {
 	aClient *acptr;
 	char	nick[NICKLEN+2], *s;
-	
+	ts_val	newts = 0;
+	int	doests, sameuser = 0;
+
 	if (parc < 2)
 	    {
 		sendto_one(sptr, err_str(ERR_NONICKNAMEGIVEN),
 			   me.name, parv[0]);
 		return 0;
 	    }
+	if (!IsServer(sptr) && IsServer(cptr))
+		if (parc > 2)
+			newts = atol(parv[2]);
+		else
+			newts = sptr->tsinfo;
+	else if (parc > 3 && IsServer(cptr))
+		newts = atol(parv[3]);
+	    	
+	doests = (IsServer(cptr) && DoesTS(cptr));
+
 	if (MyConnect(sptr) && (s = (char *)index(parv[1], '~')))
 		*s = '\0';
 	strncpyzt(nick, parv[1], NICKLEN+1);
@@ -810,37 +861,72 @@ char	*parv[];
 	** same time, or net reconnecting) or just two net fragmens becoming
 	** joined and having same nicks in use. We cannot have TWO users with
 	** same nick--purge this NICK from the system with a KILL... >;)
-	**
-	** The client indicated by 'acptr' is dead meat, give at least some
-	** indication of the reason why we are just dropping it cold.
 	*/
-	sendto_one(acptr, err_str(ERR_NICKCOLLISION),
-		   me.name, acptr->name, acptr->name);
 	/*
 	** This seemingly obscure test (sptr == cptr) differentiates
 	** between "NICK new" (TRUE) and ":old NICK new" (FALSE) forms.
 	*/
-	if (sptr == cptr)
+	/* 
+	** Changed to something reasonable like IsServer(sptr)
+	** (true if "NICK new", false if ":old NICK new") -orabidoo
+	*/
+
+	if (IsServer(sptr))
 	    {
-		sendto_ops("Nick collision on %s(%s <- %s)",
-			   acptr->name, acptr->from->name,
-			   get_client_name(cptr, FALSE));
-		/*
-		** A new NICK being introduced by a neighbouring
-		** server (e.g. message type "NICK new" received)
-		*/
-		ircstp->is_kill++;
-		sendto_serv_butone(NULL, /* all servers */
-				   ":%s KILL %s :%s (%s <- %s)",
-				   me.name, acptr->name, me.name,
-				   acptr->from->name,
+	/*
+	** A new NICK being introduced by a neighbouring
+	** server (e.g. message type "NICK new" received)
+	*/
+		sameuser = (parc > 5) && 
+			    mycmp(acptr->user->username, parv[5]) == 0 &&
+			    mycmp(acptr->user->host, parv[6]) == 0;
+		if (!doests || !newts || !acptr->tsinfo
+		    || (newts == acptr->tsinfo))
+		    {
+		       sendto_ops("Nick collision on %s(%s <- %s)(both killed)",
+				   acptr->name, acptr->from->name,
+				   get_client_name(cptr, FALSE));
+			ircstp->is_kill++;
+			sendto_one(acptr, err_str(ERR_NICKCOLLISION),
+				   me.name, acptr->name, acptr->name);
+			sendto_serv_butone(NULL, /* all servers */
+					   ":%s KILL %s :%s (%s <- %s)",
+					   me.name, acptr->name, me.name,
+					   acptr->from->name,
 				   /* NOTE: Cannot use get_client_name twice
 				   ** here, it returns static string pointer:
 				   ** the other info would be lost
 				   */
+					   get_client_name(cptr, FALSE));
+			acptr->flags |= FLAGS_KILLED;
+			return exit_client(cptr, acptr, &me, "Nick collision");
+		    }
+		else if ((sameuser && newts < acptr->tsinfo) ||
+			(!sameuser && newts > acptr->tsinfo))
+			return 0;
+		else
+		    {
+			if (sameuser)
+		      sendto_ops("Nick collision on %s(%s <- %s)(older killed)",
+				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
-		acptr->flags |= FLAGS_KILLED;
-		return exit_client(cptr, acptr, &me, "Nick collision");
+			else
+		      sendto_ops("Nick collision on %s(%s <- %s)(newer killed)",
+				   acptr->name, acptr->from->name,
+				   get_client_name(cptr, FALSE));
+
+			ircstp->is_kill++;
+			sendto_one(acptr, err_str(ERR_NICKCOLLISION),
+				   me.name, acptr->name, acptr->name);
+			sendto_serv_butone(sptr, /* all servers but sptr */
+					   ":%s KILL %s :%s (%s <- %s)",
+					   me.name, acptr->name, me.name,
+					   acptr->from->name,
+					   get_client_name(cptr, FALSE));
+			acptr->flags |= FLAGS_KILLED;
+			(void)exit_client(cptr, acptr, &me, "Nick collision");
+			goto nickkilldone;
+		    }
 	    }
 	/*
 	** A NICK change has collided (e.g. message type
@@ -849,23 +935,75 @@ char	*parv[];
 	** must be killed from the incoming connection, and "old" must
 	** be purged from all outgoing connections.
 	*/
-	sendto_ops("Nick change collision from %s to %s(%s <- %s)",
-		   sptr->name, acptr->name, acptr->from->name,
-		   get_client_name(cptr, FALSE));
-	ircstp->is_kill++;
-	sendto_serv_butone(NULL, /* KILL old from outgoing servers */
-			   ":%s KILL %s :%s (%s(%s) <- %s)",
+	sameuser = mycmp(acptr->user->username, sptr->user->username) == 0 &&
+		   mycmp(acptr->user->host, acptr->user->host) == 0;
+	if (!doests || !newts || !acptr->tsinfo || (newts == acptr->tsinfo))
+	    {
+	sendto_ops("Nick change collision from %s to %s(%s <- %s)(both killed)",
+			   sptr->name, acptr->name, acptr->from->name,
+			   get_client_name(cptr, FALSE));
+		ircstp->is_kill++;
+		sendto_one(acptr, err_str(ERR_NICKCOLLISION),
+			   me.name, acptr->name, acptr->name);
+		sendto_serv_butone(NULL, /* KILL old from outgoing servers */
+				   ":%s KILL %s :%s (%s(%s) <- %s)",
 			   me.name, sptr->name, me.name, acptr->from->name,
-			   acptr->name, get_client_name(cptr, FALSE));
-	ircstp->is_kill++;
-	sendto_serv_butone(NULL, /* Kill new from incoming link */
-		   ":%s KILL %s :%s (%s <- %s(%s))",
-		   me.name, acptr->name, me.name, acptr->from->name,
-		   get_client_name(cptr, FALSE), sptr->name);
-	acptr->flags |= FLAGS_KILLED;
-	(void)exit_client(NULL, acptr, &me, "Nick collision(new)");
-	sptr->flags |= FLAGS_KILLED;
-	return exit_client(cptr, sptr, &me, "Nick collision(old)");
+				   acptr->name, get_client_name(cptr, FALSE));
+		ircstp->is_kill++;
+		sendto_serv_butone(NULL, /* Kill new from incoming link */
+			   ":%s KILL %s :%s (%s <- %s(%s))",
+			   me.name, acptr->name, me.name, acptr->from->name,
+			   get_client_name(cptr, FALSE), sptr->name);
+		acptr->flags |= FLAGS_KILLED;
+		(void)exit_client(NULL, acptr, &me, "Nick collision(new)");
+		sptr->flags |= FLAGS_KILLED;
+		return exit_client(cptr, sptr, &me, "Nick collision(old)");
+	    }
+	else if ((sameuser && newts < acptr->tsinfo) ||
+		 (!sameuser && newts > acptr->tsinfo))
+	    {
+		if (sameuser)
+    sendto_ops("Nick change collision from %s to %s(%s <- %s)(older killed)",
+			   sptr->name, acptr->name, acptr->from->name,
+			   get_client_name(cptr, FALSE));
+		else
+    sendto_ops("Nick change collision from %s to %s(%s <- %s)(newer killed)",
+			   sptr->name, acptr->name, acptr->from->name,
+			   get_client_name(cptr, FALSE));
+		ircstp->is_kill++;
+		sendto_serv_butone(cptr, /* KILL old from outgoing servers */
+				   ":%s KILL %s :%s (%s(%s) <- %s)",
+			   me.name, sptr->name, me.name, acptr->from->name,
+				   acptr->name, get_client_name(cptr, FALSE));
+		sptr->flags |= FLAGS_KILLED;
+		if (sameuser)
+		return exit_client(cptr, sptr, &me, "Nick collision(old)");
+		else
+		return exit_client(cptr, sptr, &me, "Nick collision(new)");
+	    }
+	else
+	    {
+		if (sameuser)
+		    sendto_ops("Nick collision on %s(%s <- %s)(older killed)",
+				   acptr->name, acptr->from->name,
+				   get_client_name(cptr, FALSE));
+		else
+		    sendto_ops("Nick collision on %s(%s <- %s)(newer killed)",
+				   acptr->name, acptr->from->name,
+				   get_client_name(cptr, FALSE));
+
+		    ircstp->is_kill++;
+		    sendto_one(acptr, err_str(ERR_NICKCOLLISION),
+			       me.name, acptr->name, acptr->name);
+		    sendto_serv_butone(sptr, /* all servers but sptr */
+				       ":%s KILL %s :%s (%s <- %s)",
+				       me.name, acptr->name, me.name,
+				       acptr->from->name,
+				       get_client_name(cptr, FALSE));
+		    acptr->flags |= FLAGS_KILLED;
+		    (void)exit_client(cptr, acptr, &me, "Nick collision");
+		  /*   goto nickkilldone; */
+	    }
 
 nickkilldone:
 	if (IsServer(sptr))
@@ -876,6 +1014,36 @@ nickkilldone:
 		add_client_to_list(sptr);
 		if (parc > 2)
 			sptr->hopcount = atoi(parv[2]);
+		if (newts)
+			sptr->tsinfo = newts;
+		else
+			newts = sptr->tsinfo = (ts_val)time(NULL) + timedelta;
+		/* copy the nick in place */
+		(void)strcpy(sptr->name, nick);
+		(void)add_to_client_hash_table(nick, sptr);
+		if (parc > 8)
+		    {
+		    	Reg1	int *s, flag;
+			Reg2	char *m;
+
+			/*
+			** parse the usermodes -orabidoo
+			*/
+			m = &parv[4][1];
+			while (*m)
+			    {
+				for (s = user_modes; (flag = *s); s += 2)
+					if (*m == *(s+1))
+					    {
+						sptr->flags |= flag&SEND_UMODES;
+						break;
+					    }
+				m++;
+			    }
+
+			return do_user(nick, cptr, sptr, parv[5], parv[6],
+				parv[7], parv[8]);
+		    }
 	    }
 	else if (sptr->name[0])
 	    {
@@ -884,10 +1052,22 @@ nickkilldone:
 		** on a channel, send note of change to all clients
 		** on that channel. Propagate notice to other servers.
 		*/
+		if (mycmp(parv[0], nick) || (!MyClient(sptr) && parc > 2 &&
+		    newts < sptr->tsinfo))
+			sptr->tsinfo = newts ? newts : (ts_val)time(NULL) +
+					timedelta;
 		sendto_common_channels(sptr, ":%s NICK :%s", parv[0], nick);
 		if (sptr->user)
 			add_history(sptr);
-		sendto_serv_butone(cptr, ":%s NICK :%s", parv[0], nick);
+		if (sptr->tsinfo)
+		    {
+			sendto_TS_serv_butone(1, cptr, ":%s NICK %s :%ld",
+					      parv[0], nick, sptr->tsinfo);
+			sendto_TS_serv_butone(0, cptr, ":%s NICK :%s", parv[0],
+					      nick);
+		    }
+		else
+			sendto_serv_butone(cptr, ":%s NICK :%s", parv[0], nick);
 #ifdef	USE_SERVICES
 		check_services_butone(SERVICE_WANT_NICK, sptr, ":%s NICK :%s",
 					parv[0], nick);
@@ -899,6 +1079,7 @@ nickkilldone:
 
 		/* This had to be copied here to avoid problems.. */
 		(void)strcpy(sptr->name, nick);
+		sptr->tsinfo = time(NULL) + timedelta;
 		if (sptr->user)
 			/*
 			** USER already received, now we have NICK.
@@ -1449,6 +1630,10 @@ char	*parv[];
 						*buf = '\0';
 						len = 0;
 					    }
+#ifdef	TSDEBUG
+					if (is_deopped(acptr, chptr))
+						*(buf + len++) = '-';
+#endif
 					if (is_chan_op(acptr, chptr))
 						*(buf + len++) = '@';
 					else if (has_voice(acptr, chptr))
@@ -1513,7 +1698,6 @@ char	*parv[];
 {
 #define	UFLAGS	(FLAGS_INVISIBLE|FLAGS_WALLOP|FLAGS_SERVNOTICE)
 	char	*username, *host, *server, *realname;
-	anUser	*user;
  
 	if (parc > 2 && (username = (char *)index(parv[1],'@')))
 		*username = '\0'; 
@@ -1536,6 +1720,19 @@ char	*parv[];
 	server   = (parc < 4 || BadPtr(parv[3])) ? "<noserver>" : parv[3];
 	realname = (parc < 5 || BadPtr(parv[4])) ? "<bad-realname>" : parv[4];
 
+	return do_user(parv[0], cptr, sptr, username, host, server, realname);
+}
+
+
+/*
+** do_user
+*/
+int	do_user(nick, cptr, sptr, username, host, server, realname)
+aClient	*cptr, *sptr;
+char	*nick, *username, *host, *server, *realname;
+{
+	anUser	*user;
+
  	user = make_user(sptr);
 
 	if (!MyConnect(sptr))
@@ -1548,7 +1745,7 @@ char	*parv[];
 	if (!IsUnknown(sptr))
 	    {
 		sendto_one(sptr, err_str(ERR_ALREADYREGISTRED),
-			   me.name, parv[0]);
+			   me.name, nick);
 		return 0;
 	    }
 #ifndef	NO_DEFAULT_INVISIBLE
@@ -2052,7 +2249,7 @@ char	*parv[];
 			   sptr->user->username, sptr->user->host,
 			   IsOper(sptr) ? 'O' : 'o');
 		sptr->flags |= (FLAGS_SERVNOTICE|FLAGS_WALLOP|FLAGS_CMODE|FLAGS_KMODE);
-		send_umode_out(cptr, sptr, old);
+		send_umode_out(cptr, sptr, old, 1);
  		sendto_one(sptr, rpl_str(RPL_YOUREOPER), me.name, parv[0]);
 #if !defined(CRYPT_OPER_PASSWORD) && (defined(FNAME_OPERLOG) ||\
     (defined(USE_SYSLOG) && defined(SYSLOG_OPER)))
@@ -2297,24 +2494,6 @@ char	*parv[];
 }
 #endif
 
-static int user_modes[]	     = { FLAGS_OPER, 'o',
-				 FLAGS_LOCOP, 'O',
-				 FLAGS_INVISIBLE, 'i',
-				 FLAGS_WALLOP, 'w',
-				 FLAGS_SERVNOTICE, 's',
-#ifdef FK_USERMODES
-				 FLAGS_FMODE, 'f',
-#endif
-				 FLAGS_UMODE, 'u',
-#ifdef CLIENT_NOTICES
-				 FLAGS_CMODE, 'c',
-#endif
-#ifdef FK_USERMODES
-				 FLAGS_KMODE, 'k',
-#endif
-				 FLAGS_RMODE, 'r',
-				 0, 0 };
-
 /*
  * m_umode() added 15/10/91 By Darren Reed.
  * parv[0] - sender
@@ -2444,7 +2623,7 @@ char	*parv[];
 	 * compare new flags with old flags and send string which
 	 * will cause servers to update correctly.
 	 */
-	send_umode_out(cptr, sptr, setflags);
+	send_umode_out(cptr, sptr, setflags, 1);
 
 	return 0;
 }
@@ -2504,9 +2683,12 @@ char	*umode_buf;
 /*
  * added Sat Jul 25 07:30:42 EST 1992
  */
-void	send_umode_out(cptr, sptr, old)
+/*
+ * extra argument evenTS added to send to TS servers or not -orabidoo
+ */
+void	send_umode_out(cptr, sptr, old, evenTS)
 aClient *cptr, *sptr;
-int	old;
+int	old, evenTS;
 {
 	Reg1    int     i;
 	Reg2    aClient *acptr;
@@ -2517,10 +2699,12 @@ int	old;
 # endif
 	for (i = highest_fd; i >= 0; i--)
 		if ((acptr = local[i]) && IsServer(acptr) &&
-		    (acptr != cptr) && (acptr != sptr) && *buf)
+		    (acptr != cptr) && (acptr != sptr) && *buf &&
+		    (evenTS || !DoesTS(acptr)))
 			sendto_one(acptr, ":%s MODE %s :%s",
 				   sptr->name, sptr->name, buf);
 
 	if (cptr && MyClient(cptr))
 		send_umode(cptr, sptr, old, ALL_UMODES, buf);
 }
+

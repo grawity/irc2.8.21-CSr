@@ -59,6 +59,17 @@ static	void	sub1_from_channel PROTO((aChannel *));
 void	clean_channelname PROTO((char *));
 void	del_invite PROTO((aClient *, aChannel *));
 
+#ifdef ORATIMING
+struct timeval tsdnow, tsdthen; 
+unsigned long tsdms;
+#endif
+
+/*
+** number of seconds to add to all readings of time() when making TS's
+** -orabidoo
+*/
+ts_val	timedelta = 0;
+
 static	char	*PartFmt = ":%s PART %s";
 /*
  * some buffers for rebuilding channel/nick lists with ,'s
@@ -381,7 +392,9 @@ int mine;
                         if (mine && tmp->flags & (lp->flags & MODE_FLAGS))
                                 return 0;
 #endif
-                        tmp->flags |= lp->flags & MODE_FLAGS;
+			tmp->flags |= lp->flags & MODE_FLAGS;
+			if (lp->flags & MODE_CHANOP)
+				tmp->flags &= ~MODE_DEOPPED;
                 }
                 else
                 {
@@ -389,9 +402,20 @@ int mine;
                         if (mine && !(tmp->flags & (lp->flags & MODE_FLAGS)))
                                 return 0;
 #endif
-                        tmp->flags &= ~lp->flags & MODE_FLAGS;
+			tmp->flags &= ~lp->flags & MODE_FLAGS;
                 }
 	return 1;
+}
+
+static  void    set_deopped(lp, chptr)
+Link    *lp;
+aChannel *chptr;
+{
+        Reg1    Link    *tmp;
+
+	if ((tmp = find_user_link(chptr->members, lp->value.cptr)))
+		if ((tmp->flags & MODE_CHANOP) == 0)
+			tmp->flags |= MODE_DEOPPED;
 }
 
 int	is_chan_op(cptr, chptr)
@@ -403,6 +427,19 @@ aChannel *chptr;
 	if (chptr)
 		if ((lp = find_user_link(chptr->members, cptr)))
 			return (lp->flags & CHFL_CHANOP);
+
+	return 0;
+}
+
+int	is_deopped(cptr, chptr)
+aClient *cptr;
+aChannel *chptr;
+{
+	Reg1	Link	*lp;
+
+	if (chptr)
+		if ((lp = find_user_link(chptr->members, cptr)))
+			return (lp->flags & CHFL_DEOPPED);
 
 	return 0;
 }
@@ -552,26 +589,107 @@ aChannel *chptr;
 	*modebuf = *parabuf = '\0';
 	channel_modes(cptr, modebuf, parabuf, chptr);
 
-	send_mode_list(cptr, chptr->chname, chptr->members, CHFL_CHANOP, 'o');
-	if (modebuf[1] || *parabuf)
-		sendto_one(cptr, ":%s MODE %s %s %s",
-			   me.name, chptr->chname, modebuf, parabuf);
+	if (DoesTS(cptr))
+	    {
+		Link	*l, *anop = NULL, *skip = NULL;
+		int	n = 0;
+		char	*t;
 
-	*parabuf = '\0';
-	*modebuf = '+';
-	modebuf[1] = '\0';
-	send_mode_list(cptr, chptr->chname, chptr->banlist, CHFL_BAN, 'b');
-	if (modebuf[1] || *parabuf)
-		sendto_one(cptr, ":%s MODE %s %s %s",
-			   me.name, chptr->chname, modebuf, parabuf);
+		if (*parabuf)
+			strcat(parabuf, " ");
+		sprintf(buf, ":%s SJOIN %ld %s %s %s:", me.name,
+			chptr->channelts, chptr->chname, modebuf, parabuf);
+		t = buf + strlen(buf);
+		for (l = chptr->members; l && l->value.cptr; l = l->next)
+			if (l->flags & MODE_CHANOP)
+			    {
+				anop = l;
+				break;
+			    }
+		/* follow the channel, but doing anop first if it's defined
+		**  -orabidoo
+		*/
+		l = NULL;
+		for (;;)
+		    {
+			if (anop)
+			    {
+				l = skip = anop;
+				anop = NULL;
+			    }
+			else 
+			    {
+				if (l == NULL || l == skip)
+					l = chptr->members;
+				else
+					l = l->next;
+				if (l && l == skip)
+					l = l->next;
+				if (l == NULL)
+					break;
+			    }
+			if (l->flags & MODE_CHANOP)
+				*t++ = '@';
+			if (l->flags & MODE_VOICE)
+				*t++ = '+';
+			strcpy(t, l->value.cptr->name);
+			t += strlen(t);
+			*t++ = ' ';
+			n++;
+			if (t - buf > BUFSIZE - 80)
+			    {
+				*t++ = '\0';
+				if (t[-1] == ' ') t[-1] = '\0';
+				sendto_one(cptr, "%s", buf);
+				sprintf(buf, ":%s SJOIN %ld %s 0 :",
+					me.name, chptr->channelts,
+					chptr->chname);
+				t = buf + strlen(buf);
+				n = 0;
+			    }
+		    }
 
-	*parabuf = '\0';
-	*modebuf = '+';
-	modebuf[1] = '\0';
-	send_mode_list(cptr, chptr->chname, chptr->members, CHFL_VOICE, 'v');
-	if (modebuf[1] || *parabuf)
-		sendto_one(cptr, ":%s MODE %s %s %s",
-			   me.name, chptr->chname, modebuf, parabuf);
+		if (n)
+		    {
+			*t++ = '\0';
+			if (t[-1] == ' ') t[-1] = '\0';
+			sendto_one(cptr, "%s", buf);
+		    }
+		*parabuf = '\0';
+		*modebuf = '+';
+		modebuf[1] = '\0';
+		send_mode_list(cptr, chptr->chname, chptr->banlist, CHFL_BAN,
+				'b');
+		if (modebuf[1] || *parabuf)
+			sendto_one(cptr, ":%s MODE %s %s %s",
+				   me.name, chptr->chname, modebuf, parabuf);
+	    }
+	else
+	    {
+		send_mode_list(cptr, chptr->chname, chptr->members, 
+				CHFL_CHANOP, 'o');
+		if (modebuf[1] || *parabuf)
+			sendto_one(cptr, ":%s MODE %s %s %s",
+				   me.name, chptr->chname, modebuf, parabuf);
+
+		*parabuf = '\0';
+		*modebuf = '+';
+		modebuf[1] = '\0';
+		send_mode_list(cptr, chptr->chname, chptr->banlist, CHFL_BAN,
+				'b');
+		if (modebuf[1] || *parabuf)
+			sendto_one(cptr, ":%s MODE %s %s %s",
+				   me.name, chptr->chname, modebuf, parabuf);
+
+		*parabuf = '\0';
+		*modebuf = '+';
+		modebuf[1] = '\0';
+		send_mode_list(cptr, chptr->chname, chptr->members, CHFL_VOICE,
+				'v');
+		if (modebuf[1] || *parabuf)
+			sendto_one(cptr, ":%s MODE %s %s %s",
+				   me.name, chptr->chname, modebuf, parabuf);
+	   }
 }
 
 /*
@@ -623,36 +741,40 @@ char	*parv[];
 	mcount = set_mode(cptr, sptr, chptr, parc - 2, parv + 2,
 			  modebuf, parabuf);
 
-	if ((mcount < 0) && MyConnect(sptr) && !IsServer(sptr))
-	    {
-		sendto_one(sptr, err_str(ERR_CHANOPRIVSNEEDED),
-			   me.name, parv[0], chptr->chname);
-		return 0;
-	    }
 	if (strlen(modebuf) > (size_t)1)
-	    {
-		if ((IsServer(cptr) && !IsServer(sptr) && !chanop) ||
-		    (mcount < 0))
+		switch (mcount)
 		    {
+			case 0:
+			    break;
+			case -1:
+			    if (MyClient(sptr))
+				    sendto_one(sptr,
+					       err_str(ERR_CHANOPRIVSNEEDED),
+					       me.name, parv[0], chptr->chname);
+			    else
+				{
 #ifndef DONT_SEND_FAKES
 #ifdef FK_USERMODES
-			sendto_flagops(4,"Fake: %s MODE %s %s %s",
-                                   parv[0], parv[1], modebuf, parabuf);
+				    sendto_flagops(4,"Fake: %s MODE %s %s %s",
+					   parv[0], parv[1], modebuf, parabuf);
 #else
-			sendto_ops("Fake: %s MODE %s %s %s",
-				   parv[0], parv[1], modebuf, parabuf);
+				    sendto_ops("Fake: %s MODE %s %s %s",
+					   parv[0], parv[1], modebuf, parabuf);
 #endif
 #endif
-			ircstp->is_fake++;
-		    }
-		else
-			sendto_channel_butserv(chptr, sptr,
+				    ircstp->is_fake++;
+				}
+			    break;
+			default:
+			    sendto_channel_butserv(chptr, sptr,
 						":%s MODE %s %s %s", parv[0],
 						chptr->chname, modebuf,
 						parabuf);
-		sendto_match_servs(chptr, cptr, ":%s MODE %s %s %s",
-				   parv[0], chptr->chname, modebuf, parabuf);
-	    }
+			    sendto_match_servs(chptr, cptr,
+						":%s MODE %s %s %s",
+						parv[0], chptr->chname,
+						modebuf, parabuf);
+		    }
 	return 0;
 }
 
@@ -672,7 +794,6 @@ char	*parv[], *mbuf, *pbuf;
 				MODE_PRIVATE,    'p', MODE_SECRET,     's',
 				MODE_MODERATED,  'm', MODE_NOPRIVMSGS, 'n',
 				MODE_TOPICLIMIT, 't', MODE_INVITEONLY, 'i',
-				MODE_VOICE,      'v', MODE_KEY,        'k',
 				0x0, 0x0 };
 
 	Reg1	Link	*lp;
@@ -680,7 +801,8 @@ char	*parv[], *mbuf, *pbuf;
 	Reg3	int	*ip;
 	u_int	whatt = MODE_ADD;
 	int	limitset = 0, count = 0, chasing = 0;
-	int	nusers, ischop, new, len, keychange = 0, opcnt = 0;
+	int	nusers, ischop, isok, isdeop, new, len;
+	int	keychange = 0, opcnt = 0;
 	char	fm = '\0';
 	aClient *who;
 	Mode	*mode, oldm;
@@ -692,6 +814,9 @@ char	*parv[], *mbuf, *pbuf;
 	mode = &(chptr->mode);
 	bcopy((char *)mode, (char *)&oldm, sizeof(Mode));
 	ischop = IsServer(sptr) || is_chan_op(sptr, chptr);
+	isdeop = !ischop && !IsServer(sptr) && is_deopped(sptr, chptr);
+	isok = ischop || (!isdeop && IsServer(cptr) && DoesTS(cptr) && 
+	       chptr->channelts);
 	new = mode->mode;
 
 	while (curr && *curr && count >= 0)
@@ -733,11 +858,14 @@ char	*parv[], *mbuf, *pbuf;
 			** just some extra messages if nick appeared more than
 			** once in the MODE message... --msa
 			*/
-			if (chasing && ischop)
-				sendto_one(cptr, ":%s MODE %s %c%c %s",
-					   me.name, chptr->chname,
-					   whatt == MODE_ADD ? '+' : '-',
-					   *curr, who->name);
+			/*
+			** This is actually useless - if we notice a nick
+			** change it means the server the mode comes from       
+			** dealt with the mode with the old nick, and already
+			** applied it, and the nick change must be coming
+			** from another server; besides, we don't want to
+			** be resetting the channel's TS -orabidoo
+			*/
 
 			if (who == cptr && whatt == MODE_ADD && *curr == 'o')
 				break;
@@ -870,6 +998,7 @@ char	*parv[], *mbuf, *pbuf;
 			    {
 				limitset = 1;
 				nusers = 0;
+				count++;
 				break;
 			    }
 			if (--parc > 0)
@@ -930,6 +1059,24 @@ char	*parv[], *mbuf, *pbuf;
 	    } /* end of while loop for MODE processing */
 
 	whatt = 0;
+
+	/* if it's a non-deopped non-op on a TS channel from a TS
+	** server, allow only deops and ignore everything else (to
+	** avoid "i deop you you deop me"-type desynchs) -orabidoo
+	*/
+	if (!ischop && isok)
+	    {
+		Reg1	int 	i;
+		Reg2	int	j;
+
+		new = oldm.mode;
+		for (i = 0, j = 0; i < opcnt; i++)
+			if (chops[i].flags == (MODE_CHANOP | MODE_DEL))
+				chops[j++] = chops[i];
+			else
+				count--;
+		opcnt = j;
+	    }
 
 	for (ip = flags; *ip; ip += 2)
 		if ((*ip & new) && !(*ip & oldm.mode))
@@ -1074,15 +1221,26 @@ char	*parv[], *mbuf, *pbuf;
 			case MODE_CHANOP :
 			case MODE_VOICE :
                                 /* pass fakes along? nawww */
-                                if (ischop && change_chan_flag(lp, chptr,
-					MyClient(sptr)))
-                                {
-                                        *mbuf++ = c;
-                                        (void)strcat(pbuf, cp);
-                                        len += strlen(cp);
-                                        (void)strcat(pbuf, " ");
-                                        len++;
-                                }
+				/* uh-huh.. if they're fake, they'd go
+				   into a FAKE, not get sent along as
+				   a MODE  -orabidoo
+				*/
+				if (IsServer(sptr) && c == 'o' &&
+				    whatt == MODE_ADD)
+					chptr->channelts = 0;
+				if (c == 'o' && whatt == MODE_ADD && isdeop &&
+				    !is_chan_op(lp->value.cptr, chptr))
+					set_deopped(lp, chptr);
+				if ((ischop || (isok && c == 'o' &&
+				    whatt == MODE_DEL)) && 
+				    change_chan_flag(lp, chptr, MyClient(sptr)))
+				    {
+					*mbuf++ = c;
+					(void)strcat(pbuf, cp);
+					len += strlen(cp);
+					(void)strcat(pbuf, " ");
+					len++;
+				    }
 				break;
 			case MODE_BAN :
 				if (ischop && ((whatt & MODE_ADD) &&
@@ -1103,7 +1261,19 @@ char	*parv[], *mbuf, *pbuf;
 
 	*mbuf++ = '\0';
 
-	return ischop ? count : -count;
+	/* returns:
+	** -1  = mode changes were generated but ignored, and a FAKE
+	**       must be sent for remote clients and a CHANOPRIVSNEEDED
+	**       for local ones
+	**  0  = ignore whatever was generated, do not propagate anything
+	** >0  = modes were accepted, propagate
+	*/
+	if (isok)
+		return count;
+	if (isdeop && !MyClient(sptr))
+		return 0;
+	else
+		return -1;
 }
 
 static	int	can_join(sptr, chptr, key)
@@ -1435,17 +1605,32 @@ char	*parv[];
 		*/
 		add_user_to_channel(chptr, sptr, flags);
 		/*
+		**  Set timestamp if appropriate, and propagate
+		*/
+		if (MyClient(sptr) && flags)
+		    {
+			chptr->channelts = time(NULL) + timedelta;
+			sendto_match_TS_servs(0, chptr, cptr, ":%s JOIN :%s",
+						parv[0], name);
+			sendto_match_TS_servs(1, chptr, cptr,
+					     ":%s SJOIN %ld %s + :@%s",
+					     me.name, chptr->channelts, name,
+					     parv[0]);
+		    }
+		else
+		    sendto_match_servs(chptr, cptr, ":%s JOIN :%s", parv[0],
+					 name);
+		/*
 		** notify all other users on the new channel
 		*/
 		sendto_channel_butserv(chptr, sptr, ":%s JOIN :%s",
 					parv[0], name);
-		sendto_match_servs(chptr, cptr, ":%s JOIN :%s", parv[0], name);
 
 		if (MyClient(sptr))
 		    {
 			del_invite(sptr, chptr);
 			if (flags == CHFL_CHANOP)
-				sendto_match_servs(chptr, cptr,
+				sendto_match_TS_servs(0, chptr, cptr,
 						   ":%s MODE %s +o %s",
 						   me.name, name, parv[0]);
 			if (chptr->topic[0] != '\0')
@@ -1582,7 +1767,8 @@ char	*parv[];
 		    }
 		if (check_channelmask(sptr, cptr, name))
 			continue;
-		if (!IsServer(sptr) && !is_chan_op(sptr, chptr))
+		if (!IsServer(sptr) && !is_chan_op(sptr, chptr) &&
+		    (MyConnect(sptr) || !DoesTS(cptr) || !chptr->channelts))
 		    {
 			sendto_one(sptr, err_str(ERR_CHANOPRIVSNEEDED),
 				   me.name, parv[0], chptr->chname);
@@ -1927,7 +2113,7 @@ char	*parv[];
 	    hunt_server(cptr, sptr, ":%s NAMES %s %s", 2, parc, parv))
 		return 0;
 
-	mlen = strlen(me.name) + 10;
+	mlen = strlen(me.name) + NICKLEN + 7;
 
 	if (!BadPtr(para))
 	    {
@@ -1989,7 +2175,7 @@ char	*parv[];
 			idx += strlen(c2ptr->name) + 1;
 			flag = 1;
 			(void)strcat(buf," ");
-			if (mlen + idx + NICKLEN > BUFSIZE - 2)
+			if (mlen + idx + NICKLEN > BUFSIZE - 3)
 			    {
 				sendto_one(sptr, rpl_str(RPL_NAMREPLY),
 					   me.name, parv[0], buf);
@@ -2112,3 +2298,447 @@ aClient	*cptr, *user;
 
 	return;
 }
+
+static	void sjoin_sendit(cptr, sptr, chptr, from)
+aClient *cptr;
+aClient *sptr;
+aChannel *chptr;
+char	*from;
+{
+	sendto_channel_butserv(chptr, sptr, ":%s MODE %s %s %s", from,
+				chptr->chname, modebuf, parabuf);
+
+	sendto_match_TS_servs(0, chptr, cptr, ":%s MODE %s %s %s",
+				from, chptr->chname, modebuf, parabuf);
+}
+
+/*
+ * m_sjoin
+ * parv[0] - sender
+ * parv[1] - TS
+ * parv[2] - channel
+ * parv[3] - modes + n arguments (key and/or limit)
+ * parv[4+n] - flags+nick list (all in one parameter)
+
+ * 
+ * process a SJOIN, taking the TS's into account to either ignore the
+ * incomign modes or undo the existing ones or merge them, and JOIN
+ * all the specified users while sending JOIN/MODEs to non-TS servers
+ * and to clients
+ */
+
+int	m_sjoin(cptr, sptr, parc, parv)
+aClient *cptr;
+aClient *sptr;
+int	parc;
+char	*parv[];
+{
+	aChannel *chptr;
+	aClient	*acptr;
+	ts_val	newts, oldts, tstosend;
+	static	Mode mode, *oldmode;
+	Link	*l;
+	int	args = 0, haveops = 0, keepourmodes = 1, keepnewmodes = 1,
+		doesop = 0, what = 0, pargs = 0, *ip, fl, people = 0;
+	Reg1	char *s, *s0;
+	static	char numeric[16], sjbuf[BUFSIZE];
+	char	*mbuf = modebuf, *t = sjbuf, *p;
+
+	static	int	flags[] = {
+				MODE_PRIVATE,    'p', MODE_SECRET,     's',
+				MODE_MODERATED,  'm', MODE_NOPRIVMSGS, 'n',
+				MODE_TOPICLIMIT, 't', MODE_INVITEONLY, 'i',
+				0x0, 0x0 };
+
+	if (check_registered(sptr) || IsClient(sptr) || parc < 5)
+		return 0;
+	if (!IsChannelName(parv[2]) ||
+	    check_channelmask(sptr, cptr, parv[2]) == -1)
+		return 0;
+	newts = atol(parv[1]);
+	bzero((char *)&mode, sizeof(mode));
+
+	s = parv[3];
+	while (*s)
+		switch(*(s++))
+		    {
+		    case 'i':
+			mode.mode |= MODE_INVITEONLY;
+			break;
+		    case 'n':
+			mode.mode |= MODE_NOPRIVMSGS;
+			break;
+		    case 'p':
+			mode.mode |= MODE_PRIVATE;
+			break;
+		    case 's':
+			mode.mode |= MODE_SECRET;
+			break;
+		    case 'm':
+			mode.mode |= MODE_MODERATED;
+			break;
+		    case 't':
+			mode.mode |= MODE_TOPICLIMIT;
+			break;
+		    case 'k':
+			strncpyzt(mode.key, parv[4+args], KEYLEN+1);
+			args++;
+			if (parc < 5+args) return 0;
+			break;
+		    case 'l':
+			mode.limit = atoi(parv[4+args]);
+			args++;
+			if (parc < 5+args) return 0;
+			break;
+		    }
+
+	*parabuf = '\0';
+
+	chptr = get_channel(sptr, parv[2], CREATE);
+	oldts = chptr->channelts;
+	doesop = (parv[4+args][0] == '@' || parv[4+args][1] == '@');
+
+	for (l = chptr->members; l && l->value.cptr; l = l->next)
+		if (l->flags & MODE_CHANOP)
+		    {
+			haveops++;
+			break;
+		    }
+
+	oldmode = &chptr->mode;
+
+	if (newts == 0)
+		if (haveops || !doesop)
+			tstosend = oldts;
+		else
+			chptr->channelts = tstosend = 0;
+	else if (oldts == 0)
+		if (doesop || !haveops)
+			chptr->channelts = tstosend = newts;
+		else
+			tstosend = 0;
+	else if (newts == oldts)
+		tstosend = oldts;
+	else if (newts < oldts)
+	    {
+		if (doesop)
+			keepourmodes = 0;
+		if (haveops && !doesop)
+			tstosend = oldts;
+		else
+			chptr->channelts = tstosend = newts;
+	    }
+	else
+	    {
+		if (haveops)
+			keepnewmodes = 0;
+		if (doesop && !haveops)
+		    {
+			chptr->channelts = tstosend = newts;
+			if (MyConnect(sptr))
+				sendto_ops("Hacked ops on opless channel: %s",
+					    chptr->chname);
+		    }
+		else
+			tstosend = oldts;
+	    }
+
+	if (!keepnewmodes)
+		mode = *oldmode;
+	else if (keepourmodes)
+	    {
+		mode.mode |= oldmode->mode;
+		if (oldmode->limit > mode.limit)
+			mode.limit = oldmode->limit;
+		if (strcmp(mode.key, oldmode->key) < 0)
+			strcpy(mode.key, oldmode->key);
+	    }
+
+	for (ip = flags; *ip; ip += 2)
+		if ((*ip & mode.mode) && !(*ip & oldmode->mode))
+		    {
+			if (what != 1)
+			    {
+				*mbuf++ = '+';
+				what = 1;
+			    }
+			*mbuf++ = *(ip+1);
+		    }
+	for (ip = flags; *ip; ip += 2)
+		if ((*ip & oldmode->mode) && !(*ip & mode.mode))
+		    {
+			if (what != -1)
+			    {
+				*mbuf++ = '-';
+				what = -1;
+			    }
+			*mbuf++ = *(ip+1);
+		    }
+	if (oldmode->limit && !mode.limit)
+	    {
+		if (what != -1)
+		    {
+			*mbuf++ = '-';
+			what = -1;
+		    }
+		*mbuf++ = 'l';
+	    }
+	if (oldmode->key[0] && !mode.key[0])
+	    {
+		if (what != -1)
+		    {
+			*mbuf++ = '-';
+			what = -1;
+		    }
+		*mbuf++ = 'k';
+                strcat(parabuf, oldmode->key);
+                strcat(parabuf, " ");
+                pargs++;
+	    }
+	if (mode.limit && oldmode->limit != mode.limit)
+	    {
+		if (what != 1)
+		    {
+			*mbuf++ = '+';
+			what = 1;
+		    }
+		*mbuf++ = 'l';
+		(void)sprintf(numeric, "%-15d", mode.limit);
+		if ((s = index(numeric, ' ')))
+			*s = '\0';
+		strcat(parabuf, numeric);
+		strcat(parabuf, " ");
+		pargs++;
+	    }
+	if (mode.key[0] && strcmp(oldmode->key, mode.key))
+	    {
+		if (what != 1)
+		    {
+			*mbuf++ = '+';
+			what = 1;
+		    }
+		*mbuf++ = 'k';
+		strcat(parabuf, mode.key);
+		strcat(parabuf, " ");
+		pargs++;
+	    }
+
+	chptr->mode = mode;
+
+	if (!keepourmodes)
+	    {
+	    	what = 0;
+		for (l = chptr->members; l && l->value.cptr; l = l->next)
+		    {
+			if (l->flags & MODE_CHANOP)
+			    {
+				if (what != -1)
+				    {
+					*mbuf++ = '-';
+					what = -1;
+				    }
+				*mbuf++ = 'o';
+				strcat(parabuf, l->value.cptr->name);
+				strcat(parabuf, " ");
+				pargs++;
+				if (pargs >= (MAXMODEPARAMS-2))
+				    {
+					*mbuf = '\0';
+					sjoin_sendit(cptr, sptr, chptr,
+						    parv[0]);
+					mbuf = modebuf;
+					*mbuf = parabuf[0] = '\0';
+					pargs = what = 0;
+				    }
+				l->flags &= ~MODE_CHANOP;
+			    }
+			if (l->flags & MODE_VOICE)
+			    {
+				if (what != -1)
+				    {
+					*mbuf++ = '-';
+					what = -1;
+				    }
+				*mbuf++ = 'v';
+				strcat(parabuf, l->value.cptr->name);
+				strcat(parabuf, " ");
+				pargs++;
+				if (pargs >= (MAXMODEPARAMS-2))
+				    {
+					*mbuf = '\0';
+					sjoin_sendit(cptr, sptr, chptr,
+						    parv[0]);
+					mbuf = modebuf;
+					*mbuf = parabuf[0] = '\0';
+					pargs = what = 0;
+				    }
+				l->flags &= ~MODE_VOICE;
+			    }
+		    }
+	    }
+	if (mbuf != modebuf)
+	    {
+	    	*mbuf = '\0';
+		sjoin_sendit(cptr, sptr, chptr, parv[0]);
+	    }
+
+	*modebuf = *parabuf = '\0';
+	if (parv[3][0] != '0' && keepnewmodes)
+		channel_modes(sptr, modebuf, parabuf, chptr);
+	else
+	    {
+		modebuf[0] = '0';
+		modebuf[1] = '\0';
+	    }
+
+	sprintf(t, ":%s SJOIN %ld %s %s %s :", parv[0], tstosend, parv[2],
+		modebuf, parabuf);
+	t += strlen(t);
+
+	mbuf = modebuf;
+	parabuf[0] = '\0';
+	pargs = 0;
+	*mbuf++ = '+';
+
+	for (s = s0 = strtoken(&p, parv[args+4], " "); s;
+	     s = s0 = strtoken(&p, NULL, " "))
+	    {
+		fl = 0;
+		if (*s == '@' || s[1] == '@')
+			fl |= MODE_CHANOP;
+		if (*s == '+' || s[1] == '+')
+			fl |= MODE_VOICE;
+		if (!keepnewmodes)
+			if (fl & MODE_CHANOP)
+				fl = MODE_DEOPPED;
+			else
+				fl = 0;
+		while (*s == '@' || *s == '+')
+			s++;
+		if (!(acptr = find_chasing(sptr, s, NULL)))
+			continue;
+		if (acptr->from != cptr)
+			continue;
+		people++;
+		if (!IsMember(acptr, chptr))
+		    {
+			add_user_to_channel(chptr, acptr, fl);
+			sendto_channel_butserv(chptr, acptr, ":%s JOIN :%s",
+						s, parv[2]);
+			sendto_match_TS_servs(0, chptr, cptr, ":%s JOIN :%s",
+						s, parv[2]);
+		    }
+		if (keepnewmodes)
+			strcpy(t, s0);
+		else
+			strcpy(t, s);
+		t += strlen(t);
+		*t++ = ' ';
+		if (fl & MODE_CHANOP)
+		    {
+			*mbuf++ = 'o';
+			strcat(parabuf, s);
+			strcat(parabuf, " ");
+			pargs++;
+			if (pargs >= (MAXMODEPARAMS-2))
+			    {
+				*mbuf = '\0';
+				sjoin_sendit(cptr, sptr, chptr, parv[0]);
+				mbuf = modebuf;
+				*mbuf++ = '+';
+				parabuf[0] = '\0';
+				pargs = 0;
+			    }
+		    }
+		if (fl & MODE_VOICE)
+		    {
+			*mbuf++ = 'v';
+			strcat(parabuf, s);
+			strcat(parabuf, " ");
+			pargs++;
+			if (pargs >= (MAXMODEPARAMS-2))
+			    {
+				*mbuf = '\0';
+				sjoin_sendit(cptr, sptr, chptr, parv[0]);
+				mbuf = modebuf;
+				*mbuf++ = '+';
+				parabuf[0] = '\0';
+				pargs = 0;
+			    }
+		    }
+	    }
+
+	*mbuf = '\0';
+	if (pargs)
+		sjoin_sendit(cptr, sptr, chptr, parv[0]);
+	if (people)
+	    {
+		if (t[-1] == ' ')
+			t[-1] = '\0';
+		else
+			*t = '\0';
+		sendto_match_TS_servs(1, chptr, cptr, "%s", sjbuf);
+	    }
+}
+
+
+#ifdef	TSDEBUG
+/* this code is for debugging purposes only and should be removed in the
+** definitive version of TSora... besides, it's illegible  -orabidoo
+*/
+int	m_ts(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int	parc;
+char	*parv[];
+{
+	aClient	*acptr;
+	aChannel *chptr;
+
+	if (check_registered_user(sptr))
+		return 0;
+	sendto_one(sptr, ":%s 999 %s :Time delta is: %ld", me.name, sptr->name, timedelta);
+	if (parc > 1)
+	    {
+		if (*parv[1] == '#' || *parv[1] == '&') 
+		    {
+			chptr = get_channel(sptr, parv[1], 0);
+			if (!chptr)
+			    {
+				sendto_one(sptr, err_str(ERR_NOSUCHCHANNEL),
+					    me.name, parv[0], parv[1]);
+				return 0;
+			    }
+			sendto_one(sptr, ":%s 999 %s :Channel - %s : %ld", 
+				   me.name, sptr->name, chptr->chname,
+				   chptr->channelts);
+		    }
+		else
+		    {
+			acptr = find_chasing(sptr, parv[1], NULL);
+			if (!acptr)
+				return 0;
+			sendto_one(sptr, ":%s 999 %s :User - %s : %ld",
+				   me.name, sptr->name, acptr->name,
+				   acptr->tsinfo);
+		   }
+	       return 0;
+	   }
+	for (acptr = client; acptr; acptr = acptr->next)
+	{
+	    if (IsPerson(acptr))
+	    	sendto_one(sptr, ":%s 999 %s :User - %s : %ld", me.name,
+			     sptr->name, acptr->name, acptr->tsinfo);
+	    else if (IsServer(acptr) && MyConnect(acptr))
+		sendto_one(sptr, ":%s 999 %s :Server - %s (%s)", me.name,
+			    sptr->name, acptr->name,
+			    (DoesTS(acptr) ? "does TS" : "no TS"));
+	}
+	for (chptr = channel; chptr; chptr = chptr->nextch)
+		sendto_one(sptr, ":%s 999 %s :Channel - %s : %ld", me.name,
+			     sptr->name, chptr->chname, chptr->channelts);
+	return 0;
+}
+
+#endif
+
+

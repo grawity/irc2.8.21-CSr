@@ -203,6 +203,12 @@ char	serveropts[] = {
 #ifdef DOG3
 '3',
 #endif
+' ',
+'T',
+'S',
+#ifdef	TSDEBUG
+'d',
+#endif
 '\0'};
 
 #include "numeric.h"

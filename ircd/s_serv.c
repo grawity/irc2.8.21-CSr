@@ -51,6 +51,8 @@ static	char	buf[BUFSIZE];
 int     max_connection_count = 1, max_client_count = 1;
 #endif
 
+extern 	ts_val	timedelta;
+
 /*
 ** m_functions execute protocol messages on this server:
 **
@@ -360,6 +362,49 @@ char	*parv[];
     }
 
 /*
+** ts_servcount
+**	returns the number of TS servers that are connected to us
+*/
+int	ts_servcount()
+{
+	Reg1	int	i;
+	Reg2	aClient	*acptr;
+	Reg3	int	r = 0;
+
+	for (i = 0; i <= highest_fd; i++)
+	    	if ((acptr = local[i]) && IsServer(acptr) && DoesTS(acptr))
+			r++;
+	return r;
+}
+
+/*
+** m_svinfo
+**	parv[0] = sender prefix
+**	parv[1] = TS_CURRENT for the server
+**	parv[2] = TS_MIN for the server
+**	parv[3] = server is standalone or connected to non-TS only
+**	parv[4] = server's idea of UTC time
+*/
+int	m_svinfo(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int	parc;
+char	*parv[];
+{
+	Reg1	ts_val	v;
+
+	if (cptr != sptr || (!IsUnknown(cptr) && !IsHandshake(cptr)) ||
+	    parc < 5 || TS_CURRENT < atoi(parv[2]) || atoi(parv[1]) < TS_MIN)
+		return 0;
+
+	if (atoi(parv[3]))
+	    	v = (atol(parv[4]) - (ts_val)time(NULL) - timedelta) / 2;
+	else
+	    	v = atol(parv[4]) - (ts_val)time(NULL) - timedelta;
+	cptr->tsinfo = (v ? v : (ts_val)TS_LEAVEIT);
+	return 0;
+}
+
+/*
 ** m_server
 **	parv[0] = sender prefix
 **	parv[1] = servername
@@ -606,9 +651,36 @@ char	*parv[];
 
 }
 
+static void	sendnick_TS(cptr, acptr)
+aClient	*cptr, *acptr;
+{
+	static	char ubuf[12];
+
+	if (IsPerson(acptr))
+	    {
+		send_umode(NULL, acptr, 0, SEND_UMODES,
+			   ubuf);
+		if (!*ubuf)
+			strcpy(ubuf, "+");
+		sendto_one(cptr, "NICK %s %d %ld %s %s %s %s :%s", acptr->name, 
+			   acptr->hopcount + 1, acptr->tsinfo, ubuf,
+			   acptr->user->username, acptr->user->host,
+			   acptr->user->server, acptr->info);
+	    }
+	else if (IsService(acptr))
+	    {
+		sendto_one(cptr,"NICK %s :%d",
+			   acptr->name, 
+			   acptr->hopcount + 1);
+		sendto_one(cptr,":%s SERVICE * * :%s", acptr->name,
+			   acptr->info);
+	    }
+}
+
 int	m_server_estab(cptr)
 Reg1	aClient	*cptr;
 {
+	Reg1	aChannel *chptr;
 	Reg2	aClient	*acptr;
 	Reg3	aConfItem	*aconf, *bconf;
 	char	*inpath, *host, *s, *encr;
@@ -681,6 +753,9 @@ Reg1	aClient	*cptr;
 		/*
 		** Pass my info to the new server
 		*/
+		sendto_one(cptr, "SVINFO %d %d %d :%ld", TS_CURRENT, TS_MIN,
+			   (ts_servcount() == 0 ? 1 : 0),
+			   (ts_val)time(NULL) + timedelta);
 		sendto_one(cptr, "SERVER %s 1 :%s",
 			   my_name_for_link(me.name, aconf), 
 			   (me.info[0]) ? (me.info) : "IRCers United");
@@ -704,6 +779,13 @@ Reg1	aClient	*cptr;
 		*s = '@';
 	    }
 
+	if (cptr->tsinfo && cptr->tsinfo != (ts_val)TS_LEAVEIT &&
+	    !DoesTS(cptr) && ts_servcount() == 0)
+		timedelta += cptr->tsinfo;
+
+	if (cptr->tsinfo)
+		cptr->tsinfo = TS_DOESTS;
+	    
 	det_confs_butmask(cptr, CONF_LEAF|CONF_HUB|CONF_NOCONNECT_SERVER);
 	/*
 	** *WARNING*
@@ -802,42 +884,93 @@ Reg1	aClient	*cptr;
 		    }
 	    }
 
-	for (acptr = &me; acptr; acptr = acptr->prev)
+	if (DoesTS(cptr))
 	    {
-		/* acptr->from == acptr for acptr == cptr */
-		if (acptr->from == cptr)
-			continue;
-		if (IsPerson(acptr))
+	    	Link	*l;
+		static	char nickissent = 1;
+
+		/*
+		** Send it in the shortened format with the TS, if
+		** it's a TS server; walk the list of channels, sending
+		** all the nicks that haven't been sent yet for each
+		** channel, then send the channel itself -- it's less
+		** obvious than sending all nicks first, but on the
+		** receiving side memory will be allocated more nicely
+		** saving a few seconds in the handling of a split
+		** -orabidoo
+		*/
+
+		nickissent = 3 - nickissent;
+		/* flag used for each nick to check if we've sent it
+		   yet - must be different each time and !=0, so we
+		   alternate between 1 and 2 -orabidoo
+	        */
+		for (chptr = channel; chptr; chptr = chptr->nextch)
 		    {
+			for (l = chptr->members; l; l = l->next)
+			    {
+				acptr = l->value.cptr;
+				if (acptr->nicksent != nickissent)
+				    {
+					acptr->nicksent = nickissent;
+					if (acptr->from != cptr)
+						sendnick_TS(cptr, acptr);
+				    }
+			    }
+			send_channel_modes(cptr, chptr);
+		    }
+		/*
+		** also send out those that are not on any channel
+		*/
+		for (acptr = &me; acptr; acptr = acptr->prev)
+			if (acptr->nicksent != nickissent)
+			    {
+				acptr->nicksent = nickissent;
+				if (acptr->from != cptr)
+					sendnick_TS(cptr, acptr);
+			    }
+			
+	    }
+	else
+	    {
+	    	/*
+		** do it the usual way, for non-TS servers  -orabidoo
+		*/
+		for (acptr = &me; acptr; acptr = acptr->prev)
+		    {
+			/* acptr->from == acptr for acptr == cptr */
+			if (acptr->from == cptr)
+				continue;
+			if (IsPerson(acptr))
+			    {
 			/*
 			** IsPerson(x) is true only when IsClient(x) is true.
 			** These are only true when *BOTH* NICK and USER have
 			** been received. -avalon
 			*/
-			sendto_one(cptr,"NICK %s :%d",acptr->name,
-				   acptr->hopcount + 1);
-			sendto_one(cptr,":%s USER %s %s %s :%s", acptr->name,
-				   acptr->user->username, acptr->user->host,
-				   acptr->user->server, acptr->info);
-			send_umode(cptr, acptr, 0, SEND_UMODES, buf);
-			send_user_joins(cptr, acptr);
+				sendto_one(cptr,"NICK %s :%d",acptr->name,
+					   acptr->hopcount + 1);
+				sendto_one(cptr,
+					":%s USER %s %s %s :%s", acptr->name,
+				       acptr->user->username, acptr->user->host,
+				       acptr->user->server, acptr->info);
+				send_umode(cptr, acptr, 0, SEND_UMODES, buf);
+				send_user_joins(cptr, acptr);
+			    }
+			else if (IsService(acptr))
+			    {
+				sendto_one(cptr,"NICK %s :%d",
+					   acptr->name, acptr->hopcount + 1);
+				sendto_one(cptr,":%s SERVICE * * :%s",
+					   acptr->name, acptr->info);
+			    }
 		    }
-		else if (IsService(acptr))
-		    {
-			sendto_one(cptr,"NICK %s :%d",
-				   acptr->name, acptr->hopcount + 1);
-			sendto_one(cptr,":%s SERVICE * * :%s",
-				   acptr->name, acptr->info);
-		    }
-	    }
-	/*
-	** Last, pass all channels plus statuses
-	*/
-	{
-		Reg1 aChannel *chptr;
+		/*
+		** Last, pass all channels plus statuses
+		*/
 		for (chptr = channel; chptr; chptr = chptr->nextch)
 			send_channel_modes(cptr, chptr);
-	}
+	    }
 	return 0;
 }
 

@@ -363,10 +363,11 @@ char	*comment;	/* Reason for the exit */
 		on_for = time(NULL) - sptr->firsttime;
 # if defined(USE_SYSLOG) && defined(SYSLOG_USERS)
 		if (IsPerson(sptr))
-			syslog(LOG_NOTICE, "%s (%3d:%02d:%02d): %s@%s\n",
+			syslog(LOG_NOTICE, "%s (%3d:%02d:%02d): %s!%s@%s\n",
 				myctime(sptr->firsttime),
 				on_for / 3600, (on_for % 3600)/60,
 				on_for % 60,
+				sptr->name,
 				sptr->user->username, sptr->user->host);
 # else
 	    {
@@ -385,10 +386,11 @@ char	*comment;	/* Reason for the exit */
 		    (logfile = open(FNAME_USERLOG, O_WRONLY|O_APPEND)) != -1)
 		    {
 			(void)irc_sprintf(linebuf,
-				"%s (%3d:%02d:%02d): %s@%s [%s]\n",
+				"%s (%3d:%02d:%02d): %s!%s@%s [%s]\n",
 				myctime(sptr->firsttime),
 				on_for / 3600, (on_for % 3600)/60,
 				on_for % 60,
+				sptr->name,
 				sptr->user->username, sptr->user->host,
 				sptr->username);
 			(void)write(logfile, linebuf, strlen(linebuf));

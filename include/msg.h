@@ -79,6 +79,11 @@
 #define	MSG_REHASH   "REHASH"	/* REHA */
 #define	MSG_RESTART  "RESTART"	/* REST */
 #define	MSG_CLOSE    "CLOSE"	/* CLOS */
+#define	MSG_SVINFO   "SVINFO"	/* SVINFO */
+#define	MSG_SJOIN    "SJOIN"	/* SJOIN */
+#ifdef	TSDEBUG
+#define	MSG_TS	     "TS"	/* TS */
+#endif
 #define	MSG_DIE	     "DIE"
 #define	MSG_HASH     "HSAH"	/* HASH */
 #define	MSG_DNS      "DNS"	/* DNS  -> DNSS */
@@ -110,8 +115,11 @@ extern int m_oper(), m_pass(), m_trace();
 extern int m_time(), m_names(), m_admin();
 extern int m_lusers(), m_umode(), m_note(), m_close();
 extern int m_motd(), m_whowas();
-extern int m_service(), m_userhost(), m_ison();
+extern int m_service(), m_userhost(), m_ison(), m_svinfo(), m_sjoin();
 extern int m_service(), m_servset(), m_servlist(), m_squery();
+#ifdef TSDEBUG
+extern int m_ts();
+#endif
 #if defined(OPER_REHASH) || defined(LOCOP_REHASH)
 extern	int	m_rehash();
 #endif
@@ -169,6 +177,11 @@ struct Message msgtab[] = {
   { MSG_INFO,    m_info,     0, MAXPARA, 1 ,0L },
   { MSG_MOTD,    m_motd,     0, MAXPARA, 1 ,0L },
   { MSG_CLOSE,   m_close,    0, MAXPARA, 1 ,0L },
+  { MSG_SVINFO,  m_svinfo,   0, MAXPARA, 1, 0L },
+  { MSG_SJOIN,   m_sjoin,    0, MAXPARA, 1, 0L },
+#ifdef TSDEBUG
+  { MSG_TS,      m_ts,       0, MAXPARA, 1, 0L },
+#endif
 #ifdef IDLE_CHECK
   { MSG_IDLE,    m_idle,     0, MAXPARA, 1 ,0L },
 #endif 

@@ -30,6 +30,9 @@
 #ifdef STDDEFH
 # include <stddef.h>
 #endif
+#ifdef ORATIMING
+#include <sys/time.h>
+#endif
 
 #ifdef USE_SYSLOG
 # include <syslog.h>
@@ -48,6 +51,7 @@ typedef	struct	User	anUser;
 typedef	struct	Server	aServer;
 typedef	struct	SLink	Link;
 typedef	struct	SMode	Mode;
+typedef	long	ts_val;
 
 typedef struct  CloneItem aClone;
 
@@ -336,11 +340,13 @@ struct Client	{
 	time_t	lasttime;	/* ...should be only LOCAL clients? --msa */
 	time_t	firsttime;	/* time client was created */
 	time_t	since;		/* last time we parsed something */
+	ts_val	tsinfo;		/* TS on the nick, SVINFO on servers */
 	long	flags;		/* client flags */
 	aClient	*from;		/* == self, if Local Client, *NEVER* NULL! */
 	int	fd;		/* >= 0, for local clients */
 	int	hopcount;	/* number of servers to this 0 = local */
 	short	status;		/* Client type */
+	char	nicksent;
 	char	name[HOSTLEN+1]; /* Unique name of the client, nick or host */
 	char	username[USERLEN+1]; /* username here now for auth stuff */
 	char	info[REALLEN+1]; /* Free form additional client information */
@@ -473,8 +479,15 @@ struct Channel	{
 	Link	*members;
 	Link	*invites;
 	Link	*banlist;
+	ts_val	channelts;
 	char	chname[1];
 };
+
+#define	TS_CURRENT	1	/* current TS protocol version */
+#define	TS_MIN		1	/* minimum supported TS protocol version */
+#define	TS_LEAVEIT	0x10000000
+#define	TS_DOESTS	0x20000000
+#define	DoesTS(x)	((x)->tsinfo == TS_DOESTS)
 
 /*
 ** Channel Related macros follow
@@ -484,22 +497,24 @@ struct Channel	{
 
 #define	CHFL_CHANOP     0x0001 /* Channel operator */
 #define	CHFL_VOICE      0x0002 /* the power to speak */
-#define	CHFL_BAN	0x0004 /* ban channel flag */
+#define	CHFL_DEOPPED	0x0004 /* deopped by us, modes need to be bounced */
+#define	CHFL_BAN	0x0008 /* ban channel flag */
 
 /* Channel Visibility macros */
 
 #define	MODE_CHANOP	CHFL_CHANOP
 #define	MODE_VOICE	CHFL_VOICE
-#define	MODE_PRIVATE	0x0004
-#define	MODE_SECRET	0x0008
-#define	MODE_MODERATED  0x0010
-#define	MODE_TOPICLIMIT 0x0020
-#define	MODE_INVITEONLY 0x0040
-#define	MODE_NOPRIVMSGS 0x0080
-#define	MODE_KEY	0x0100
-#define	MODE_BAN	0x0200
-#define	MODE_LIMIT	0x0400
-#define MODE_FLAGS	0x07ff
+#define	MODE_DEOPPED	CHFL_DEOPPED
+#define	MODE_PRIVATE	0x0008
+#define	MODE_SECRET	0x0010
+#define	MODE_MODERATED  0x0020
+#define	MODE_TOPICLIMIT 0x0040
+#define	MODE_INVITEONLY 0x0080
+#define	MODE_NOPRIVMSGS 0x0100
+#define	MODE_KEY	0x0200
+#define	MODE_BAN	0x0400
+#define	MODE_LIMIT	0x0800
+#define	MODE_FLAGS	0x0fff
 /*
  * mode flags which take another parameter (With PARAmeterS)
  */
@@ -576,6 +591,25 @@ extern	char	*generation, *creation;
 #define	FLUSH_BUFFER	-2
 #define	UTMP		"/etc/utmp"
 #define	COMMA		","
+
+#ifdef ORATIMING
+/* Timing stuff (for performance measurements): compile with -DORATIMING
+   and put a TMRESET where you want the counter of time spent set to 0,
+   a TMPRINT where you want the accumulated results, and TMYES/TMNO pairs
+   around the parts you want timed -orabidoo
+*/
+extern struct timeval tsdnow, tsdthen;
+extern unsigned long tsdms;
+#define TMRESET tsdms=0;
+#define TMYES gettimeofday(&tsdthen, NULL);
+#define TMNO gettimeofday(&tsdnow, NULL); if (tsdnow.tv_sec!=tsdthen.tv_sec) tsdms+=1000000*(tsdnow.tv_sec-tsdthen.tv_sec); tsdms+=tsdnow.tv_usec; tsdms-=tsdthen.tv_usec;
+#define TMPRINT sendto_ops("Time spent: %ld ms", tsdms);
+#else
+#define TMRESET
+#define TMYES
+#define TMNO
+#define TMPRINT
+#endif
 
 /* IRC client structures */
 

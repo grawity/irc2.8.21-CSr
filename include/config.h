@@ -107,8 +107,8 @@
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/home/irc/irc2.8.21+CSr15/lib"	/* dir where all ircd stuff is */
-#define	SPATH	"/home/irc/irc2.8.21+CSr15/lib/ircd"
+#define	DPATH	"/home/irc/irc2.8.21+CSr16/lib"	/* dir where all ircd stuff is */
+#define	SPATH	"/home/irc/irc2.8.21+CSr16/lib/ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
 #define	LPATH	"ircd.log" /* Where the debug file lives, if DEBUGMODE */
@@ -122,8 +122,8 @@
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
 
-#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr15/logs/users.log" /* */
-#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr15/logs/opers.log" /* */
+#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr16/logs/users.log" /* */
+#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr16/logs/opers.log" /* */
 
 /* CHROOTDIR
  *
@@ -324,7 +324,7 @@
 /*
  * Max amount of internal send buffering when socket is stuck (bytes)
  */
-#define MAXSENDQLENGTH 1500000    /* Recommended value: 100000 for leaves */
+#define MAXSENDQLENGTH 3000000    /* Recommended value: 100000 for leaves */
                                  /*                    700000 for backbones */
 /*
  *  BUFFERPOOL is the maximum size of the total of all sendq's.

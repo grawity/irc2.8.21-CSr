@@ -109,6 +109,8 @@ static	char	*readbuf;
 static	char	readbuf[READBUFSIZE];
 #endif
 
+extern	ts_val	timedelta;
+
 /*
  * Try and find the correct name to use with getrlimit() for setting the max.
  * number of files allowed to be open by this process.
@@ -938,6 +940,8 @@ aClient	*cptr;
 		sendto_ops("Lost N-Line for %s", get_client_name(cptr,FALSE));
 		return -1;
 	    }
+	sendto_one(cptr, "SVINFO %d %d %d :%ld", TS_CURRENT, TS_MIN,
+		   (ts_servcount() == 0 ? 1 : 0), (ts_val)time(NULL)+timedelta);
 	sendto_one(cptr, "SERVER %s 1 :%s",
 		   my_name_for_link(me.name, aconf), me.info);
 	if (!IsDead(cptr))

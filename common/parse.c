@@ -487,66 +487,47 @@ static	int	cancel_clients(cptr, sptr, cmd)
 aClient	*cptr, *sptr;
 char	*cmd;
 {
-	sendto_ops("Message from %s[%s] != %s", sptr->name,
-		sptr->from->name, get_client_name(cptr, TRUE));
+	if (IsServer(sptr) || IsMe(sptr) || (IsServer(cptr) &&
+	    !DoesTS(cptr)))
+		sendto_ops("Message from %s[%s] != %s", sptr->name,
+			   sptr->from->name, get_client_name(cptr, TRUE));
 	if (IsServer(sptr) || IsMe(sptr))
 	{ 
 		sendto_ops("Dropping link for fake direction: %s", cptr->name);
 		return exit_client(cptr, cptr, &me, "Fake Direction");
 	}
+	/*
+	** with TS, fake prefixes are a common thing, during the
+	** connect burst when there's a nick collision, and they
+	** must be ignored rather than killed because one of the
+	** two is surviving.. so we don't bother sending them to
+	** all ops everytime, as this could send 'private' stuff
+	** from lagged clients. we do send the ones that cause
+	** servers to be dropped though, as well as the ones from
+	** non-TS servers -orabidoo
+	*/
 	if (IsServer(cptr))
 	{
-                sendto_serv_butone(NULL, ":%s KILL %s :%s (%s[%s] != %s)",
-                                   me.name, sptr->name, me.name,
-                                   sptr->name, sptr->from->name,
-                                   get_client_name(cptr, TRUE));
-                sptr->flags |= FLAGS_KILLED;
-                return exit_client(cptr, sptr, &me, "Fake Prefix");
+	/*
+	** If the fake prefix from a client is coming from a TS server,
+	** discard it silently -orabidoo
+	*/
+		if (DoesTS(cptr))
+			return 0;
+		else
+		    {
+                	sendto_serv_butone(NULL,
+					   ":%s KILL %s :%s (%s[%s] != %s)",
+					   me.name, sptr->name, me.name,
+					   sptr->name, sptr->from->name,
+					   get_client_name(cptr, TRUE));
+	                sptr->flags |= FLAGS_KILLED;
+			return exit_client(cptr, sptr, &me, "Fake Prefix");
+		    }
 	}
 	/* Fake prefix came from a client of mine...something is screwed
 	   with it, so we can exit this one
 	*/
-	return exit_client(cptr, cptr, &me, "Fake prefix");
-}
-
-static	int	av_cancel_clients(cptr, sptr, cmd)
-aClient	*cptr, *sptr;
-char	*cmd;
-{
-	/*
-	 * kill all possible points that are causing confusion here,
-	 * I'm not sure I've got this all right...
-	 * - avalon
-	 * No, i don't think you do
-	 * - comstud
-	 */
-	sendto_ops("Message (%s) for %s[%s!%s@%s] from %s", cmd,
-		   sptr->name, sptr->from->name, sptr->from->username,
-		   sptr->from->sockhost, get_client_name(cptr, TRUE));
-	/*
-	 * Incorrect prefix for a server from some connection.  If it is a
-	 * client trying to be annoying, just QUIT them, if it is a server
-	 * then the same deal.
-	 */
-	if (IsServer(sptr) || IsMe(sptr))
-	    {
-		sendto_ops("Fake Direction: Not dropping: %s", cptr->name);
-		return exit_client(cptr, cptr, &me, "Fake Direction");
-	    }
-	/*
-	 * Ok, someone is trying to impose as a client and things are
-	 * confused.  If we got the wrong prefix from a server, send out a
-	 * kill, else just exit the lame client.
-	 */
-	if (IsServer(cptr))
-	    {
-		sendto_serv_butone(NULL, ":%s KILL %s :%s (%s[%s] != %s)",
-				   me.name, sptr->name, me.name,
-				   sptr->name, sptr->from->name,
-				   get_client_name(cptr, TRUE));
-		sptr->flags |= FLAGS_KILLED;
-		return exit_client(cptr, sptr, &me, "Fake Prefix");
-	    }
 	return exit_client(cptr, cptr, &me, "Fake prefix");
 }
 

@@ -882,9 +882,9 @@ done_check:
 		** ping times) --msa
 		*/
 #ifdef DOG3
-		if (now >= nextping && !lifesux)
+		if ((now >= nextping && !lifesux) || rehashed)
 #else
-		if (now >= nextping)
+		if ((now >= nextping) || rehashed)
 #endif
 			nextping = check_pings(now);
 

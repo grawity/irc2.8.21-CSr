@@ -83,7 +83,7 @@ COMMONOBJS=../common/bsd.o ../common/dbuf.o ../common/packet.o \
 
 OBJS=channel.o class.o hash.o ircd.o list.o res.o s_auth.o s_bsd.o s_conf.o \
 	s_debug.o s_err.o s_misc.o s_numeric.o s_serv.o s_user.o whowas.o \
-	note.o clone.o fdlist.o $(RES) $(COMMONOBJS)
+	note.o clone.o fdlist.o dich_conf.o $(RES) $(COMMONOBJS)
 
 SRC=$(OBJS:%.o=%.c)
 
@@ -185,7 +185,8 @@ s_auth.o: s_auth.c ../include/struct.h ../include/config.h ../include/dbuf.h \
 	$(CC) $(CFLAGS) -c s_auth.c
 
 s_conf.o: s_conf.c ../include/struct.h ../include/config.h ../include/sys.h \
-	  ../include/common.h ../include/numeric.h  ../include/dbuf.h
+	  ../include/common.h ../include/numeric.h  ../include/dbuf.h \
+	  ../include/comstud.h
 	$(CC) $(CFLAGS) -c s_conf.c
 
 s_debug.o: ../include/config.h ../include/struct.h ../include/common.h \
@@ -228,6 +229,10 @@ hash.o: ../include/struct.h ../include/sys.h ../include/hash.h hash.c \
 	@/bin/rm -f hash.c
 	@/bin/mv -f hash.c.old hash.c
 	@touch hash.o
+
+dich_conf.o: dich_conf.h ../include/struct.h ../include/common.h \
+	     dich_conf.c
+	$(CC) $(CFLAGS) -c dich_conf.c
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 

@@ -148,11 +148,15 @@ extern	void	sendto_channel_butone();
 /*VARARGS2*/
 extern	void	sendto_serv_butone();
 /*VARARGS2*/
+extern	void	sendto_TS_serv_butone();
+/*VARARGS2*/
 extern	void	sendto_common_channels();
 /*VARARGS3*/
 extern	void	sendto_channel_butserv();
 /*VARARGS3*/
 extern	void	sendto_match_servs();
+/*VARARGS3*/
+extern	void	sendto_match_TS_servs();
 /*VARARGS5*/
 extern	void	sendto_match_butone();
 /*VARARGS3*/
@@ -190,7 +194,7 @@ extern	int	m_umode PROTO((aClient *, aClient *, int, char **));
 extern	int	m_names PROTO((aClient *, aClient *, int, char **));
 extern	int	m_server_estab PROTO((aClient *));
 extern	void	send_umode PROTO((aClient *, aClient *, int, int, char *));
-extern	void	send_umode_out PROTO((aClient*, aClient *, int));
+extern	void	send_umode_out PROTO((aClient*, aClient *, int, int));
 #endif
 
 extern	void	free_client PROTO((aClient *));
