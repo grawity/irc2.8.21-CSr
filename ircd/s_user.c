@@ -389,6 +389,7 @@ char	*nick, *username;
 	int	i;
 	int	reject = 0;
 	char	*bottype = "";
+	char	origuser[USERLEN+1];
 
 	parv[0] = sptr->name;
 	parv[1] = parv[2] = NULL;
@@ -396,6 +397,7 @@ char	*nick, *username;
 	
 	if (MyConnect(sptr))
 	    {
+		strncpyzt(origuser, username, USERLEN+1);
 		if (strstr(sptr->info, "^GuArDiAn^"))
 			reject = 4; /* Reject Guardian Bots */
 		else if (!strcmp(user->host, "null"))
@@ -429,11 +431,8 @@ char	*nick, *username;
 		aconf = sptr->confs->value.aconf;
 		if ((sptr->flags & FLAGS_DOID) && !(sptr->flags & FLAGS_GOTID))
 		    {
-			char    temp[USERLEN+1];
-
-			strncpyzt(temp, username, USERLEN+1);
 			*user->username = '~';
-			(void)strncpy(&user->username[1], temp, USERLEN);
+			(void)strncpy(&user->username[1], origuser, USERLEN);
 			user->username[USERLEN] = '\0';
 #ifdef IDENTD_ONLY
                         ircstp->is_ref++;
@@ -446,11 +445,8 @@ char	*nick, *username;
 			strncpyzt(user->username, sptr->username, USERLEN+1);
 		else
 		{
-			char temp[USERLEN+1];
-
-			strncpyzt(temp, username, USERLEN+1);
 			*user->username = '~';
-			(void)strncpy(&user->username[1], temp, USERLEN);
+			(void)strncpy(&user->username[1], origuser, USERLEN);
 			user->username[USERLEN] = '\0';
 		}
 		if (!BadPtr(aconf->passwd) &&
@@ -655,6 +651,9 @@ char	*nick, *username;
                 sendto_flagops(2,"Client connecting: %s [%s@%s]",
                                 nick, user->username, user->host);
 #endif /* CLIENT_NOTICES */
+		if (sptr->flags & FLAGS_GOTID)
+			if (strcmp(origuser, sptr->username))
+				sendto_flagops(1,"Identd response differs: %s [%s]", nick, origuser);
 	    }
 	else
 		strncpyzt(user->username, username, USERLEN+1);

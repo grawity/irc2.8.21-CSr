@@ -24,7 +24,7 @@
 
 #include "comstud.h"
 
-#define COMSTUD_DEBUG
+#undef COMSTUD_DEBUG
 
 #ifdef DOG3
 #include "dog3.h"
@@ -53,6 +53,14 @@
 #undef	VMS			/* Should work for IRC client, not server */
 #undef	MAIL50			/* If you're running VMS 5.0 */
 #undef	PCS			/* PCS Cadmus MUNIX, use with BSD flag! */
+
+#ifdef SOL20
+
+#define USE_POLL                /* Define this if you want to use poll()
+                                   on lame Solaris */
+
+#endif
+
 
 /*
  * NOTE: On some systems, valloc() causes many problems.
@@ -108,8 +116,8 @@
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/home/irc/irc2.8.21+CSr23/lib"	/* dir where all ircd stuff is */
-#define	SPATH	"/home/irc/irc2.8.21+CSr23/lib/ircd"
+#define	DPATH	"/home/irc/irc2.8.21+CSr24/lib"	/* dir where all ircd stuff is */
+#define	SPATH	"/home/irc/irc2.8.21+CSr24/lib/ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
 #define	LPATH	"ircd.log" /* Where the debug file lives, if DEBUGMODE */
@@ -123,8 +131,8 @@
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
 
-#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr23/logs/users.log" /* */
-#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr23/logs/opers.log" /* */
+#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr24/logs/users.log" /* */
+#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr24/logs/opers.log" /* */
 
 /* CHROOTDIR
  *

@@ -26,6 +26,10 @@
 
 #include "comstud.h"
 
+#ifdef LIMIT_UH
+extern	int	uhlimit;
+#endif
+
 #ifdef HIGHEST_CONNECTION
 extern        void    check_max_count();
 #endif /* HIGHEST_CONNECTION */

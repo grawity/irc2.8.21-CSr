@@ -23,7 +23,8 @@ INCLUDEDIR=../include -I/usr/include
 #-I/usr/gnu/include
 
 # Default flags:
-CFLAGS= -I$(INCLUDEDIR) -O2
+CFLAGS= -I$(INCLUDEDIR) -g
+#O2
 #IRCDLIBS=-L/usr/lib -L/usr/gnu/lib -lgnuc -O2
 IRCLIBS=-lcurses -ltermcap
 #
@@ -54,7 +55,7 @@ IRCLIBS=-lcurses -ltermcap
 #IRCDLIBS=-lresolv
 #
 # Solaris 2
-#IRCDLIBS=-lsocket -lnsl
+#IRCDLIBS=-lsocket -lnsl -lresolv
 #IRCLIBS=-lcurses -ltermcap -lresolv -lsocket -lnsl
 #
 # ESIX
@@ -83,7 +84,7 @@ IRCDMODE = 711
 
 # IRCDDIR must be the same as DPATH in include/config.h
 #
-# IRCDDIR=/home/irc/irc2.8.21+CSr4/lib
+# IRCDDIR=/home/irc/irc2.8.21+CSr2/lib
 
 SHELL=/bin/sh
 SUBDIRS=common ircd 

@@ -1,6 +1,21 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/* LIMIT_UH        - If you want to limit clients to 1 u@h on your server,
+                     define this to 1.  You can also define this to 0
+                     which disables the check...but it will compile the
+                     code into the server, and then you can /quote limituh #
+                     while opered.
+                     If you never want to use this, #undef it.
+Examples:
+
+     #define LIMIT_UH 1   - Starts out limiting 1 client per user@host
+     #define LIMIT_UH 0   - Starts out with no checking, but you can /quote
+     #undef LIMIT_UH      - Doesn't compile in the code.../quote won't work.
+*/
+
+#define LIMIT_UH 0
+
 
 /* BUFFERED_LOGS   - define this to reduce disk IO when writing users.log
                      and clones.log
@@ -220,7 +235,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr23/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr24/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -310,7 +325,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr23/lib/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr24/lib/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

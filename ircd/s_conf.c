@@ -1233,6 +1233,37 @@ matched:
 			me.name, cptr->name,
 			(BadPtr(tmp->passwd) || !is_comment(tmp->passwd)) ?
 			"<No reason>" : tmp->passwd);
+
+/* Oh, what the fuck...let's put the user@host limit check right here.
+   I'm not sure that I actually like this patch since you have to loop
+   through every client on every client-connect...but oh well... - CS
+*/
+
+#ifdef LIMIT_UH
+        if (!tmp && uhlimit)
+        {
+		register aClient *sptr;
+		register int i;
+		int num = 0;
+
+                for (i = highest_fd; i >= 0; i--)
+		{
+			if (!(sptr=local[i]) || !IsPerson(sptr))
+				continue;
+			if (!strcmp(sptr->user->username, name) &&
+				!strcmp(sptr->sockhost, host))
+				if (++num >= uhlimit)
+				{
+					sendto_one(cptr, ":%s NOTICE %s :This server is currently limited to %i client%s per user",
+						me.name, cptr->name, uhlimit, uhlimit==1?"":"s"); 
+					sendto_flagops(5, "Rejecting for too many clients: %s [%s@%s]",
+						cptr->name, cptr->user->username, cptr->user->host);	
+					return 1;
+				}
+		}
+        }
+#endif /* LIMIT_UH */
+
  	return (tmp ? -1 : 0);
  }
 

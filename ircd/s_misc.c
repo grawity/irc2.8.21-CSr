@@ -319,7 +319,8 @@ int len;
 
 	static char userbuf[ULOGBUFFERLEN];
 	static char clonebuf[CLOGBUFFERLEN];
-	int userbuflen = 0, clonebuflen = 0, doit=0;
+	static int userbuflen = 0, clonebuflen = 0;
+	int doit=0;
 	char *filename, *buffer;
 	int fd, *len2;
 

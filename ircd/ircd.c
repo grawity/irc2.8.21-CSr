@@ -98,6 +98,10 @@ void send_high_sendq();
 	int idlelimit = DEFAULT_IDLELIMIT;
 #endif
 
+#ifdef LIMIT_UH
+	int uhlimit = LIMIT_UH;
+#endif
+
 time_t	NOW;
 aClient me;			/* That's me */
 aClient *client = &me;		/* Pointer to beginning of Client list */

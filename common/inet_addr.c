@@ -61,6 +61,10 @@
 #include "nameser.h"
 #include "resolv.h"
 
+#ifndef INADDR_NONE
+#define INADDR_NONE -1
+#endif
+
 /* this is a compatibility routine, not needed on recent BSD releases */
 #ifdef	NEED_INET_ADDR
 /*

@@ -1,5 +1,31 @@
+---
+
+This is the README for irc2.8.21+CSr24.  Basically, this is just a list
+of changes...more information can be found in include/comstud.h.
+
+Any questions or comments can be directed to cbehrens@stealth.net
+
+---
+
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
+
+New in CSr24:
+
+1) BUFFERED_LOGS were not logging at all...this is fixed.
+2) Patched match.c to fix coredumps
+3) Attempted to add poll(), using basically all of the code from 2.9
+   This is for Solaris folks only, of course.  There is a #define in
+   config.h for "USE_POLL" after the section where you #define SOL20
+4) Added #define LIMIT_UH.  You can now limit your server to only allow
+   a certain # of connections from a u@h...For example, LIMIT_UH 1 will
+   only allow 1 u@h per client.  If another person with the same u@h tries
+   to connect, they will be rejected.  While on IRC, you can /QUOTE LIMITUH #
+5) Added a notice to opers when a person tries to "evade" identd.
+   I had this in one of my 2.8.16 ircds, but when ds2 added it to his, it
+   reminded me that I had forgotten to carry it over to my 2.8.21 series...
+   Thanks, buddy =) Sorry, I am going to stick with using identd replies
+   for clients' usernames.
 
 New in CSr23:
 

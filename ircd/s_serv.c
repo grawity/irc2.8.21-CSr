@@ -51,26 +51,22 @@ static	char	buf[BUFSIZE];
 
 #ifdef HIGHEST_CONNECTION
 int     max_connection_count = 1, max_client_count = 1;
-time_t  max_connection_time = 0;
 #endif
 
 #ifdef HIGHEST_CONNECTION
 void
 check_max_count()
 {
-	if (!max_connection_time)
-		max_connection_time = NOW;
-	if (m_clients > max_client_count)
-		max_client_count = m_clients;
-	if ((m_clients + m_servers) > max_connection_count)
-	{
-		max_connection_count = m_clients + m_servers;
-		max_connection_time = NOW;
-		if (max_connection_count % 10 == 0)
-			sendto_flagops(1,
-				"New highest connections: %d (%d clients)",
-				max_connection_count, max_client_count);
-	}
+      if (m_clients > max_client_count)
+              max_client_count = m_clients;
+      if ((m_clients + m_servers) > max_connection_count)
+      {
+              max_connection_count = m_clients + m_servers;
+              if (max_connection_count % 10 == 0)
+                      sendto_flagops(1,
+                              "New highest connections: %d (%d clients)",
+                              max_connection_count, max_client_count);
+      }
 }
 #endif /* HIGHEST_CONNECTION */
 
@@ -289,6 +285,55 @@ char    *parv[];
       sendto_one(sptr, ":%s NOTICE %s :The idle limit is now set to %i minute(s)",
               me.name, parv[0], idlelimit/60);
       return 0;
+}
+
+#endif
+
+#ifdef LIMIT_UH
+
+int     m_limituh(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int     parc;
+char    *parv[];
+{
+        int temp;
+
+        if (!MyClient(sptr) || !IsAnOper(sptr))
+        {
+                sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
+                return 0;
+        }
+        if (!parv[1] || !*parv[1])
+        {
+		if (uhlimit)
+                sendto_one(sptr, ":%s NOTICE %s :The current limit for the number of same u@h's is %i",
+                        me.name, parv[0], uhlimit);
+		else
+		sendto_one(sptr, ":%s NOTICE %s :There is currently no limit for the number of same u@h's",
+			me.name, parv[0]);
+                return 0;
+        }
+	temp = atoi(parv[1]);
+	if (temp < 0)
+	{
+		sendto_one(sptr, ":%s NOTICE %s :Hello???  Try a number >= 0.",
+			me.name, parv[0]);
+		return 0;
+	}
+	if (uhlimit = temp)
+	{
+		sendto_flagops(1,"%s has changed the u@h limit to %i.",
+			parv[0], uhlimit);
+		sendto_one(sptr, ":%s NOTICE %s :The u@h limit is now set to %i.",
+			me.name, parv[0], uhlimit);
+	}
+	else
+	{
+		sendto_flagops(1,"%s has disabled the u@h limit.", parv[0]);
+		sendto_one(sptr, ":%s NOTICE %s :The u@h limit is now disabled.", 
+			me.name, parv[0]);
+	}
+	return 0;
 }
 
 #endif
@@ -884,7 +929,7 @@ Reg1	aClient	*cptr;
 	check_fdlists();
 #endif 
 	nextping = NOW;
-	sendto_ops("Link with %s established.", inpath);
+	sendto_ops("Link with %s (%s) established.", inpath, DoesTS(cptr) ? "TS" : "NoTS");
 	(void)add_to_client_hash_table(cptr->name, cptr);
 	/* doesnt duplicate cptr->serv if allocted this struct already */
 	(void)make_server(cptr);
@@ -1328,9 +1373,8 @@ char	*parv[];
 	aClient	*acptr;
 	char	stat = parc > 1 ? parv[1][0] : '\0';
 	Reg1	int	i;
-	int	doall = 0, wilds = 0;
+	int	doall = 0, wilds = 0, j;
 	char	*name;
-	char	*ptr;
 
 	if (check_registered(sptr))
 		return 0;
@@ -1357,6 +1401,27 @@ char	*parv[];
 #endif 
 	switch (stat)
 	{
+	case '?':
+#ifndef DOG3
+		for(i=0;i<=highest_fd;i++)
+		{
+			if (!(acptr=local[i]) || !IsServer(acptr))
+				continue;
+#else
+                for (i=serv_fdlist.entry[j=1];j<=serv_fdlist.last_entry;
+                        i=serv_fdlist.entry[++j])
+			if (!(acptr=local[i]))
+				continue;
+		{
+#endif
+			sendto_one(sptr, ":%s NOTICE %s :%s %s %u :%u",
+				me.name, parv[0],
+				get_client_name(acptr, TRUE),
+				DoesTS(acptr) ? "TS" : "NoTS",
+				(int)DBufLength(&acptr->sendQ),
+                                NOW - acptr->firsttime);
+		} 
+		break;
 	case 'L' : case 'l' :
 		/*
 		 * send info about connections which match, or all if the
@@ -1448,11 +1513,8 @@ char	*parv[];
 		sendto_one(sptr, rpl_str(RPL_STATSUPTIME), me.name, parv[0],
 			   now/86400, (now/3600)%24, (now/60)%60, now%60);
 #ifdef HIGHEST_CONNECTION
-		ptr = ctime(&max_connection_time);
                 sendto_one(sptr, rpl_str(RPL_STATSCONN), me.name, parv[0],
                            max_connection_count, max_client_count);
-		sendto_one(sptr, ":%s %d %s :Highest connection reached at %s",
-			me.name, RPL_MOTD, parv[0], ptr);
 #endif 
 		break;
 	    }
@@ -1588,7 +1650,6 @@ int	parc;
 char	*parv[];
     {
 	aClient *acptr;
-	char *ptr;
 
 	if (check_registered_user(sptr))
 		return 0;
@@ -1636,13 +1697,8 @@ char	*parv[];
 	sendto_one(sptr, rpl_str(RPL_LUSERME),
 		   me.name, parv[0], m_cs, m_ss);
 #ifdef HIGHEST_CONNECTION
-	ptr = ctime(&max_connection_time);
-	if (strchr(ptr, '\n'))
-		*strchr(ptr, '\n') = (char) 0;
 	sendto_one(sptr, rpl_str(RPL_STATSCONN), me.name, parv[0],
                           max_connection_count, max_client_count);
-	sendto_one(sptr, ":%s %d %s :Highest connection reached at %s",
-			me.name, RPL_MOTD, parv[0], ptr); 
 #endif
 	return 0;
 }
