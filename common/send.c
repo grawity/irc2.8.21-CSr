@@ -97,19 +97,60 @@ char	*notice;
 **	client and try to send it. if we cant send it, it goes into the sendQ
 **	-avalon
 */
+
 void	flush_connections(fd)
 int	fd;
 {
 #ifdef SENDQ_ALWAYS
 	Reg1	int	i;
 	Reg2	aClient *cptr;
+	int	length = 1;
 
 	if (fd == me.fd)
-	    {
+	{
 		for (i = highest_fd; i >= 0; i--)
+		{
 			if ((cptr = local[i]) && DBufLength(&cptr->sendQ) > 0)
 				(void)send_queued(cptr);
-	    }
+			if (!cptr)
+				continue;
+			length = 1;
+			if (!NoNewLine(cptr))
+				length = read_packet(cptr, 0);
+			if (length == FLUSH_BUFFER)
+				continue;
+			if (IsDead(cptr))
+			{
+				(void)exit_client(cptr, cptr, &me,
+					strerror(get_sockerr(cptr)));
+				continue;
+			}
+			if (length > 0)
+				continue;
+			if (IsServer(cptr) || IsHandshake(cptr))
+			{
+				int connected = NOW - cptr->firsttime;
+
+				if (length == 0)
+				sendto_ops("Server %s closed the connection",
+						get_client_name(cptr,FALSE));
+				else
+					report_error("Lost connection to %s:%s",
+						cptr);
+
+				sendto_ops("%s had been connected for %d day%s, %2d:%02d:%02d",
+					cptr->name,
+					connected/86400,
+					(connected/86400 == 1) ? "" : "s",
+					(connected % 86400) / 3600,
+					(connected % 3600) / 60,
+					connected % 60);
+			}
+			(void)exit_client(cptr, cptr, &me, length >= 0 ?
+				"EOF From client" :
+					strerror(get_sockerr(cptr)));
+		}
+	}
 	else if (fd >= 0 && (cptr = local[fd]) && DBufLength(&cptr->sendQ) > 0)
 		(void)send_queued(cptr);
 #endif

@@ -30,6 +30,9 @@
 #ifdef STDDEFH
 # include <stddef.h>
 #endif
+
+#include <time.h>
+
 #ifdef ORATIMING
 #include <sys/time.h>
 #endif
@@ -61,6 +64,18 @@ typedef struct	MotdItem aMotd;
 #include "class.h"
 #include "dbuf.h"	/* THIS REALLY SHOULDN'T BE HERE!!! --msa */
 #endif
+
+#ifdef MAJORLOGGING
+typedef struct commandlog
+{
+	char line[520];
+	time_t	thetime;
+	struct commandlog *next;
+} aCommandlog;
+
+#endif
+
+
 
 /* These set of defines are for sendto_flagops */
 #define OPERS 1
@@ -163,6 +178,15 @@ typedef struct	MotdItem aMotd;
 #define	SetLog(x)		((x)->status = STAT_LOG)
 #define	SetService(x)		((x)->status = STAT_SERVICE)
 
+/* aConfItem->flags ... */
+
+#define FLAGS_LIMIT_IP		0x0001
+#define FLAGS_NO_TILDE		0x0002
+#define FLAGS_NEED_IDENTD	0x0004
+#define FLAGS_PASS_IDENTD	0x0008
+
+/* aClient->flags? ... */
+
 #define	FLAGS_PINGSENT   0x0001	/* Unreplied ping sent */
 #define	FLAGS_DEADSOCKET 0x0002	/* Local socket is dead--Exiting soon */
 #define	FLAGS_KILLED     0x0004	/* Prevents "QUIT" from being sent for this */
@@ -181,7 +205,7 @@ typedef struct	MotdItem aMotd;
 #define	FLAGS_WRAUTH	 0x8000	/* set if we havent writen to ident server */
 #define	FLAGS_LOCAL	0x10000 /* set for local clients */
 #define	FLAGS_GOTID	0x20000	/* successful ident lookup achieved */
-#define	FLAGS_DOID	0x40000	/* I-lines say must use ident return */
+#define	FLAGS_BLAHBLAH	0x40000	/* Not used */ 
 #define	FLAGS_NONL	0x80000 /* No \n in buffer */
 #define FLAGS_FMODE	0x100000 /* +f usermode */
 #define FLAGS_CMODE	0x200000 /* +c usermode */
@@ -193,7 +217,6 @@ typedef struct	MotdItem aMotd;
 
 #define	SEND_UMODES	(FLAGS_INVISIBLE|FLAGS_OPER|FLAGS_WALLOP)
 #define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_LMODE|FLAGS_DMODE|FLAGS_BMODE)
-#define	FLAGS_ID	(FLAGS_DOID|FLAGS_GOTID)
 
 /*
  * flags macros.
@@ -287,6 +310,7 @@ struct	ConfItem	{
 	char	*passwd;
 	char	*name;
 	int	port;
+	int	flags;  /* Special flags... */
 	time_t	hold;	/* Hold action until this time (calendar time) */
 #ifndef VMSP
 	aClass	*class;  /* Class of connection */
@@ -560,6 +584,12 @@ struct Channel	{
 #define	MODE_DEL       0x40000000
 #define	MODE_ADD       0x80000000
  */
+
+
+#define IsLimitIp(x)		((x)->flags & FLAGS_LIMIT_IP)
+#define IsNoTilde(x)		((x)->flags & FLAGS_NO_TILDE)
+#define IsNeedIdentd(x)		((x)->flags & FLAGS_NEED_IDENTD)
+#define IsPassIdentd(x)		((x)->flags & FLAGS_PASS_IDENTD)
 
 #define	HoldChannel(x)		(!(x))
 /* name invisible */

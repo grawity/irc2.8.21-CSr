@@ -109,11 +109,12 @@ Reg1	int	*chasing;
 	if (who)
 		return who;
 	if (!(who = get_history(user, (long)KILLCHASETIMELIMIT)))
-	    {
-		sendto_one(sptr, err_str(ERR_NOSUCHNICK),
-			   me.name, sptr->name, user);
+	{
+		if (sptr != NULL)
+			sendto_one(sptr, err_str(ERR_NOSUCHNICK),
+				me.name, sptr->name, user);
 		return NULL;
-	    }
+	}
 	if (chasing)
 		*chasing = 1;
 	return who;
@@ -135,10 +136,10 @@ Reg1	char *s;
 
 	for ( ;*s; s++)
 		if (isspace(*s))
-		    {
+		{
 			*s = '\0';
 			break;
-		    }
+		}
 
 	return (BadPtr(str)) ? star : str;
 }
@@ -1877,6 +1878,8 @@ char	*parv[];
 		return 0;
 	    }
 
+	parv[1] = canonize(parv[1], NULL);
+
 	for (; (name = strtoken(&p, parv[1], ",")); parv[1] = NULL)
 	    {
 		if (parc > 1 && IsChannelName(name))
@@ -2041,9 +2044,10 @@ int	m_list(cptr, sptr, parc, parv)
 aClient *cptr, *sptr;
 int	parc;
 char	*parv[];
-    {
+{
 	aChannel *chptr;
 	char	*name, *p = NULL;
+	int sc;
 
 #if defined(DOG3) && defined(RESTRICT)
 	if (lifesux && !IsAnOper(sptr))
@@ -2056,35 +2060,37 @@ char	*parv[];
 	sendto_one(sptr, rpl_str(RPL_LISTSTART), me.name, parv[0]);
 
 	if (parc < 2 || BadPtr(parv[1]))
-	    {
+	{
 		for (chptr = channel; chptr; chptr = chptr->nextch)
-		    {
+		{
 			if (!sptr->user ||
 			    (SecretChannel(chptr) && !IsMember(sptr, chptr)))
 				continue;
+			sc = ShowChannel(sptr, chptr);
 			sendto_one(sptr, rpl_str(RPL_LIST), me.name, parv[0],
-				   ShowChannel(sptr, chptr)?chptr->chname:"*",
-				   chptr->users,
-				   ShowChannel(sptr, chptr)?chptr->topic:"");
-		    }
+				sc ? chptr->chname : "*", chptr->users,
+				sc ? chptr->topic : "");
+		}
 		sendto_one(sptr, rpl_str(RPL_LISTEND), me.name, parv[0]);
 		return 0;
-	    }
+	}
 
 	if (hunt_server(cptr, sptr, ":%s LIST %s %s", 2, parc, parv))
 		return 0;
 
+	parv[1] = canonize(parv[1], NULL);
+
 	for (; (name = strtoken(&p, parv[1], ",")); parv[1] = NULL)
-	    {
+	{
 		chptr = find_channel(name, NullChn);
 		if (chptr && ShowChannel(sptr, chptr) && sptr->user)
 			sendto_one(sptr, rpl_str(RPL_LIST), me.name, parv[0],
 				   ShowChannel(sptr,chptr) ? name : "*",
 				   chptr->users, chptr->topic);
-	     }
+	}
 	sendto_one(sptr, rpl_str(RPL_LISTEND), me.name, parv[0]);
 	return 0;
-    }
+}
 
 
 /************************************************************************

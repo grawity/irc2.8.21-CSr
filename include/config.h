@@ -41,7 +41,7 @@
 /*	SGI			Nothing needed (IRIX 4.0.4) */
 #undef 	SVR3			/* SVR3 stuff - being worked on where poss. */
 #undef	DYNIXPTX		/* Sequents Brain-dead Posix implement. */
-#undef  SOL20			/* Solaris2 */
+#define SOL20			/* Solaris2 */
 #undef	ESIX			/* ESIX */
 #undef	NEXT			/* NeXTStep */
 #undef        SVR4
@@ -55,10 +55,7 @@
 
 #ifdef SOL20
 
-/* POLL seems to be broken/using 99% CPU, so this is disabled until
-   I can take a look at it */
-
-#undef USE_POLL                /* Define this if you want to use poll()
+#define USE_POLL                /* Define this if you want to use poll()
                                    on lame Solaris */
 
 #endif
@@ -118,8 +115,8 @@
  * these are only the recommened names and paths. Change as needed.
  * You must define these to something, even if you don't really want them.
  */
-#define	DPATH	"/home/irc/irc2.8.21+CSr25/lib"	/* dir where all ircd stuff is */
-#define	SPATH	"/home/irc/irc2.8.21+CSr25/lib/ircd"
+#define	DPATH	"/home/irc/irc2.8.21+CSr27"	/* dir where all ircd stuff is */
+#define	SPATH	"/home/irc/irc2.8.21+CSr27/lib/ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define KPATH	"klines/klines.conf"	/* config file containing K: lines */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
@@ -416,7 +413,7 @@
  * 1 server = 1 connection, 1 user = 1 connection.
  * This should be at *least* 3: 1 listen port, 1 dns port + 1 client
  */
-#define MAXCONNECTIONS	1024
+#define MAXCONNECTIONS	3000
 
 /*
  * this defines the length of the nickname history.  each time a user changes
@@ -432,7 +429,7 @@
  *	 resident and running - it hardly ever gets swapped to disk! You can
  *	 ignore these recommendations- they only are meant to serve as a guide
  */
-#define NICKNAMEHISTORYLENGTH 300
+#define NICKNAMEHISTORYLENGTH 15000
 
 /*
  * Time interval to wait and if no messages have been received, then check for
@@ -463,8 +460,8 @@
  * (HANGONRETRYDELAY). This latter has to be long enough that the
  * other end of the connection has time to notice it broke too.
  */
-#define HANGONRETRYDELAY 10	/* Recommended value: 10 seconds */
-#define HANGONGOODLINK 300	/* Recommended value: 5 minutes */
+#define HANGONRETRYDELAY 20	/* Recommended value: 20 seconds */
+#define HANGONGOODLINK 1800	/* Recommended value: 30 minutes */
 
 /*
  * Number of seconds to wait for write to complete if stuck.

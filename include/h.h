@@ -37,9 +37,8 @@ extern        void    check_max_count();
 	extern struct tm *motd_tm;
 #endif
 
-#ifdef NO_REDUNDANT_KLINES
+
 extern int test_kline_userhost PROTO((aClient *, aConfList *, char *, char *));
-#endif
 
 extern int idlelimit;
 extern int s_count, c_count, ch_count, u_count, i_count;
@@ -68,10 +67,11 @@ extern aConfList       EList3;   /* what we can't sort */
 
 #ifdef DOG3
 #include "fdlist.h"
+
+extern float currentrate;
 extern fdlist serv_fdlist;
 extern fdlist busycli_fdlist; /* high-priority clients */
 extern fdlist default_fdlist; /* just the number of the entry */
-extern fdlist auth_fdlist;
 extern int lifesux;
 extern int dog3loadcfreq;
 extern int dog3loadrecv;
@@ -97,6 +97,8 @@ extern	aChannel *channel;
 extern	struct	stats	*ircstp;
 extern	int	bootopt;
 
+extern	char	*canonize PROTO((char *, int *));
+extern	int	read_packet PROTO((aClient *, int));
 extern	aChannel *find_channel PROTO((char *, aChannel *));
 extern	void	remove_user_from_channel PROTO((aClient *, aChannel *));
 extern	void	del_invite PROTO((aClient *, aChannel *));
@@ -129,7 +131,7 @@ extern	aConfItem *find_conf_exact PROTO((char *, char *, char *, int));
 extern	aConfItem *find_conf_host PROTO((Link *, char *, int));
 extern	aConfItem *find_conf_ip PROTO((Link *, char *, char *, int));
 extern	aConfItem *find_conf_name PROTO((char *, int));
-extern	int	find_kill PROTO((aClient *, int));
+extern	int	find_kill PROTO((aClient *, int, char **));
 extern	int	find_restrict PROTO((aClient *));
 extern	int	rehash PROTO((aClient *, aClient *, int));
 extern	int	initconf PROTO((int, char *));

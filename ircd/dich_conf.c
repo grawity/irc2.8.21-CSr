@@ -58,11 +58,14 @@
  * Thank you to Chris Behrens for this addition -Sol
  */
 void
-report_conf_links(sptr, List, numeric, c)
+report_conf_links(sptr, List, numeric, c, muser, mhost, num)
 aClient		*sptr;
 aConfList	*List;
 int		numeric;
 char		*c;
+char		*muser;
+char		*mhost;
+int		*num;
 {
 	register aConfItem	*tmp;
 	register int		current;
@@ -80,13 +83,25 @@ char		*c;
 		for(; ptr; ptr = ptr->next)
 		{
 			if (ptr->sub)
-				report_conf_links(sptr, ptr->sub, numeric, c);
+				report_conf_links(sptr, ptr->sub, numeric, c,
+					muser, mhost, num);
 			if (!(tmp = ptr->conf))
 				continue;
 			host = BadPtr(tmp->host) ? null : tmp->host;
 			pass = BadPtr(tmp->passwd) ? null : tmp->passwd;
 			name = BadPtr(tmp->name) ? null : tmp->name;
 			port = (int)tmp->port;
+			if (muser)
+			{
+				if ((!strcmp(muser, "*") ||
+					!matches(name,muser)) &&
+					!matches(host,mhost))
+					;
+				else
+					continue;
+			}					
+			if (num)
+				(*num)++;
 			if (tmp->status == CONF_KILL)
 				sendto_one(sptr, rpl_str(numeric), me.name,
 					sptr->name, c, host, pass,

@@ -211,12 +211,11 @@ int	showip;
 		else
 		    {
 			if (showip)
-				(void)irc_sprintf(nbuf, "%s[%s@%s.%u]",
+				(void)irc_sprintf(nbuf, "%s[%s@%s]",
 					sptr->name,
 					(!(sptr->flags & FLAGS_GOTID)) ? "" :
 					sptr->username,
-					inetntoa((char *)&sptr->ip),
-					(unsigned int)sptr->port);
+					inetntoa((char *)&sptr->ip));
 			else
 			    {
 				if (mycmp(sptr->name, sptr->sockhost))

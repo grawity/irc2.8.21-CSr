@@ -184,6 +184,16 @@ extern 	ts_val	timedelta;
 
 #ifdef DOG3
 
+int	m_htm(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int parc;
+char *parv[];
+{
+	sendto_one(sptr, ":%s NOTICE %s :The incoming rate is %0.2f kb/s",
+		me.name, parv[0], currentrate);
+	return 0;
+}
+
 int     m_dog3freq(cptr, sptr, parc, parv)
 aClient *cptr, *sptr;
 int     parc;
@@ -1284,6 +1294,7 @@ int	mask;
 	aConfItem *tmp;
 	int	*p, port;
 	char	c, *host, *pass, *name;
+	char	string[10];
 	
 	for (tmp = conf; tmp; tmp = tmp->next)
 		if (tmp->status & mask)
@@ -1298,6 +1309,15 @@ int	mask;
 			pass = BadPtr(tmp->passwd) ? null : tmp->passwd;
 			name = BadPtr(tmp->name) ? null : tmp->name;
 			port = (int)tmp->port;
+			*string = (char) 0;
+			if (IsNoTilde(tmp))
+				strcat(string, "-");
+			if (IsLimitIp(tmp))
+				strcat(string, "!");
+			if (IsNeedIdentd(tmp))
+				strcat(string, "+");
+			if (IsPassIdentd(tmp))
+				strcat(string, "#");
 			/*
 			 * On K line the passwd contents can be
 			/* displayed on STATS reply. 	-Vesa
@@ -1306,10 +1326,15 @@ int	mask;
 				sendto_one(sptr, rpl_str(p[1]), me.name,
 					   sptr->name, c, host, pass,
 					   name, port, get_conf_class(tmp));
+			else if (mask == CONF_CLIENT)
+				sendto_one(sptr, rpl_str(p[1]), me.name,
+					sptr->name, c, host, string,
+					name, port,
+					get_conf_class(tmp));
 			else
 				sendto_one(sptr, rpl_str(p[1]), me.name,
-					   sptr->name, c, host, name, port,
-					   get_conf_class(tmp));
+					sptr->name, c, host, name, port,
+					get_conf_class(tmp));
 		    }
 	return;
 }
@@ -1322,38 +1347,68 @@ char	*parv[];
 	static	char	Lformat[]  = ":%s %d %s %s %u %u %u %u %u :%u";
 	static	char	CSformat[] = ":%s %d %s %s %u %u %u %u %u %u :%s";
 	struct	Message	*mptr;
-	aClient	*acptr;
+	aClient	*acptr, *tmpptr;
 	char	stat = parc > 1 ? parv[1][0] : '\0';
 	Reg1	int	i;
-	int	doall = 0, wilds = 0, j;
-	char	*name;
+	int	doall = 0, wilds = 0, j, num = 0;
+	char	*name, *user, *host;
+	char	buffer[512];
 
 	if (check_registered(sptr))
 		return 0;
 
 	if (hunt_server(cptr,sptr,":%s STATS %s :%s",2,parc,parv)!=HUNTED_ISME)
 		return 0;
-
-	if (parc > 2)
-	    {
-		name = parv[2];
+        if (parc < 2)
+        {
+                sendto_one(sptr, err_str(ERR_NEEDMOREPARAMS),
+                           me.name, parv[0], "TOPIC");
+                return 0;
+        }
+	if (parc > 3)
+	{
+		name = parv[3];
 		if (!mycmp(name, me.name))
 			doall = 2;
 		else if (matches(name, me.name) == 0)
 			doall = 1;
 		if (index(name, '*') || index(name, '?'))
 			wilds = 1;
-	    }
+	}
 	else
+	{
 		name = me.name;
+		if (parc > 2)
+			doall = 2;
+	}
 #ifdef STATS_NOTICE
-	if (stat != (char) 0)
+	if ((stat != (char) 0) && sptr->user)
 		sendto_flagops(OPERS,"STATS %c requested by %s (%s@%s)", stat,
 			sptr->name, sptr->user->username, sptr->user->host);
 #endif 
+
+#define Meg 1024
+#define Gig (Meg*1024)
+#define Tera (Gig*1024)
+#define IsMeg(x) (x>Meg)
+#define IsGig(x) (x>Gig)
+#define IsTera(x) (x>Tera)
+#define ByteString(x) (IsTera(x) ? "terabytes" : \
+			IsGig(x) ? "gigabytes" : \
+			IsMeg(x) ? "megabytes" : \
+			"Kilobytes")
+#define ByteConvert(x) (IsTera(x) ? (float)((float)x/(float)Tera) : \
+			IsGig(x) ? (float)((float)x/(float)Gig) : \
+			IsMeg(x) ? (float)((float)x/(float)Meg) : \
+			(float)x)
+
 	switch (stat)
 	{
 	case '?':
+	{
+		int tottime = 0;
+		long int totsent = 0, totrecv = 0, totsentb = 0, totrecvb = 0;
+		int uptime = NOW - me.firsttime;
 #ifndef DOG3
 		for(i=0;i<=highest_fd;i++)
 		{
@@ -1374,8 +1429,50 @@ char	*parv[];
                                    (int)acptr->receiveM, (int)acptr->receiveK,
                                    NOW - acptr->firsttime, DoesTS(acptr) ?
 						"TS" : "NoTS");
+			tottime += (NOW - acptr->firsttime);
+			totsent += acptr->sendK;
+			totrecv += acptr->receiveK;
+			totsentb += acptr->sendB;
+			totrecvb += acptr->receiveB;
+			if (totsentb > 1023)
+			{
+				totsent += (totsentb >> 10);
+				totsentb &= 0x3ff;
+			}
+			if (totrecvb > 1023)
+			{
+				totrecv += (totrecvb >> 10);
+				totrecvb &= 0x3ff;
+			}
 		} 
+		if (uptime)
+		{
+		sendto_one(sptr, ":%s %d %s :Since startup, I've:",
+			me.name, RPL_STATSDEBUG, parv[0]);
+		sendto_one(sptr, ":%s %d %s :Sent a total of %0.3f %s at a rate of %0.2f kilobytes per second.",
+			me.name, RPL_STATSDEBUG, parv[0],
+			ByteConvert(me.sendK), ByteString(me.sendK),
+			(float)((float)me.sendK/(float)uptime));
+		sendto_one(sptr, ":%s %d %s :Received a total of %0.3f %s at a rate of %0.2f kilobytes per second.",
+			me.name, RPL_STATSDEBUG, parv[0],
+			ByteConvert(me.receiveK), ByteString(me.receiveK),
+			(float)((float)me.receiveK/(float)uptime));
+		}
+		if (tottime)
+		{
+			sendto_one(sptr, ":%s %d %s :The current averages for servers:",
+			me.name, RPL_STATSDEBUG, parv[0]);
+			sendto_one(sptr, ":%s %d %s :Sent a total of %0.3f %s at a rate of %0.2f kilobytes per second.",
+				me.name, RPL_STATSDEBUG, parv[0],
+				ByteConvert(totsent), ByteString(totsent),
+				(float)((float)totsent/(float)tottime));
+			sendto_one(sptr, ":%s %d %s :Received a total of %0.3f %s at a rate of %0.2f kilobytes per second.",
+				me.name, RPL_STATSDEBUG, parv[0],
+				ByteConvert(totrecv), ByteString(totrecv),
+				(float)((float)totrecv/(float)tottime));
+		}
 		break;
+	}
 	case 'L' : case 'l' :
 		/*
 		 * send info about connections which match, or all if the
@@ -1383,6 +1480,26 @@ char	*parv[];
 		 * are invisible not being visible to 'foreigners' who use
 		 * a wild card based search to list it.
 		 */
+		acptr = NULL;
+		if (parc > 2)
+			acptr = find_chasing(NULL, parv[2], NULL);
+		if (acptr && IsPerson(acptr))
+		{
+gohere:
+			if (MyConnect(acptr))
+			sendto_one(sptr, Lformat, me.name, RPL_STATSLINKINFO,
+				parv[0], isupper(stat) ?
+					get_client_name(acptr, TRUE) :
+					get_client_name(acptr, FALSE),
+				(int)DBufLength(&cptr->sendQ),
+				(int)acptr->sendM, (int)acptr->sendK,
+				(int)acptr->receiveM, (int)acptr->receiveK,
+				NOW - acptr->firsttime);
+			break;
+		}
+		acptr = find_chasing(NULL, me.name, NULL);
+		if (acptr && IsPerson(acptr))
+			goto gohere;
 		for (i = 0; i <= highest_fd; i++)
 		    {
 			if (!(acptr = local[i]))
@@ -1408,10 +1525,13 @@ char	*parv[];
 		break;
 #ifdef B_LINES
 	case 'B' : case 'b' :
-                report_conf_links(sptr, &BList1, RPL_STATSBLINE, 'B');
-                report_conf_links(sptr, &BList2, RPL_STATSBLINE, 'B');
-                report_conf_links(sptr, &BList3, RPL_STATSBLINE, 'B');
-		break;
+		report_conf_links(sptr, &BList1, RPL_STATSBLINE, 'B',
+			NULL, NULL, NULL);
+		report_conf_links(sptr, &BList2, RPL_STATSBLINE, 'B',
+			NULL, NULL, NULL);
+		report_conf_links(sptr, &BList3, RPL_STATSBLINE, 'B',
+			NULL, NULL, NULL);
+	break;
 #endif
 	case 'C' : case 'c' :
                 report_configured_links(sptr, CONF_CONNECT_SERVER|
@@ -1419,10 +1539,13 @@ char	*parv[];
 		break;
 #ifdef E_LINES
 	case 'E' : case 'e' :
-		report_conf_links(sptr, &EList1, RPL_STATSELINE, 'E');
-		report_conf_links(sptr, &EList2, RPL_STATSELINE, 'E');
-		report_conf_links(sptr, &EList3, RPL_STATSELINE, 'E');
-		break;
+		report_conf_links(sptr, &EList1, RPL_STATSELINE, 'E',
+                        NULL, NULL, NULL);
+		report_conf_links(sptr, &EList2, RPL_STATSELINE, 'E',
+                        NULL, NULL, NULL);
+		report_conf_links(sptr, &EList3, RPL_STATSELINE, 'E',
+                        NULL, NULL, NULL);
+	break;
 #endif 
 	case 'H' : case 'h' :
                 report_configured_links(sptr, CONF_HUB|CONF_LEAF);
@@ -1431,9 +1554,60 @@ char	*parv[];
 		report_configured_links(sptr, CONF_CLIENT);
 		break;
 	case 'K' : case 'k' :
-		report_conf_links(sptr, &KList1, RPL_STATSKLINE, 'K');
-                report_conf_links(sptr, &KList2, RPL_STATSKLINE, 'K');
-                report_conf_links(sptr, &KList3, RPL_STATSKLINE, 'K');
+		tmpptr = NULL;
+		user = host = NULL;
+#ifdef RESTRICT_STATSK
+		if (name == me.name)
+		{
+			if (!IsAnOper(sptr))
+				tmpptr = sptr;
+				
+			else
+				tmpptr = NULL;
+		}
+		else if (!strchr(name, '@') && !strchr(name, '.'))
+		{
+			if (!(tmpptr = find_chasing(sptr, name, NULL)))
+				return 0;
+		}
+		if (!tmpptr && (me.name != name))
+		{
+			char *ptr;
+
+			strcpy(buffer, name);
+			ptr = strchr(buffer, '@');
+			if (!ptr)
+			{
+				user = "*";
+				host = buffer;
+			}
+			else
+			{
+				*ptr = (char) 0;
+				user = buffer;
+				host = ptr+1;
+			}
+		}			
+		if (tmpptr && tmpptr->user)
+		{
+			user = tmpptr->user->username;
+			host = tmpptr->user->host;
+		}
+		if (user)
+		sendto_one(sptr, ":%s NOTICE %s :Finding bans matching %s@%s",
+			me.name, parv[0], user, host);
+#endif
+		report_conf_links(sptr, &KList1, RPL_STATSKLINE, 'K',
+			user, host, &num);
+                report_conf_links(sptr, &KList2, RPL_STATSKLINE, 'K',
+			user, host, &num);
+                report_conf_links(sptr, &KList3, RPL_STATSKLINE, 'K',
+			user, host, &num);
+#ifdef RESTRICT_STATSK
+		if (!num && user)
+		   sendto_one(sptr,":%s NOTICE %s :No bans for %s@%s found.",
+			me.name, parv[0], user, host);
+#endif
 		break;
 	case 'M' : case 'm' :
 		for (mptr = msgtab; mptr->cmd; mptr++)
@@ -1612,7 +1786,7 @@ char	*parv[];
 		if(hunt_server(cptr, sptr, ":%s LUSERS %s :%s", 2, parc, parv)
 				!= HUNTED_ISME)
 			return 0;
-	if (parc > 1)
+	if (parc > 3)
 	{
 		(void)collapse(parv[1]);
 		compute_lusers(parv[1]);
@@ -1983,6 +2157,35 @@ char *hostname;
         return result;
 }
 
+#ifdef ALLOW_KLINES_FROM_SERVERS
+int rmatches(string, specs)
+char *string;
+char *specs;
+{
+	char buffer[1024];
+	char *ptr, *ptr2;
+	int ok=1;
+
+	if (!specs || !*specs)
+		return 1;
+	strcpy(buffer, specs);
+	ptr = buffer;
+	do
+	{
+		ptr2 = strchr(ptr, ' ');
+		if (ptr2)
+		{
+			*ptr2 = (char) 0;
+			ptr2++;
+		}
+		ok = matches(ptr, string);
+		ptr = ptr2;
+	} while (ok && ptr);
+	return ok;
+}
+
+#endif /* ALLOW_KLINES_FROM_SERVERS */
+
 int     m_kline(cptr, sptr, parc, parv)
 aClient *cptr, *sptr;
 int     parc;
@@ -1990,7 +2193,7 @@ char    *parv[];
 {
         int out;
 	char buffer[1024];
-        char *user, *host;
+        char *user, *host, *reason;
         aClient *acptr;
         char tempuser[30];
         char temphost[512];
@@ -2000,22 +2203,24 @@ char    *parv[];
 	char *filename;
 	struct tm *tmptr;
 
-        if (!MyClient(sptr) ||
 #ifdef NO_LOCAL_KLINE
-		!IsOper(sptr))
+	if (!IsOper(sptr))
 #else
-		!IsAnOper(sptr))
+	if (!IsAnOper(sptr))
 #endif
-            {
+	{
                 sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
                 return 0;
-            }
-        if (!parv[1] || !*parv[1])
+	}
+        if (!parv[1] || (!MyClient(sptr) && (!parv[2] || !parv[3])))
         {
-                sendto_one(sptr, ":%s NOTICE %s :Not enough parameters",
-                        me.name, parv[0]);
+		if (MyClient(sptr))
+			sendto_one(sptr, ":%s NOTICE %s :Not enough parameters",
+				me.name, parv[0]);
                 return 0;
         }
+	if (MyClient(sptr))
+	{
         if (strchr(parv[1], '@') || *parv[1] == '*')
         {
 		if (strchr(parv[1], '@'))
@@ -2036,7 +2241,7 @@ char    *parv[];
                 user = tempuser;
                 host = temphost;
         }
-        else
+        else /* strchr(...) || ... */
         {
                 if (!(acptr = find_chasing(sptr, parv[1], NULL)))
                         return 0;
@@ -2054,25 +2259,49 @@ char    *parv[];
                 user = tempuser;
                 host = cluster(acptr->user->host);
         }
+	reason = parv[2];
+	} /* if (MyClient(sptr)) */
+	else
+	{
+		user = parv[1];
+		host = parv[2];
+		reason = parv[3];
+	}
+	reason = (reason && *reason) ? reason : "No reason";
+        if (!matches(user, "akjhfkahfasfjd") &&
+                !matches(host, "ldksjfl.kss...kdjfd.jfklsjf"))
+        {
+                sendto_one(sptr, ":%s NOTICE %s :Can't K-Line *@*", me.name,
+                        parv[0]);
+                return 0;
+        }
+#ifdef PASS_KLINES
+	sendto_serv_butone(MyClient(sptr) ? NULL : cptr,
+		":%s KLINE %s %s :%s", parv[0], user, host, reason);
+#endif
+#ifdef ALLOW_KLINES_FROM_SERVERS
+        if (!MyClient(sptr))
+        {
+                if (IsPerson(sptr) && IsOper(sptr) && parv[1] &&
+                        *parv[1] && parv[2] && *parv[2] &&
+                        !rmatches(sptr->user->server, ALLOWED_KLINES))
+			;
+                else
+                        return 0;
+        }
+#endif
 #ifdef NO_REDUNDANT_KLINES
 	if (test_kline_userhost(sptr, &KList1, user, host) ||
 		test_kline_userhost(sptr, &KList2, user, host) ||
 		test_kline_userhost(sptr, &KList3, user, host))
 		return 0;
 #endif
-        if (!matches(user, "akjhfkahfasfjd") &&
-                !matches(host, "ldksjfl.ksskdjfd.jfklsjf"))
-        {
-                sendto_one(sptr, ":%s NOTICE %s :Can't K-Line *@*", me.name,
-                        parv[0]);
-                return 0;
-        }
 	aconf = make_conf();
 	aconf->status = CONF_KILL;
 	DupString(aconf->host, host);
-	if (parv[2])
-		sprintf(buffer, "%s", parv[2]); 
-	DupString(aconf->passwd, parv[2] ? buffer : "");
+	if (reason)
+		sprintf(buffer, "%s", reason);
+	DupString(aconf->passwd, reason ? buffer : "");
 	DupString(aconf->name, user);
 	aconf->port = 0;
 	Class(aconf) = find_class(0);
@@ -2095,8 +2324,13 @@ char    *parv[];
 		MyFree(host);
 	}
 	rehashed = 1; /* Forces looping thru clients to check k-lines */
-        sendto_flagops(OPERS,"%s added K-Line for [%s@%s]: %s", parv[0], user, host,
-		parv[2] && *parv[2] ? parv[2] : "No reason");
+	if (MyClient(sptr))
+        sendto_flagops(OPERS,"%s added K-Line for [%s@%s]: %s", parv[0], user,
+		host, reason && *reason ? reason : "No reason");
+	else
+	sendto_flagops(OPERS,"%s from %s added K-Line for [%s@%s]: %s",
+		parv[0], sptr->user->server, user, host,
+		reason && *reason ? reason:"No reason");
 #ifdef PUT_KLINES_IN_IRCD_CONF
 	filename = configfile;
 #elif defined(SEPARATE_QUOTE_KLINES_BY_DATE)
@@ -2118,7 +2352,7 @@ char    *parv[];
 	irc_sprintf(buffer, "#%s!%s@%s K'd: %s@%s: %s\n",
 		sptr->name, sptr->user->username,
 		sptr->user->host, user, host,
-		(parv[2] && *parv[2]) ? parv[2] : "No reason");
+		(reason && *reason) ? reason : "No reason");
 	if (write(out, buffer, strlen(buffer)) <= 0)
 	{
 		sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);
@@ -2126,8 +2360,8 @@ char    *parv[];
 		return 0;
 	}
         irc_sprintf(buffer, "K:%s:%s%s:%s\n", host,
-		(parv[2] && *parv[2]) ? "" : "",
-		(parv[2] && *parv[2]) ? parv[2] : "", user);
+		(reason && *reason) ? "" : "",
+		(reason && *reason) ? reason : "", user);
 	if (write(out, buffer, strlen(buffer)) <= 0)
 		sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);
         close(out);
@@ -2137,6 +2371,96 @@ char    *parv[];
 }
 
 #endif /* QUOTE_KLINE */
+
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE
+
+/*
+** m_rehashadd
+**
+*/
+int     m_rehashadd(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int     parc;
+char    *parv[];
+{
+	struct tm *tmptr;
+	char timebuffer[25];
+	char filename[1024];
+
+#ifndef LOCOP_REHASH
+        if (!MyClient(sptr) || !IsOper(sptr))
+#else
+# ifdef OPER_REHASH
+        if (!MyClient(sptr) || !IsAnOper(sptr))
+# else
+        if (!MyClient(sptr) || !IsLocOp(sptr))
+# endif
+#endif
+            {
+                sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
+                return 0;
+            }
+        sendto_one(sptr, rpl_str(RPL_REHASHING), me.name, parv[0], configfile);
+        sendto_ops("%s is rehashing Server config file", parv[0]);
+#ifdef USE_SYSLOG
+        syslog(LOG_INFO, "REHASHADD From %s\n", get_client_name(sptr, FALSE));
+#endif
+        (void)rehash(cptr, sptr, (parc > 1) ? ((*parv[1] == 'q')?2:0) : 0);
+        tmptr = localtime(&NOW);
+        strftime(timebuffer, 20, "%y%m%d", tmptr);
+        sprintf(filename, "%s.%s", klinefile, timebuffer);
+        if (initconf(0,filename))
+                sendto_one(sptr,":%s NOTICE %s :There was a problem opening %s",
+			me.name, parv[0], filename);
+	else
+	{
+		sendto_one(sptr, ":%s NOTICE %s :K-lines were loaded from %s",
+			me.name, parv[0], filename); 
+		sendto_flagops(OPERS, "%s loaded K-lines from %s",
+			parv[0], filename);
+	}
+	rehashed = 1;
+	return 0;
+}
+
+/*
+** m_addklines
+**
+*/
+int	m_addklines(cptr, sptr, parc, parv)
+aClient *cptr, *sptr;
+int     parc;
+char    *parv[];
+{
+	char buffer[1024];
+
+	if (!MyClient(sptr) || !IsAnOper(sptr))
+	{
+		sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
+		return 0;
+	}
+	if (parc < 2 || (!parv[1] || !*parv[1]))
+	{
+		sendto_one(sptr, ":%s NOTICE %s :No date given to load",
+			me.name, parv[0]);
+		return 0;
+	}
+	sprintf(buffer, "%s.%s", KLINEFILE, parv[1]);
+        sendto_one(sptr, ":%s NOTICE %s :Loading K-lines from %s", me.name, parv[0], buffer);
+	if (initconf(0,buffer))
+		sendto_one(sptr, ":%s NOTICE %s :There was a problem opening the file", me.name, parv[0]);
+	else
+	{
+		sendto_flagops(OPERS, "%s loaded K-lines from %s",
+			parv[0], buffer);
+		sendto_one(sptr, ":%s NOTICE %s :K-lines have been loaded",
+			me.name, parv[0]);
+	}
+	rehashed = 1;
+	return 0;
+}
+
+#endif /* SEPARATE_QUOTE_KLINES_BY_DATE */
 
 #if defined(OPER_REHASH) || defined(LOCOP_REHASH)
 /*
@@ -2161,12 +2485,16 @@ char	*parv[];
 		sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
 		return 0;
 	    }
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE
+	return m_rehashadd(cptr, sptr, parc, parv);
+#else
 	sendto_one(sptr, rpl_str(RPL_REHASHING), me.name, parv[0], configfile);
 	sendto_ops("%s is rehashing Server config file", parv[0]);
 #ifdef USE_SYSLOG
 	syslog(LOG_INFO, "REHASH From %s\n", get_client_name(sptr, FALSE));
 #endif
 	return rehash(cptr, sptr, (parc > 1) ? ((*parv[1] == 'q')?2:0) : 0);
+#endif
 }
 #endif
 
@@ -2286,7 +2614,7 @@ char	*parv[];
 		if (!(acptr = local[i])) /* Local Connection? */
 			continue;
 		if (IsInvisible(acptr) && dow &&
-		    !(MyConnect(sptr) && IsOper(sptr)) &&
+		    !(MyConnect(sptr) && IsAnOper(sptr)) &&
 		    !IsAnOper(acptr) && (acptr != sptr))
 			continue;
 		if (!doall && wilds && matches(tname, acptr->name))
@@ -2379,19 +2707,26 @@ char	*parv[];
        	if (!IsAnOper(sptr) || !cnt)
 	    {
 		if (cnt)
+		{
+			sendto_one(sptr,rpl_str(RPL_ENDOFTRACE),me.name,parv[0],
+				tname);
 			return 0;
+		}
 		/* let the user have some idea that its at the end of the
 		 * trace
 		 */
 		sendto_one(sptr, rpl_str(RPL_TRACESERVER),
 			   me.name, parv[0], 0, link_s[me.fd],
 			   link_u[me.fd], me.name, "*", "*", me.name);
+		sendto_one(sptr, rpl_str(RPL_ENDOFTRACE), me.name, parv[0],
+			tname);
 		return 0;
 	    }
 	for (cltmp = FirstClass(); doall && cltmp; cltmp = NextClass(cltmp))
 		if (Links(cltmp) > 0)
 			sendto_one(sptr, rpl_str(RPL_TRACECLASS), me.name,
 				   parv[0], Class(cltmp), Links(cltmp));
+	sendto_one(sptr, rpl_str(RPL_ENDOFTRACE), me.name, parv[0], tname);
 	return 0;
     }
 

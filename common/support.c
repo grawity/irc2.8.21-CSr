@@ -31,6 +31,16 @@ extern	int errno; /* ...seems that errno.h doesn't define this everywhere */
 extern	void	outofmemory();
 #endif
 
+char	*mystrdup(s)
+char	*s;
+{
+	char *t;
+
+	if ((t = (char *) MyMalloc(strlen(s) + 1)) == NULL)
+		return NULL;
+	return (char *) strcpy(t, s);
+}
+
 #ifdef NEED_STRTOKEN
 /*
 ** 	strtoken.c --  	walk through a string of tokens, using a set

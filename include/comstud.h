@@ -1,6 +1,43 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
+/* RESTRICT_STATSK
+                   - Define this if you want to restrict /stats k so
+                     that it will only show if a certain spec is banned.
+                     Ie, /stats k will tell you if you are banned or not.
+                     /stats k <server or *> <nick/u@h> tells you if that
+                     person is banned.
+*/
+
+#define RESTRICT_STATSK
+
+/* PASS_KLINES
+                   - This will pass klines to up/downlinks for them
+                     to deal with as they want..
+*/
+
+#undef  PASS_KLINES
+
+/* ALLOW_KLINES_FROM_SERVERS
+                   - Define this if you want to accept K-lines from
+                     other servers.  Use #define ALLOWED_KLINES to
+                     pick which servers you want to accept them from
+*/
+
+#define ALLOW_KLINES_FROM_SERVERS
+
+/* ALLOWED_KLINES
+                   - This defines which servers you want to accept
+                     klines from.  For example:
+        #define ALLOWED_KLINES "*.netcom.com *.cerf.net"
+                     If you get a KLINE from those servers, it'll
+                     put them in.
+         Note:       This is only if ALLOW_KLINES_FROM_SERVERS is
+                     #defined.
+*/
+
+#define ALLOWED_KLINES "*.cris.com"
+
 /* NO_REDUNDANT_KLINES
                    - This will check the kline that you try and put in
                      via /quote kline and will not allow it if it matches
@@ -39,7 +76,7 @@
                      kline.conf.
 */
 
-#define SEPARATE_QUOTE_KLINES_BY_DATE
+#undef SEPARATE_QUOTE_KLINES_BY_DATE
 
 /* LIMIT_UH        - Use this if you want to use the connect frequency
 		     field in the Y: lines to limit that class to a
@@ -272,7 +309,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr25/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc2.8.21+CSr27/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -362,7 +399,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr25/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr27/lib/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

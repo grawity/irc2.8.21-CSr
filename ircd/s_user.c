@@ -313,16 +313,18 @@ char	*nick;
 ** reduce a string of duplicate list entries to contain only the unique
 ** items.  Unavoidably O(n^2).
 */
-char	*canonize(buffer)
+char	*canonize(buffer, num)
 char	*buffer;
+int	*num;
 {
 	static	char	cbuf[BUFSIZ];
 	register char	*s, *t, *cp = cbuf;
 	register int	l = 0;
 	char	*p = NULL, *p2;
-
+	
 	*cp = '\0';
-
+	if (num)
+		*num = 0;
 	for (s = strtoken(&p, buffer, ","); s; s = strtoken(&p, NULL, ","))
 	    {
 		if (l)
@@ -343,6 +345,8 @@ char	*buffer;
 			else
 				l = 1;
 			(void)strcpy(cp, s);
+			if (num)
+				(*num)++;
 			if (p)
 				cp += (p - s);
 		    }
@@ -384,18 +388,15 @@ char	*nick, *username;
 {
 	Reg1	aConfItem *aconf;
         char	*parv[3];
-	char	*temp;
+	char	*temp, *reason, *bottype = "";
 	static	char ubuf[12];
+	char	origuser[USERLEN+1];
 	short	oldstatus = sptr->status;
 	anUser	*user = sptr->user;
-	int	i;
-	int	reject = 0;
-	char	*bottype = "";
-	char	origuser[USERLEN+1];
+	int	i, reject = 0;
 
 	parv[0] = sptr->name;
 	parv[1] = parv[2] = NULL;
-
 	
 	if (MyConnect(sptr))
 	    {
@@ -431,51 +432,52 @@ char	*nick, *username;
 		else
 			strncpyzt(user->host, sptr->sockhost, HOSTLEN+1);
 		aconf = sptr->confs->value.aconf;
-		if ((sptr->flags & FLAGS_DOID) && !(sptr->flags & FLAGS_GOTID))
-		    {
-			*user->username = '~';
-			(void)strncpy(&user->username[1], origuser, USERLEN);
-			user->username[USERLEN] = '\0';
-#ifdef IDENTD_ONLY
-                        ircstp->is_ref++;
-			sendto_one(sptr, ":%s NOTICE %s :This server will not allow connections from sites that don't run RFC1413 (pidentd).", me.name, parv[0]);
-                        sendto_one(sptr, ":%s NOTICE %s :Have your system administrator install it if you wish to connect here.", me.name, parv[0]);
-			return exit_client(cptr, sptr, &me, "Install identd");
-#endif
-		    }
-		else if (sptr->flags & FLAGS_GOTID)
+		if (sptr->flags & FLAGS_GOTID)
 			strncpyzt(user->username, sptr->username, USERLEN+1);
 		else
 		{
-#ifdef IDENTD_ONLY
-			*user->username = '~';
-			(void)strncpy(&user->username[1], origuser, USERLEN);
+			if (IsNoTilde(aconf))
+				(void)strncpy(user->username, origuser, USERLEN);
+			else
+			{
+				*user->username = '~';
+				(void)strncpy(&user->username[1], origuser, USERLEN);
+			}
 			user->username[USERLEN] = '\0';
+#ifndef IDENTD_ONLY
+			if (IsNeedIdentd(aconf))
 #else
-			strncpyzt(user->username, origuser, USERLEN+1);
+			if (!IsPassIdentd(aconf))
 #endif
+			{
+                        ircstp->is_ref++;
+			sendto_one(sptr, ":%s NOTICE %s :This server doesn't allow connections from your site, unless it runs identd. (RFC1413)", me.name, parv[0]);
+                        sendto_one(sptr, ":%s NOTICE %s :Have your system administrator install it if you wish to connect here.", me.name, parv[0]);
+			return exit_client(cptr, sptr, &me, "Install identd");
+			}
 		}
+
 		if (!BadPtr(aconf->passwd) &&
 		    !StrEq(sptr->passwd, aconf->passwd))
-		    {
+		{
 			ircstp->is_ref++;
 			sendto_one(sptr, err_str(ERR_PASSWDMISMATCH),
 				   me.name, parv[0]);
 			return exit_client(cptr, sptr, &me, "Bad Password");
-		    }
+		}
 		bzero(sptr->passwd, sizeof(sptr->passwd));
 
-		if (find_kill(sptr, 1))
-		    {
+		if (find_kill(sptr, 1, &reason))
+		{
 			ircstp->is_ref++;
-			return exit_client(cptr, sptr, &me, "K-lined");
-		    }
+			return exit_client(cptr, sptr, &me, reason);
+		}
 #ifdef R_LINES
 		if (find_restrict(sptr))
-		    {
+		{
 			ircstp->is_ref++;
 			return exit_client(cptr, sptr, &me , "R-lined");
-		    }
+		}
 #endif
 		if (oldstatus == STAT_MASTER && MyConnect(sptr))
 			(void)m_oper(&me, sptr, 1, parv);
@@ -485,6 +487,7 @@ char	*nick, *username;
                 register char *tmpstr, c;
                 register int lower, upper, special;
                 char *Myptr, *Myptr2;
+		char *username = user->username;
 
                 lower = upper = special = 0;
 #ifdef IGNORE_FIRST_CHAR
@@ -499,7 +502,7 @@ char	*nick, *username;
                       lower++;
                     if (isupper(c))
                       upper++;
-                    if (!isalnum(c) && !strchr("-_.", c))
+                    if (strchr("[]().;",c)||(!isalnum(c) && !strchr("-_.", c)))
                       special++;
                   }
 #endif /* NO_MIXED_CASE || NO_SPECIAL */
@@ -509,6 +512,8 @@ char	*nick, *username;
                     sendto_flagops(BMODE, "Invalid username: %s [%s@%s]",
                                nick, username, user->host);
                     ircstp->is_ref++;
+		    sendto_one(sptr, ":%s NOTICE %s :Sorry, your userid contains a mix of lower and upper case characters.", me.name, parv[0]);
+		    sendto_one(sptr, ":%s NOTICE %s :Only all lower or all upper case is allowed.", me.name, parv[0]);
                     return exit_client(cptr, sptr, &me, "Invalid username");
                   }
 #endif /* NO_MIXED_CASE */
@@ -518,6 +523,8 @@ char	*nick, *username;
                     sendto_flagops(BMODE,"Invalid username: %s [%s@%s]",
                                nick, user->username, user->host);
                     ircstp->is_ref++;
+                    sendto_one(sptr, ":%s NOTICE %s :Sorry, your userid contains invalid characters.", me.name, parv[0]);
+                    sendto_one(sptr, ":%s NOTICE %s :Only alphanumeric characters are allowed.", me.name, parv[0]);
                     return exit_client(cptr, sptr, &me, "Invalid username");
                   }
 #endif /* NO_SPECIAL */
@@ -534,6 +541,11 @@ char	*nick, *username;
 		if (!find_bline(cptr))
 		{
 #endif
+
+#define bot_msg sendto_one(sptr, ":%s NOTICE %s :Sorry, certain bots currently aren't allowed.", me.name, parv[0]); \
+                sendto_one(sptr, ":%s NOTICE %s :If you are not a bot, your client is probably outdated, and you should contact the author.", \
+		me.name, parv[0]);
+
 #if defined(BOTS_NOTICE) || defined(REJECT_BOTS)
 			if (reject == 1)
 			{
@@ -542,6 +554,7 @@ char	*nick, *username;
                                         user->host);
 #ifdef REJECT_BOTS
 				ircstp->is_ref++;
+				bot_msg;
                                 return exit_client(cptr, sptr, &me, "No bots allowed");
 #endif
 			} 
@@ -552,6 +565,7 @@ char	*nick, *username;
                                         nick, user->username, user->host);
 #ifdef REJECT_BOTS
 				ircstp->is_ref++;
+				bot_msg;
                                 return exit_client(cptr, sptr, &me, "No bots allowed");
 #endif
 			}
@@ -562,6 +576,7 @@ char	*nick, *username;
 					nick, user->username, user->host);
 #ifdef REJECT_BOTS
 				ircstp->is_ref++;
+				bot_msg;
 				return exit_client(cptr, sptr, &me, "No bots allowed");
 #endif
 			}
@@ -572,11 +587,12 @@ char	*nick, *username;
 				nick, user->username, user->host);
 #ifdef REJECT_BOTS
 				ircstp->is_ref++;
+				bot_msg;
 				return exit_client(cptr, sptr, &me, "No bots allowed");
 #endif
 			}
-                        if (!matches("*bot*", nick)||!matches("*Serv*", nick)||
-                                !matches("*help*", nick))
+                        if (my_stristr(nick, "bot")||my_stristr(nick, "Serv")||
+				my_stristr(nick, "help"))
                         {
                                 sendto_flagops(BMODE,"%s bot: %s [%s@%s]",
 					bottype,
@@ -658,7 +674,7 @@ char	*nick, *username;
                                 nick, user->username, user->host);
 #endif /* CLIENT_NOTICES */
 		if (sptr->flags & FLAGS_GOTID)
-			if (strcmp(origuser, sptr->username))
+			if (mycmp(origuser, sptr->username))
 				sendto_flagops(DMODE,"Identd response differs: %s [%s]", nick, origuser);
 	    }
 	else
@@ -756,6 +772,9 @@ char	*parv[];
 	ts_val	newts = 0;
 	int	doests, sameuser = 0;
 	int	fromts;
+#ifdef NO_NICK_FLOODS
+	int	dontcheck = 0;
+#endif
 
 	if (parc < 2)
 	    {
@@ -828,33 +847,6 @@ char	*parv[];
 				   BadPtr(parv[0]) ? "*" : parv[0], nick);
 			return 0; /* NICK message ignored */
 		    }
-#ifdef NO_NICK_FLOODS
-        if (MyClient(sptr) && IsRegistered(sptr))
-        {
-/* "lastnick" will actually be the first time a person did a /nick
-   if "lastnick" is 0 (has never /nick'd) or if "lastnick" is more
-   than 15 seconds ago, then "lastnick" will be reset to NOW
-   Basically, when someone hits 4 nick changes in 15 seconds, boom.
-*/
-
-                if (!sptr->lastnick || (NOW-sptr->lastnick > 15))
-                {
-                        sptr->numnicks = 0;
-                        sptr->lastnick = NOW;
-                }
-                sptr->numnicks++;
-                if (sptr->numnicks > 3)
-                {
-                        sptr->lastnick = NOW+15; /* Hurt the person */
-                        sendto_flagops(OPERS,"Nick flooding detected by: %s (%s@%s)",
-                                sptr->name, sptr->user->username, sptr->user->host);
-                        sendto_one(sptr, err_str(ERR_TOOMANYNICKS),
-                                   me.name, sptr->name);
-                        return 0;
-                }
-        }
-#endif
-
 	/*
 	** acptr already has result from previous find_server()
 	*/
@@ -892,10 +884,15 @@ char	*parv[];
 	*/
 	if (acptr == sptr)
 		if (strcmp(acptr->name, nick) != 0)
+		{
 			/*
 			** Allows change of case in his/her nick
 			*/
+#ifdef NO_NICK_FLOODS
+			dontcheck = 1;
+#endif
 			goto nickkilldone; /* -- go and process change */
+		}
 		else
 			/*
 			** This is just ':old NICK old' type thing.
@@ -934,6 +931,7 @@ char	*parv[];
 			   me.name, BadPtr(parv[0]) ? "*" : parv[0], nick);
 		return 0; /* NICK message ignored */
 	    }
+
 	/*
 	** NICK was coming from a server connection. Means that the same
 	** nick is registerd for different users by different server.
@@ -1092,6 +1090,32 @@ char	*parv[];
 	    }
 
 nickkilldone:
+#ifdef NO_NICK_FLOODS
+        if (!dontcheck && MyClient(sptr) && IsPerson(sptr) && IsRegistered(sptr))
+        {
+/* "lastnick" will actually be the first time a person did a /nick
+   if "lastnick" is 0 (has never /nick'd) or if "lastnick" is more
+   than 15 seconds ago, then "lastnick" will be reset to NOW
+   Basically, when someone hits 4 nick changes in 15 seconds, boom.
+*/
+
+                if (!sptr->lastnick || (NOW-sptr->lastnick > 15))
+                {
+                        sptr->numnicks = 0;
+                        sptr->lastnick = NOW;
+                }
+                sptr->numnicks++;
+                if (sptr->numnicks > 3)
+                {
+                        sptr->lastnick = NOW+15; /* Hurt the person */
+                        sendto_flagops(OPERS,"Nick flooding detected by: %s (%s@%s)",
+                                sptr->name, sptr->user->username, sptr->user->host);
+                        sendto_one(sptr, err_str(ERR_TOOMANYNICKS),
+                                   me.name, sptr->name);
+                        return 0;
+                }
+        }
+#endif /* NO_NICK_FLOODS */
 	if (IsServer(sptr))
 	    {
 		/* A server introducing a new client, change source */
@@ -1211,6 +1235,7 @@ int	notice;
 	Reg2	char	*s;
 	aChannel *chptr;
 	char	*nick, *server, *p, *cmd, *host;
+	int num = 0;
 	int resetidle = 0;
 
 	if (notice)
@@ -1237,7 +1262,20 @@ int	notice;
 	    }
 
 	if (MyConnect(sptr))
-		parv[1] = canonize(parv[1]);
+	{
+		parv[1] = canonize(parv[1], &num);
+		if (IsPerson(sptr) && (num>10))
+		{
+			sendto_one(sptr, ":%s NOTICE %s :Too many recipients",
+				me.name, parv[0]);
+			if (num>=20)
+				sendto_flagops(OPERS,
+					"%s (%s@%s) tried %i recipients",
+					sptr->name, sptr->user->username,
+					sptr->user->host, num);
+			goto here;
+		}
+	}
 	for (p = NULL, nick = strtoken(&p, parv[1], ","); nick;
 	     nick = strtoken(&p, NULL, ","))
 	    {
@@ -1378,9 +1416,10 @@ int	notice;
 		sendto_one(sptr, err_str(ERR_NOSUCHNICK), me.name,
 			   parv[0], nick);
             }
-    if (resetidle && MyConnect(sptr) && sptr->user)
-	sptr->user->last = NOW;	
-    return 0;
+here:
+	if (resetidle && MyConnect(sptr) && sptr->user)
+		sptr->user->last = NOW;	
+	return 0;
 }
 
 /*
@@ -1618,6 +1657,8 @@ char	*parv[];
 			return 0;
 		parv[1] = parv[2];
 	    }
+
+	parv[1] = canonize(parv[1], NULL);
 
 	for (tmp = parv[1]; (nick = strtoken(&p, tmp, ",")); tmp = NULL)
 	    {
@@ -1931,23 +1972,11 @@ char	*parv[];
 			path[TOPICLEN] = '\0';
 	    }
 
-	if (!(acptr = find_client(user, NULL)))
-	    {
-		/*
-		** If the user has recently changed nick, we automaticly
-		** rewrite the KILL for this new nickname--this keeps
-		** servers in synch when nick change and kill collide
-		*/
-		if (!(acptr = get_history(user, (long)KILLCHASETIMELIMIT)))
-		    {
-			sendto_one(sptr, err_str(ERR_NOSUCHNICK),
-				   me.name, parv[0], user);
-			return 0;
-		    }
+	if (!(acptr = find_chasing(sptr, user, &chasing)))
+		return 0;
+	if (chasing)
 		sendto_one(sptr,":%s NOTICE %s :KILL changed from %s to %s",
 			   me.name, parv[0], user, acptr->name);
-		chasing = 1;
-	    }
 	if (!MyConnect(acptr) && IsLocOp(cptr))
 	    {
 		sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);

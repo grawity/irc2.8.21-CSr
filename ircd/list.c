@@ -130,8 +130,10 @@ aClient	*from;
 	if (size == CLIENT_LOCAL_SIZE)
 	    {
 		cptr->since = cptr->lasttime = cptr->firsttime = NOW;
+#ifdef NO_NICK_FLOODS
 		cptr->lastnick = 0;
 		cptr->numnicks = 0;
+#endif
 		cptr->confs = NULL;
 		cptr->sockhost[0] = '\0';
 		cptr->buffer[0] = '\0';
@@ -378,6 +380,7 @@ aConfItem	*make_conf()
 	aconf->clients = 0;
 	aconf->port = 0;
 	aconf->hold = 0;
+	aconf->flags = 0;
 	Class(aconf) = 0;
 	return (aconf);
 }

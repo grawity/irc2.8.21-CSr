@@ -7,7 +7,7 @@
 
 #define DEFAULT_LOADCFREQ 5
 #define DEFAULT_LOADRECV 110
-#define FDLISTCHKFREQ  2
+#define FDLISTCHKFREQ  3
  
 #endif 
 

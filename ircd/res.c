@@ -309,7 +309,7 @@ int	len, rcount;
 	for (i = 0; i < max; i++)
 	    {
 		_res.nsaddr_list[i].sin_family = AF_INET;
-		if (sendto(resfd, msg, len, 0, &(_res.nsaddr_list[i]),
+		if (sendto(resfd, msg, len, 0, (struct sockaddr *)&(_res.nsaddr_list[i]),
 			   sizeof(struct sockaddr)) == len)
 		    {
 			reinfo.re_sent++;

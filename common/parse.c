@@ -239,6 +239,13 @@ struct	Message *mptr;
 	for (ch = buffer; *ch == ' '; ch++)
 		;
 	para[0] = from->name;
+#ifdef MAJORLOGGING
+	add_command(buffer);
+	numcommands++;
+	if (numcommands > 100000)
+		free_and_write_commands();
+		
+#endif
 	if (*ch == ':')
 	    {
 		/*

@@ -246,7 +246,7 @@ static	Numeric	numeric_replies[] = {
 /* 212 */	RPL_STATSCOMMANDS, "%s %u %u",
 /* 213 */	RPL_STATSCLINE, "%c %s * %s %d %d",
 /* 214 */	RPL_STATSNLINE, "%c %s * %s %d %d",
-/* 215 */	RPL_STATSILINE, "%c %s * %s %d %d",
+/* 215 */	RPL_STATSILINE, "%c %s * %s%s %d %d",
 /* 216 */	RPL_STATSKLINE, "%c %s %s %s %d %d",
 /* 217 */	RPL_STATSQLINE, "%c %s * %s %d %d",
 /* 218 */	RPL_STATSYLINE, "%c %d %d %d %d %ld",
@@ -290,7 +290,7 @@ static	Numeric	numeric_replies[] = {
 /* 259 */	RPL_ADMINEMAIL, ":%s",
 		0, (char *)NULL,
 /* 261 */	RPL_TRACELOG, "File %s %d",
-		0, (char *)NULL,
+/* 262 */	RPL_ENDOFTRACE, "%s :End of /TRACE list.",
 #ifdef DOG3
 /* 263 */	RPL_LOAD2HI, ":Server load too high, try again in a while"
 #else

@@ -158,8 +158,6 @@ char	*username;
 			goto attach_iline;
 		continue;
 attach_iline:
-		if (index(uhost, '@'))
-			cptr->flags |= FLAGS_DOID;
 		get_sockhost(cptr, uhost);
 		return attach_conf(cptr, aconf);
 	    }
@@ -716,7 +714,34 @@ char *filename;
 	return open(filename, O_RDONLY);
 #endif
 }
+
 extern char *getfield();
+
+char *set_conf_flags(aconf, tmp)
+aConfItem *aconf;
+char *tmp;
+{
+	while(strchr("!-+#", *tmp))
+	{
+		switch(*tmp)
+		{
+			case '!':
+				aconf->flags |= FLAGS_LIMIT_IP;
+				break;
+			case '-':
+				aconf->flags |= FLAGS_NO_TILDE;
+				break;
+			case '+':
+				aconf->flags |= FLAGS_NEED_IDENTD;
+				break;
+			case '#':
+				aconf->flags |= FLAGS_PASS_IDENTD;
+				break;
+		}
+		tmp++;
+	}
+	return tmp;
+}
 
 /*
 ** initconf() 
@@ -900,12 +925,16 @@ char *filename;
 		    {
 			if ((tmp = getfield(NULL)) == NULL)
 				break;
+			if (aconf->status & CONF_CLIENT)
+				tmp = set_conf_flags(aconf, tmp);
 			DupString(aconf->host, tmp);
 			if ((tmp = getfield(NULL)) == NULL)
 				break;
 			DupString(aconf->passwd, tmp);
 			if ((tmp = getfield(NULL)) == NULL)
 				break;
+			if (aconf->status & CONF_CLIENT)
+				tmp = set_conf_flags(aconf, tmp);
 			DupString(aconf->name, tmp);
 			if ((tmp = getfield(NULL)) == NULL)
 				break;
@@ -950,6 +979,7 @@ char *filename;
 					bconf->class->links -= bconf->clients;
 					bconf->class = aconf->class;
 					bconf->class->links += bconf->clients;
+					bconf->flags = aconf->flags;
 				    }
 				free_conf(aconf);
 				aconf = bconf;
@@ -1181,8 +1211,9 @@ char            *kuser, *khost;
                         if (tmp->status == CONF_KILL)
                         if (!match(name,kuser) && !match(host,khost))
 			{
+				if (MyClient(sptr))
 				sendto_one(sptr, ":%s NOTICE %s :K: line not added. %s@%s already matched by %s@%s", me.name, sptr->name, kuser, khost, name, host );
-                        return 1;
+				return 1;
                         }
                 }
         }
@@ -1191,15 +1222,20 @@ char            *kuser, *khost;
 
 #endif
 
-int	find_kill(cptr, checkuh)
+int	find_kill(cptr, checkuh, reason)
 aClient	*cptr;
 int	checkuh;
+char **reason;
 {
 	char	reply[256], *host, *name;
 	aConfItem *tmp;
 	char		*rev;
 	aConfList	*list;
+	static char toomany[100] = "Over the limit of number of clients allowed";
+	static char klined[20] = "K-lined";
 
+	if (reason)
+		*reason = klined;
 #ifdef E_LINES
 	if (find_eline(cptr))
 		return 0;
@@ -1294,33 +1330,43 @@ matched:
 		register int i;
 		int num = 0, tot;
 		int cc = get_client_class(cptr);
+		aConfItem *aconf;
 		aClass *cs;
 		
-		cs = find_class(cc);
+		aconf = cptr->confs->value.aconf;
+		cs = aconf->class;
 		tot = get_con_freq(cs);
 		if (tot)
                 for (i = highest_fd; i >= 0; i--)
 		{
 			if (!(sptr=local[i]) || !IsPerson(sptr))
 				continue;
-			if (cc != get_client_class(sptr))
+			if (cs != sptr->confs->value.aconf->class)
 				continue;
-			if (!strcmp(sptr->user->username, name) &&
-				!strcmp(sptr->sockhost, host))
+			if ((IsLimitIp(aconf) ||
+				!strcmp(sptr->user->username, name)) &&
+				sptr->ip.s_addr == cptr->ip.s_addr)
 				if (++num >= tot)
 				{
 					sendto_one(cptr, ":%s NOTICE %s :This server is currently limited to %i client%s per user in your class",
 						me.name, cptr->name, tot, tot==1?"":"s"); 
 					sendto_flagops(LMODE, "Rejecting for too many clients: %s [%s@%s]",
 						cptr->name, cptr->user->username, cptr->user->host);	
+					if (reason)
+						*reason = toomany;
 					return 1;
 				}
 		}
         }
 #endif /* LIMIT_UH */
-
- 	return (tmp ? -1 : 0);
- }
+	if (tmp)
+	{
+		if (reason)
+			*reason = tmp->passwd ? tmp->passwd : klined;
+		return -1;
+	}
+	return 0;
+}
 
 int	find_conf_match(cptr, List1, List2, List3)
 aClient	*cptr;

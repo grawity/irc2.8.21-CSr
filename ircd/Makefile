@@ -27,7 +27,7 @@ INSTALL=/usr/bin/install
 # IRCDMODE given in top level Makefile, but added here to make sure
 # compilation works if started in ircd subdirectory
 
-IRCDMODE=711
+IRCDMODE=771
 INCLUDEDIR=../include
 
 # CFLAGS/IRCDLIBS used in ../Makefile should also be used here.  The list

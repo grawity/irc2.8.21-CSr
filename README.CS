@@ -1,6 +1,6 @@
 ---
 
-This is the README for irc2.8.21+CSr25.  Basically, this is just a list
+This is the README for irc2.8.21+CSr27.  Basically, this is just a list
 of changes...more information can be found in include/comstud.h.
 
 Any questions or comments can be directed to cbehrens@concentric.net
@@ -11,6 +11,105 @@ The newest versions of +CS ircds can be found at:
 
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
+
+New in CSr27:
+
+Still being developed...
+
+1) There are noticable differences in I: lines now.
+   There are 4 special characters that you can stick in front
+   of a hostname or ip# that do special things.
+   These characers are:
+   -  This will never put a ~ for a user not running identd
+   +  This will force people matching this I: to require identd
+   !  This means to only allow 1 connection per ip# in this I:
+   #  This means to allow a client to connect even if they don't
+      have identd.  (This is only useful if your server is compiled
+      for IDENTD_ONLY)
+   Examples:
+ a) I:x::!*@*ppp*::class  will only allow X connections per ip# for people
+      who have *ppp* in their hostname where X is given in the Y: line.
+      (See below in CSr25 about Y: lines).
+    If there is no ! and you have a limit in your Y: line, then it matches
+      full user@host instead of just host.
+
+ b) I:x::-*@*.cris.com::class will never show a ~, even though they may
+      not be running identd.  (This is equivilent to the old way of not
+      specifying a @ in the I: line).
+
+2) Rewrote parts of read_message() for the select() loop.  There used to
+   be 3 loops, which have now been condensed to 1.
+3) Rewrote poll() usage in read_message() so that poll() will finally work
+   on Solaris and you can get > 1024 fds w/o using 99% CPU!
+4) Added extra charaters to deny in usernames for NO_SPECIAL.  Also fixed
+   the fact that it wasn't checking identd replies, too.
+5) Rewrote parts of check_pings() to try and make it more optimized..
+6) #define RESTRICT_STATSK --
+   This restricts users from getting the full listing
+   of /stats K which they really don't need.  If the user is on another
+   server, /stats k <yourserver> will just tell them if they are banned or
+   not.  If they are, it shows them the bans.  If the user is on your
+   server, they may: /stats k * <nick or user@host> and it'll tell them
+   if that nick or user@host is banned.  And yes, opers can still get
+   the full stats k output.  Maybe this is bad, maybe not, but I did it.
+   So, opers can /stats k, or they can /stats k * <nick or user@host>
+7) #define PASS_KLINES --
+   Hrm, well, this will pass /quote kline's to our downlinks/uplinks.
+   This is not very useful right now, as it sends to ALL servers connected
+   to you.  Note that all servers cept +CS servers (currently) will
+   ignore it.  See #8:
+8) #define ALLOW_KLINES_FROM_SERVERS --
+   Define this if you wish to parse the klines that are sent from #7.
+   Note, you have to select which servers to accept from. See #9:
+9) #define ALLOWED_KLINES --
+   Define this to the servers you wish to allow klines from.  Ie,
+   #define ALLOWED_KLINES "*.cris.com *.netcom.com"
+   This only allows k-lines to be accepted from those servers!
+10) Changed some values in config.h dealing with auto-reconnecting
+    to servers.  Servers are trying to reconnect too quickly and
+    are causing a lot of problems.  It's good to wait about 30 seconds
+    before trying to reconnect.
+11) Added a /quote HTM which tries to tell you our current rate of
+    in coming data...not sure if it's totally accurate, but it's
+    interesting..
+12) Added /quote ADDKLINES for those using dated klines files...
+    It allows you to /quote addklines 961017
+13) Eliminated mass messaging by disallowing more than 10 nicknames
+    for PRIVMSG nick1,nick2,...nick10.  It notices /oper's if a person
+    tries more than 20, which means he's probably trying to abuse.
+    Some people are going to be pissed, because it breaks their
+    chanop-wall scripts, but screw them.  Privmsg nick1,nick2 should be
+    disallowed to happen at the same time (without penalty anyway).
+    (Maybe it should just lag the users really bad?)
+14) Added a lot of typecasting to s_bsd.c, which at least eliminates
+    all compiler warnings on Solaris, which should be okay for other
+    OS's (?)
+15) Fixed the problem of rehashing with a new P: line on Solaris.
+    You can now add ports as you wish without a problem.
+16) Fixed the accept: Protocol error on Solaris.  Solaris's accept()
+    returns EPROTO when a connection dies before or as it's accept()'d.
+17) Fixed some other getsockopt() errors that would happen occasionally...
+    (at least on Solaris)
+18) Added more stats to /stats ? (to be more like Taner's)
+19) Added RPL_ENDOFTRACE to be like /digi and +th
+20) Added more informative messages to the user for Invalid username
+    rejections and bot rejections.
+21) Fixed a problem with early releases of CSr25 where it was trying to
+    kill people who were already killed (m_kill).  Don't ask =)
+22) Now canonizing blah,blah,blah in /topic, /list and, /whowas.
+23) Upped the NICKNAMEHISTORYLENGTH size in config.h to 15000.  This uses
+    around 3 megs of RAM.  If you don't have that to spare, lower this.
+    Currently, there is usually around 10000 out of 15000 used.
+24) When a KILL line takes effect, kick the user off with the reason,
+    instead of just "K-lined".
+25) Cleaned up a lot of the code that figures out the MAX_BUFFER size
+    for reads and writes.
+26) Upped listen(, 5) to listen(, 1024)
+27) Fixed a place where fds weren't being removed from the fdlists when
+    a client was exiting.
+28) Removed the source ports for clients from /stats L
+
+CSr26 wasn't released.
 
 New in CSr25:
 
@@ -36,27 +135,6 @@ New in CSr25:
    notices to it.
 7) Created a new usermode +l, and moved UH_LIMIT reject notices there
 8) Got rid of the +r usermode, which is in 2.9 servers.
-9) USERHOST and ISON do not "lag" users now, so NOTIFY, won't penalize you.
-10) A couple things dealing with K-lines.  K-lines now by default are
-    put in a separate file.  This file is set by KPATH in config.h
-    #define PUT_KLINES_IN_IRCD_CONF if you don't wish to use a separate
-    file for klines.  Purpose of keeping klines in a separate file is for
-    easier management of your klines.  Another #define for klines is
-    SEPARATE_QUOTE_KLINES_BY_DATE.  This #define will put your quote klines
-    in a file something like klines.conf-960915 if KPATH is defined to be
-    "klines.conf".  When you /rehash or start ircd, these dated files are
-    NOT loaded.  You will have to manually move them into klines.conf.
-    The purpose of this is to decide at the end of the day which quote klines
-    you would like to keep, etc.
-11) #define NO_REDUNDANT_KLINES if you want your /quote kline to reject
-    any klines that are already in your .conf.  This patch came from
-    teletype.  I didn't use his code to remove old redundant ones that
-    are already in your .conf, but will come up with something in the
-    future.
-12) Fixed dependancies in the Makefiles for comstud.h, etc.
-13) Fixed NO_NICK_FLOODS so that if a user is trying to switch to a nickname
-    that already exists, it won't penalize him/her.
-
 
 New in CSr24:
 

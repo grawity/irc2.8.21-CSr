@@ -54,6 +54,7 @@ void	start_auth(cptr)
 Reg1	aClient	*cptr;
 {
 	struct	sockaddr_in	sock;
+	int blah;
 
 	Debug((DEBUG_NOTICE,"start_auth(%x) fd %d status %d",
 		cptr, cptr->fd, cptr->status));
@@ -72,12 +73,12 @@ Reg1	aClient	*cptr;
 		return;
 	    }
 	if (cptr->authfd >= (MAXCONNECTIONS-2))
-	    {
+	{
 		sendto_ops("Can't allocate fd for auth on %s",
 			   get_client_name(cptr, TRUE));
 		(void)close(cptr->authfd);
 		return;
-	    }
+	}
 
 	set_non_blocking(cptr->authfd, cptr);
 
@@ -87,14 +88,14 @@ Reg1	aClient	*cptr;
 	sock.sin_port = htons(113);
 	sock.sin_family = AF_INET;
 
-	if (connect(cptr->authfd, (struct sockaddr *)&sock,
+	blah = connect(cptr->authfd, (struct sockaddr *)&sock, sizeof(sock));
+	if ((blah==-1) &&
 #ifdef DGUX
-                    sizeof(sock)) == -1 && (errno != EINPROGRESS) && 
-			(errno != EAGAIN))
+                    (errnno != EINPROGRESS) && (errno != EAGAIN))
 #else
-		    sizeof(sock)) == -1 && errno != EINPROGRESS)
+		    (errno != EINPROGRESS))
 #endif
-	    {
+	{
 		ircstp->is_abad++;
 		/*
 		 * No error report from this...
@@ -104,7 +105,7 @@ Reg1	aClient	*cptr;
 		if (!DoingDNS(cptr))
 			SetAccess(cptr);
 		return;
-	    }
+	}
 	cptr->flags |= (FLAGS_WRAUTH|FLAGS_AUTH);
 	if (cptr->authfd > highest_fd)
 		highest_fd = cptr->authfd;

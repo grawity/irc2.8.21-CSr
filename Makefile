@@ -19,22 +19,21 @@
 
 CC=gcc
 RM=/bin/rm
-
-#
-# Default flags:
 INCLUDEDIR=../include
+#-I/usr/include
+#-I/usr/gnu/include
+
+# Default flags:
 CFLAGS= -I$(INCLUDEDIR) -O2 -fexpensive-optimizations -funroll-loops -fomit-frame-pointer
-IRCDLIBS=
-
-#
-# Solaris 2 flags:
-#IRCDLIBS=-L/usr/lib -lsocket -lnsl -lresolv
-
-# Others:
 
 #O2
 #IRCDLIBS=-L/usr/lib -L/usr/gnu/lib -lgnuc -O2
 #IRCLIBS=-lcurses -ltermcap
+
+# Solaris 2
+IRCDLIBS=-L/usr/lib -lsocket -lnsl -lresolv
+
+
 
 #
 # use the following on MIPS:
@@ -89,7 +88,7 @@ IRCDLIBS=
 #
 # WARNING: if you are making ircd SUID or SGID, check config.h to make sure
 #          you are not defining CMDLINE_CONFIG 
-IRCDMODE = 711
+IRCDMODE = 771
 
 # IRCDDIR must be the same as DPATH in include/config.h
 #

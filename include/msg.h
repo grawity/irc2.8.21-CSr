@@ -68,6 +68,7 @@
 #ifdef DOG3
 #define MSG_DOG3LOAD "DOG3LOAD" /* DOG3LOAD */
 #define MSG_DOG3FREQ "DOG3FREQ" /* DOG3FREQ */
+#define MSG_HTM      "HTM"      /* HTM */
 #endif
 #define MSG_NOTE     "NOTE"	/* NOTE */
 #define MSG_SQUERY   "SQUERY"	/* SQUE */
@@ -84,8 +85,14 @@
 #define	MSG_DIE	     "DIE"
 #define	MSG_HASH     "HSAH"	/* HASH */
 #define	MSG_DNS      "DNS"	/* DNS  -> DNSS */
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE
+#define MSG_REHASHADD "REHASHADD" /* REHASHADD */
+#endif
 #ifdef QUOTE_KLINE
 #define MSG_KLINE    "KLINE"    /* KLINE */
+#endif
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE 
+#define MSG_ADDKLINES "ADDKLINES" /* ADDKLINES */
 #endif
 #ifdef IDLE_CHECK
 #define MSG_IDLE     "IDLE"     /* IDLE */
@@ -95,6 +102,7 @@
 #ifdef DOG3
 extern int m_dog3load();
 extern int m_dog3freq();
+extern int m_htm();
 #endif
 #ifdef QUOTE_KLINE
 extern int m_kline();
@@ -120,8 +128,12 @@ extern int m_service(), m_servset(), m_servlist(), m_squery();
 #ifdef TSDEBUG
 extern int m_ts();
 #endif
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE 
+extern  int	m_addklines();
+#endif
 #if defined(OPER_REHASH) || defined(LOCOP_REHASH)
 extern	int	m_rehash();
+extern	int	m_rehashadd();
 #endif
 #if defined(OPER_RESTART) || defined(LOCOP_RESTART)
 extern	int	m_restart();
@@ -185,6 +197,7 @@ struct Message msgtab[] = {
 #ifdef DOG3
   { MSG_DOG3LOAD,    m_dog3load,     0, MAXPARA, 1 ,0L },
   { MSG_DOG3FREQ,    m_dog3freq,     0, MAXPARA, 1 ,0L },
+  { MSG_HTM,         m_htm,          0, MAXPARA, 1 ,0L },
 #endif
 #ifdef QUOTE_KLINE
   { MSG_KLINE,   m_kline,    0, MAXPARA, 1 ,0L },
@@ -206,6 +219,12 @@ struct Message msgtab[] = {
   { MSG_DNS,     m_dns,      0, MAXPARA, 1 ,0L },
 #if defined(OPER_REHASH) || defined(LOCOP_REHASH)
   { MSG_REHASH,  m_rehash,   0, MAXPARA, 1 ,0L },
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE
+  { MSG_REHASHADD, m_rehashadd, 0, MAXPARA,1,0L},
+#endif
+#endif
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE 
+  { MSG_ADDKLINES, m_addklines,  0, MAXPARA, 1, 0L },
 #endif
 #if defined(OPER_RESTART) || defined(LOCOP_RESTART)
   { MSG_RESTART, m_restart,  0, MAXPARA, 1 ,0L },

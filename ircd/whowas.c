@@ -141,6 +141,9 @@ char	*parv[];
 		if (hunt_server(cptr,sptr,":%s WHOWAS %s %s :%s", 3,parc,parv))
 			return 0;
 
+	parv[1] = canonize(parv[1], NULL);
+	if (!MyConnect(sptr) && (max > 20))
+		max = 20;
 	for (s = parv[1]; (nick = strtoken(&p, s, ",")); s = NULL)
 	    {
 		wp = wp2 = &was[ww_index - 1];
@@ -171,7 +174,7 @@ char	*parv[];
 
 		if (up == NULL)
 			sendto_one(sptr, err_str(ERR_WASNOSUCHNICK),
-				   me.name, parv[0], parv[1]);
+				   me.name, parv[0], nick);
 
 		if (p)
 			p[-1] = ',';

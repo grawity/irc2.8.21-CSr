@@ -326,3 +326,5 @@
 #define	RPL_ADMINEMAIL       259
 
 #define	RPL_TRACELOG         261
+#define RPL_ENDOFTRACE       262
+

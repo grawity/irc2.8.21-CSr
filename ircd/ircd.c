@@ -37,7 +37,6 @@ Computing Center and Jarkko Oikarinen";
 #include "h.h"
 #include "dich_conf.h"
 
-
 /* Lists to do K: line matching -Sol */
 aConfList       KList1 = { 0, NULL };   /* ordered */
 aConfList       KList2 = { 0, NULL };   /* ordered, reversed */
@@ -75,10 +74,12 @@ int	m_invis = 0;    /* My invisible users */
 #include "dog3.h"
 #include "fdlist.h"
 
+time_t  lastrecvtime=0;
+long    lastrecvK=0;
+float   currentrate=0;
 fdlist serv_fdlist;
 fdlist busycli_fdlist; /* high-priority clients */
 fdlist default_fdlist; /* just the number of the entry */
-fdlist auth_fdlist;
 int lifesux = 0;
 int dog3loadcfreq = DEFAULT_LOADCFREQ;
 int dog3loadrecv = DEFAULT_LOADRECV;
@@ -325,12 +326,12 @@ static	time_t	check_pings(currenttime)
 time_t	currenttime;
 {
 	Reg1	aClient	*cptr;
-	Reg2	int	killflag;
-	int	ping = 0, i, rflag = 0, checkit = 0;
+	int	ping = 0, i, checkit = 0;
 	time_t	oldest = 0, timeout;
 	static time_t  lastcheck = 0;
+	register int reg;
 #ifdef IDLE_CHECK
-	register int idleflag = 0, checkit2 = 0;
+	register int checkit2 = 0;
 	static	time_t	lastidlecheck = 0;
 #endif
 
@@ -394,17 +395,19 @@ time_t	currenttime;
 		if (cptr->flags & FLAGS_DEADSOCKET)
 		    {
 			(void)exit_client(cptr, cptr, &me, "Dead socket");
+			i=0;
 			continue;
 		    }
+
 #ifdef IDLE_CHECK
-		idleflag = (checkit2 && IsPerson(cptr)) ? (idlelimit && !IsAnOper(cptr) &&
+		if (checkit2 && IsPerson(cptr) && idlelimit &&
+			!IsAnOper(cptr) &&
 #ifdef E_LINES
 			(currenttime-cptr->user->last > idlelimit) &&
-			!find_eline(cptr)) : 0;
+			!find_eline(cptr))
 #else
-                        (currenttime-cptr->user->last > idlelimit)) : 0;
+                        (currenttime-cptr->user->last > idlelimit))
 #endif /* E_LINES */
-		if (idleflag)
 		{
 			if (!find_idle(cptr))
 			{
@@ -417,103 +420,100 @@ time_t	currenttime;
 				strcpy(crap->username, temp);
 				strcpy(crap->hostname, cptr->user->host);
 			}
+			sendto_ops("Idle time limit exceeded for %s",
+				get_client_name(cptr, FALSE));
+			(void)exit_client(cptr, cptr, &me,
+				"Idle time limit exceeded");
+			i=0;
+			continue;
 		}
 #endif
-		killflag = (checkit && IsPerson(cptr)) ?
-			find_kill(cptr, 0) : 0;
-#ifdef R_LINES_OFTEN
-		rflag = (checkit && IsPerson(cptr)) ? find_restrict(cptr) : 0;
+		if (checkit && IsPerson(cptr))
+		{
+			char *reason;
+
+			if (find_kill(cptr, 0, &reason))
+			{
+                        /*
+                         * this is used for KILL lines with time restrictions
+                         * on them - send a messgae to the user being killed
+                         * first.
+                         */
+				sendto_ops("Kill line active for %s",
+					get_client_name(cptr, FALSE));
+				(void)exit_client(cptr, cptr, &me, reason);
+				i=0;
+				continue;
+			}
+#if defined(R_LINES) && defined(R_LINES_OFTEN)
+			if (find_restrict(cptr))
+			{
+                                sendto_ops("Restricting %s, closing link.",
+                                           get_client_name(cptr,FALSE));
+				(void)exit_client(cptr, cptr, &me, "R-Lined");
+				i=0;
+				continue;
+			}
 #endif
-		ping = IsRegistered(cptr) ? get_client_ping(cptr) :
-					    CONNECTTIMEOUT;
-		Debug((DEBUG_DEBUG, "c(%s)=%d p %d k %d r %d a %d",
-			cptr->name, cptr->status, ping, killflag, rflag,
-			currenttime - cptr->lasttime));
-		/*
-		 * Ok, so goto's are ugly and can be avoided here but this code
-		 * is already indented enough so I think its justified. -avalon
-		 */
-		if (!killflag && !rflag &&
-#ifdef IDLE_CHECK
-			!idleflag &&
-#endif
-			IsRegistered(cptr) &&
-		    (ping >= currenttime - cptr->lasttime))
-			goto ping_timeout;
+		}
+		reg = IsRegistered(cptr);
+		if (reg)
+		{
+                /*
+                 * Ok, so goto's are ugly and can be avoided here but this code
+                 * is already indented enough so I think its justified. -avalon
+                 */
+			ping = get_client_ping(cptr);
+			if (ping >= (currenttime - cptr->lasttime))
+				goto ping_timeout;
+		}
+		else
+			ping = CONNECTTIMEOUT;
+
 		/*
 		 * If the server hasnt talked to us in 2*ping seconds
 		 * and it has a ping time, then close its connection.
 		 * If the client is a user and a KILL line was found
 		 * to be active, close this connection too.
 		 */
-		if (killflag || rflag ||
-#ifdef IDLE_CHECK
-			idleflag ||
-#endif
-		    ((currenttime - cptr->lasttime) >= (2 * ping) &&
-		     (cptr->flags & FLAGS_PINGSENT)) ||
-		    (!IsRegistered(cptr) &&
-		     (currenttime - cptr->firsttime) >= ping))
-		    {
-			if (!IsRegistered(cptr) &&
-			    (DoingDNS(cptr) || DoingAuth(cptr)))
-			    {
-				if (cptr->authfd >= 0)
-				    {
-					(void)close(cptr->authfd);
-					cptr->authfd = -1;
-					cptr->count = 0;
-					*cptr->buffer = '\0';
+		if ( (((currenttime - cptr->lasttime) >= ping*2) &&
+			(cptr->flags & FLAGS_PINGSENT)) ||
+		     ((IsUnknown(cptr) || !reg) &&
+			((currenttime - cptr->firsttime) >= ping)))
+		{
+			if (!reg || (cptr->flags & FLAGS_PINGSENT))
+			{
+				if (!reg && (DoingDNS(cptr) || DoingAuth(cptr)))
+				{
+					if (cptr->authfd >= 0)
+					{
+						(void)close(cptr->authfd);
+						cptr->authfd = -1;
+						cptr->count = 0;
+						*cptr->buffer = '\0';
+					}
+					Debug((DEBUG_NOTICE,
+						"DNS/AUTH timeout %s",
+						get_client_name(cptr,TRUE)));
+					del_queries((char *)cptr);
+					ClearAuth(cptr);
+					ClearDNS(cptr);
+					SetAccess(cptr);
+					cptr->firsttime = currenttime;
+					cptr->lasttime = currenttime;
+					continue;
 				    }
-				Debug((DEBUG_NOTICE,
-					"DNS/AUTH timeout %s",
-					get_client_name(cptr,TRUE)));
-				del_queries((char *)cptr);
-				ClearAuth(cptr);
-				ClearDNS(cptr);
-				SetAccess(cptr);
-				cptr->firsttime = currenttime;
-				cptr->lasttime = currenttime;
-				continue;
-			    }
 			if (IsServer(cptr) || IsConnecting(cptr) ||
 			    IsHandshake(cptr))
 				sendto_ops("No response from %s, closing link",
 					   get_client_name(cptr, FALSE));
-			/*
-			 * this is used for KILL lines with time restrictions
-			 * on them - send a messgae to the user being killed
-			 * first.
-			 */
-			if (killflag) /* this is above: && IsPerson(cptr)) */
-				sendto_ops("Kill line active for %s",
-					   get_client_name(cptr, FALSE));
-#ifdef IDLE_CHECK
-			if (idleflag)
-				sendto_ops("Idle time limit exceeded for %s",
-					get_client_name(cptr, FALSE));
-#endif
-#if defined(R_LINES) && defined(R_LINES_OFTEN)
-			if (IsPerson(cptr) && rflag)
-				sendto_ops("Restricting %s, closing link.",
-					   get_client_name(cptr,FALSE));
-#endif
-                        if (killflag)
-                                (void)exit_client(cptr, cptr, &me,
-                                "K-Lined");
-#ifdef IDLE_CHECK
-                        else if (idleflag)
-                                (void)exit_client(cptr, cptr, &me,
-                                "Idle time limit exceeded");
-#endif
-                        else
-                                (void)exit_client(cptr, cptr, &me, "Ping timeout");
+			(void)exit_client(cptr, cptr, &me, "Ping timeout");
 			i = 0;
 			continue;
-		    }
-		else if (IsRegistered(cptr) &&
-			 (cptr->flags & FLAGS_PINGSENT) == 0)
-		    {
+			}
+		}
+		else if (reg && !(cptr->flags & FLAGS_PINGSENT))
+		{
 			/*
 			 * if we havent PINGed the connection and we havent
 			 * heard from it in a while, PING it to make sure
@@ -525,11 +525,13 @@ time_t	currenttime;
 			sendto_one(cptr, "PING :%s", me.name);
 		    }
 ping_timeout:
+#ifdef blahblahblah
 		timeout = cptr->lasttime + ping;
 		while (timeout <= currenttime)
 			timeout += ping;
 		if (timeout < oldest || !oldest)
 			oldest = timeout;
+#endif
 #if defined(CLONE_CHECK) && defined(KILL_CLONES)
         if (*clonekillhost)
         {
@@ -541,12 +543,6 @@ ping_timeout:
                         sendto_ops("Clonebot killed: %s [%s@%s]",
                            cptr->name, cptr->user->username,
                                 cptr->user->host);
-#ifdef REALLY_FUCK_EM_UP
-                        sendto_serv_butone(NULL,
-                                  ":%s KILL %s :%s (CloneBot)",
-                                   me.name, cptr->name, me.name);
-                        cptr->flags |= FLAGS_KILLED;
-#endif /* REALLY_FUCK_EM_UP */
                         (void)exit_client(cptr, cptr, &me, "CloneBot");
                         i = 0;
                         continue;
@@ -557,11 +553,15 @@ ping_timeout:
 #if defined(CLONE_CHECK) && defined(KILL_CLONES)
         *clonekillhost = (char) 0;
 #endif
+#ifdef blahblahblah
 	if (!oldest || oldest < currenttime)
 		oldest = currenttime + PINGFREQUENCY;
 	Debug((DEBUG_NOTICE,"Next check_ping() call at: %s, %d %d %d",
 		myctime(oldest), ping, oldest, currenttime));
 	return (oldest);
+#else
+	return currenttime+PINGFREQUENCY;
+#endif
 }
 
 /*
@@ -583,6 +583,20 @@ static	int	bad_command()
   return (-1);
 }
 
+void init_me()
+{
+	me.port = portnum;
+        me.flags = FLAGS_LISTEN;
+        if (bootopt & BOOT_INETD)
+        {
+                me.fd = 0;
+                local[0] = &me;
+                me.flags = FLAGS_LISTEN;
+        }
+        else
+                me.fd = -1;
+}
+ 
 int	main(argc, argv)
 int	argc;
 char	*argv[];
@@ -618,16 +632,16 @@ char	*argv[];
 
 #ifdef	CHROOTDIR
 	if (chdir(dpath))
-	    {
+	{
 		perror("chdir");
 		exit(-1);
-	    }
+	}
 	res_init();
 	if (chroot(DPATH))
-	  {
+	{
 	    (void)fprintf(stderr,"ERROR:  Cannot chdir/chroot\n");
 	    exit(5);
-	  }
+	}
 #endif /*CHROOTDIR*/
 
 	myargv = argv;
@@ -643,16 +657,16 @@ char	*argv[];
 	** "-fxyz"), it would conflict with the form "-fstring".
 	*/
 	while (--argc > 0 && (*++argv)[0] == '-')
-	    {
+	{
 		char	*p = argv[0]+1;
 		int	flag = *p++;
 
 		if (flag == '\0' || *p == '\0')
 			if (argc > 1 && argv[1][0] != '-')
-			    {
+			{
 				p = *++argv;
 				argc -= 1;
-			    }
+			}
 			else
 				p = "";
 
@@ -714,15 +728,15 @@ char	*argv[];
 		    default:
 			bad_command();
 			break;
-		    }
-	    }
+		}
+	}
 
 #ifndef	CHROOT
 	if (chdir(dpath))
-	    {
+	{
 		perror("chdir");
 		exit(-1);
-	    }
+	}
 #endif
 #ifdef BETTER_MOTD
         motd = NULL;
@@ -731,12 +745,12 @@ char	*argv[];
 #endif
 #ifndef IRC_UID
 	if ((uid != euid) && !euid)
-	    {
+	{
 		(void)fprintf(stderr,
 			"ERROR: do not run ircd setuid root. Make it setuid a\
  normal user.\n");
 		exit(-1);
-	    }
+	}
 #endif
 
 #if !defined(CHROOTDIR) || (defined(IRC_UID) && defined(IRC_GID))
@@ -745,7 +759,7 @@ char	*argv[];
 # endif
 
 	if ((int)getuid() == 0)
-	    {
+	{
 # if defined(IRC_UID) && defined(IRC_GID)
 
 		/* run as a specified user */
@@ -761,7 +775,7 @@ char	*argv[];
  normal user.\n");
 		exit(-1);
 # endif	
-	    } 
+	} 
 #endif /*CHROOTDIR/UID/GID*/
 
 	/* didn't set debuglevel */
@@ -782,12 +796,13 @@ char	*argv[];
 	initclass();
 	initwhowas();
 	initstats();
+	NOW = time(NULL);
 	open_debugfile();
+	NOW = time(NULL);
 #ifdef DOG3
 	init_fdlist(&serv_fdlist);
 	init_fdlist(&busycli_fdlist);
 	init_fdlist(&default_fdlist);
-	init_fdlist(&auth_fdlist);
 	{
 		register int i;
 		for (i=MAXCONNECTIONS+1 ; i>0 ; i--)
@@ -796,32 +811,34 @@ char	*argv[];
 #endif
 	if (portnum < 0)
 		portnum = PORTNUM;
-	me.port = portnum;
 	(void)init_sys();
-	me.flags = FLAGS_LISTEN;
-	if (bootopt & BOOT_INETD)
-	    {
-		me.fd = 0;
-		local[0] = &me;
-		me.flags = FLAGS_LISTEN;
-	    }
-	else
-		me.fd = -1;
+	init_me();
 
 #ifdef USE_SYSLOG
 	openlog(myargv[0], LOG_PID|LOG_NDELAY, LOG_FACILITY);
 #endif
 	if (initconf(bootopt,configfile) == -1)
-	    {
+	{
 		Debug((DEBUG_FATAL, "Failed in reading configuration file %s",
 			configfile));
 		(void)printf("Couldn't open configuration file %s\n",
 			configfile);
 		exit(-1);
-	    }
+	}
 	initconf(bootopt,klinefile);
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE
+{
+	struct tm *tmptr;
+	char timebuffer[20], filename[200];
+
+        tmptr = localtime(&NOW);
+        strftime(timebuffer, 20, "%y%m%d", tmptr);
+        sprintf(filename, "%s.%s", klinefile, timebuffer);
+	initconf(0,filename);
+}
+#endif
 	if (!(bootopt & BOOT_INETD))
-	    {
+	{
 		static	char	star[] = "*";
 		aConfItem	*aconf;
 
@@ -829,8 +846,12 @@ char	*argv[];
 			portnum = aconf->port;
 		Debug((DEBUG_ERROR, "Port = %d", portnum));
 		if (inetport(&me, star, portnum))
+		{
+			fprintf(stderr, "Couldn't bind to port %d\n",
+				portnum);
 			exit(1);
-	    }
+		}
+	}
 	else if (inetport(&me, "*", 0))
 		exit(1);
 
@@ -876,20 +897,18 @@ char	*argv[];
 		NOW = time(NULL);
 #ifdef DOG3 
 {
-	static time_t lasttime=0;
-	static long lastrecvK;
 	static int init=0;
 	static time_t loadcfreq=DEFAULT_LOADCFREQ;
 
-	if (NOW-lasttime < loadcfreq)
+	if (NOW-lastrecvtime < loadcfreq)
 		goto done_check;
 	if (me.receiveK - dog3loadrecv > lastrecvK)
 	{
 		if (!lifesux)
 		{
 			sendto_ops("Entering high-traffic mode - %uk/%us > %uk/%us",
-				me.receiveK-lastrecvK, NOW-lasttime,
-				dog3loadrecv, NOW-lasttime);
+				me.receiveK-lastrecvK, NOW-lastrecvtime,
+				dog3loadrecv, NOW-lastrecvtime);
 			loadcfreq *= 2; /* add hysteresis */
 			lifesux = TRUE;
 		}
@@ -901,14 +920,15 @@ char	*argv[];
 		{
 			lifesux = 0;
 			sendto_ops("Resuming standard operation - %uk/%us <= %uk/%us",
-				me.receiveK-lastrecvK, NOW-lasttime,
-				dog3loadrecv, NOW-lasttime);
+				me.receiveK-lastrecvK, NOW-lastrecvtime,
+				dog3loadrecv, NOW-lastrecvtime);
 		}
 	}
-	lasttime = NOW;
+	lastrecvtime = NOW;
 	lastrecvK = me.receiveK;
 done_check:
-	;
+	if (lastrecvtime != NOW)
+		currentrate = ((float)(me.receiveK-lastrecvK))/((float)(NOW-lastrecvtime));
 }
 #endif /* DOG3 */
  
@@ -968,7 +988,7 @@ done_check:
 #endif
 {
 		static time_t lasttime=0;
-		if ((lasttime + (lifesux +1) * 2)< NOW)
+		if ((lasttime + (lifesux ? 6 : 4))< NOW)
 		{
 			read_message(delay,NULL); /*  check everything! */
 			lasttime = NOW;
@@ -1002,7 +1022,15 @@ done_check:
 		** have data in them (or at least try to flush)
 		** -avalon
 		*/
-		flush_connections(me.fd);
+{
+		static time_t lastone = 0;
+
+		if ((lastone+1) < NOW)
+		{
+			flush_connections(me.fd);
+			lastone = NOW;
+		}
+}
 #ifdef DOG3
 		/* check which clients are active */
 		if (NOW > nextfdlistcheck)
@@ -1168,7 +1196,7 @@ time_t check_fdlists()
 
 		cptr->lastrecvM = cptr->receiveM;
 		cptr->priority = pri;
-		if ((pri <10) || (!lifesux && (pri < 25)))
+		if ((pri < 10) || (!lifesux && (pri < 25)))
 			busycli_fdlist.entry[++j] = i;
 	}
 	busycli_fdlist.last_entry=j; /* rest of the fdlist is garbage */
