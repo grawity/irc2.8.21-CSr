@@ -2,17 +2,21 @@
 $Id: README.CS,v 1.7 1998/02/21 02:50:07 cbehrens Exp $
 ---
 
-This is the README for irc2.8.21+CSr30.5.  Basically, this is just a list
+This is the README for irc2.8.21+CSr31pl4.  Basically, this is just a list
 of changes...more information can be found in include/comstud.h.
 
-Any questions or comments can be directed to cbehrens@concentric.net
+Any questions or comments can be directed to cbehrens@codestud.com
 The newest versions of +CS ircds can be found at:
-     ftp://ftp.lump.net/pub/cbehrens/ircd
+     http://www.codestud.com/ircd
 
 ---
 
 NOTE: Please change values in comstud.h to your liking...
       The default values are probably less than ideal for you! 
+
+New in CSr31pl4:
+
+1) Fixed site to get ircd from and my email address in this README, etc.
 
 
 New in CSr31pl3:

@@ -1358,10 +1358,6 @@ nickkilldone:
 **
 */
 
-#ifdef CLIENT_SERVER
-void services_klines(char *, char *);
-#endif
-
 static	int	m_message(cptr, sptr, parc, parv, notice)
 aClient *cptr, *sptr;
 int	parc;
@@ -1515,14 +1511,6 @@ int	notice;
 				continue;
 			}
 			*server = '\0';
-
-#ifdef CLIENT_SERVER
-			if (!mycmp(nick, "KLINES"))
-			{
-				services_klines(parv[0], parv[2]);
-				continue;
-			}
-#endif
 
 			if ((host = (char *)index(nick, '%')))
 				*host++ = '\0';
