@@ -2130,6 +2130,12 @@ char	*parv[];
 	if (hunt_server(cptr, sptr, ":%s LIST %s %s", 2, parc, parv))
 		return 0;
 
+	if (!MyConnect(sptr) && !IsAnOper(sptr))
+	{
+		if (flood_check(sptr, NOW))
+			return 0;
+	}
+
 	parv[1] = canonize(parv[1], NULL);
 
 	for (; (name = strtoken(&p, parv[1], ",")); parv[1] = NULL)
@@ -2169,6 +2175,12 @@ char	*parv[];
 	if (parc > 1 &&
 	    hunt_server(cptr, sptr, ":%s NAMES %s %s", 2, parc, parv))
 		return 0;
+
+	if (!MyConnect(sptr) && !IsAnOper(sptr))
+	{
+		if (flood_check(sptr, NOW))
+			return 0;
+	}
 
 	mlen = strlen(me.name) + NICKLEN + 7;
 

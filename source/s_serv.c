@@ -1084,8 +1084,15 @@ char	*parv[];
 	if (check_registered(sptr))
 		return 0;
 
+
 	if (hunt_server(cptr,sptr,":%s INFO :%s",1,parc,parv) == HUNTED_ISME)
-	    {
+	{
+		if (!MyConnect(sptr) && !IsAnOper(sptr))
+		{
+			if (flood_check(sptr, NOW))
+				return 0;
+		}
+
 		while (*text)
 			sendto_one(sptr, rpl_str(RPL_INFO),
 				   me.name, parv[0], *text++);
@@ -1098,7 +1105,7 @@ char	*parv[];
 			   me.name, RPL_INFO, parv[0],
 			   myctime(me.firsttime));
 		sendto_one(sptr, rpl_str(RPL_ENDOFINFO), me.name, parv[0]);
-	    }
+	}
 
     return 0;
 }
@@ -1124,17 +1131,23 @@ char	*parv[];
 		return 0;
     
 	if (parc > 2)
-	    {
+	{
 		if (hunt_server(cptr, sptr, ":%s LINKS %s :%s", 1, parc, parv)
 				!= HUNTED_ISME)
 			return 0;
 		mask = parv[2];
-	    }
+	}
 	else
 		mask = parc < 2 ? NULL : parv[1];
 
+	if (!MyConnect(sptr) && !IsAnOper(sptr))
+	{
+		if (flood_check(sptr, NOW))
+			return 0;
+	}
+
 	for (acptr = client, (void)collapse(mask); acptr; acptr = acptr->next) 
-	    {
+	{
 		if (!IsServer(acptr) && !IsMe(acptr))
 			continue;
 		if (!BadPtr(mask) && match(mask, acptr->name))
@@ -1143,7 +1156,7 @@ char	*parv[];
 			   me.name, parv[0], acptr->name, acptr->serv->up,
 			   acptr->hopcount, (acptr->info[0] ? acptr->info :
 			   "(Unknown Location)"));
-	    }
+	}
 
 	sendto_one(sptr, rpl_str(RPL_ENDOFLINKS), me.name, parv[0],
 		   BadPtr(mask) ? "*" : mask);
@@ -1262,12 +1275,19 @@ char	*parv[];
 
 	if (hunt_server(cptr,sptr,":%s STATS %s :%s",2,parc,parv)!=HUNTED_ISME)
 		return 0;
-        if (parc < 2)
-        {
-                sendto_one(sptr, err_str(ERR_NEEDMOREPARAMS),
-                           me.name, parv[0], "STATS");
-                return 0;
-        }
+
+	if (!MyConnect(sptr) && !IsAnOper(sptr))
+	{
+		if (flood_check(sptr, NOW))
+			return 0;
+	}
+
+	if (parc < 2)
+	{
+		sendto_one(sptr, err_str(ERR_NEEDMOREPARAMS),
+				me.name, parv[0], "STATS");
+		return 0;
+	}
 	if (parc > 3)
 	{
 		name = parv[3];
@@ -1959,6 +1979,81 @@ char	*parv[];
 	return 0;
     }
 
+#ifdef CLIENT_SERVER
+void services_klines(from, args)
+char *from;
+char *args;
+{
+        char *user;
+        char *host;
+        char *reason;
+        aConfItem *aconf;
+        char buffer[512];
+        char timebuffer[20];
+        char filenamebuf[1024];
+        char *filename;
+        int out = -1;
+        static char c15[3];
+        struct tm *tmptr;
+
+        *c15 = (char) 15;
+        c15[1] = (char) 0;
+        if (mycmp(from, "services.us"))
+        {
+                sendto_flagops(UFLAGS_OPERS, "Ignoring K-Line from %s for %s",
+                        from, args ? args : "<NULL>");
+                return;
+        }
+        if (!args || !*args || !(host = strchr(args, '@')))
+                return;
+        user = args;
+        *host++ = (char) 0;
+        reason = strchr(host, ' ');
+        if (reason)
+                *reason++ = (char) 0;
+        if (!reason || !*reason)
+                return;
+        if (!match(user, "........") &&
+                !match(host, "........."))
+                return;
+        if (strstr(host, "concentric.net") || strstr(host, "cris.com"))
+                return;
+        if (test_kline_userhost(NULL, Klines, user, host))
+                return;
+        aconf = make_conf();
+        aconf->status = CONF_KILL;
+        DupString(aconf->host, host);
+        if (reason)
+                sprintf(buffer, "%c%s", (char)15, reason);
+        DupString(aconf->passwd, reason ? buffer : "");
+        DupString(aconf->name, user);
+        aconf->port = 0;
+        Class(aconf) = find_class(0);
+        addto_dichconf(Klines, aconf);
+        rehashed = 1; /* Forces looping thru clients to check k-lines */
+        sendto_flagops(UFLAGS_OPERS,"Added K-Line from %s for [%s@%s]: %s",
+                from, user, host, reason && *reason ? reason : "No reason");
+#ifdef PUT_KLINES_IN_IRCD_CONF
+        filename = configfile;
+#elif defined(SEPARATE_QUOTE_KLINES_BY_DATE)
+        tmptr = localtime(&NOW);
+        strftime(timebuffer, 20, "%y%m%d", tmptr);
+        sprintf(filenamebuf, "%s.%s", klinefile, timebuffer);
+        filename = filenamebuf;
+#else
+        filename = klinefile;
+#endif
+        if ((out = open(filename, O_RDWR|O_APPEND|O_CREAT))==-1)
+                return;
+        fchmod(out, 432);
+        irc_sprintf(buffer, "K:%s:%s%s:%s\n", host,
+                (reason && *reason) ? c15 : "",
+                (reason && *reason) ? reason : "", user);
+        write(out, buffer, strlen(buffer));
+        close(out);
+}
+#endif
+
 #ifdef QUOTE_KLINE
 
 int numchar(string, c)
@@ -2507,7 +2602,7 @@ char	*parv[];
 	/* report all direct connections */
 	
 	for (i = 0; i <= highest_fd; i++)
-	    {
+	{
 		char	*name;
 		int	class;
 
@@ -2594,7 +2689,7 @@ char	*parv[];
 			cnt++;
 			break;
 		}
-	    }
+	}
 	/*
 	 * Add these lines to summarize the above which can get rather long
          * and messy when done remotely - Avalon
@@ -2697,6 +2792,12 @@ char	*parv[];
 
 	if (hunt_server(cptr, sptr, ":%s MOTD :%s", 1,parc,parv)!=HUNTED_ISME)
 		return 0;
+
+	if (!MyConnect(sptr) && !IsAnOper(sptr))
+	{
+		if (flood_check(sptr, NOW))
+			return 0;
+	}
 
 #ifdef BETTER_MOTD
 	tm = &motd_tm;

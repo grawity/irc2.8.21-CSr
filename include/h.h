@@ -271,6 +271,8 @@ extern	void	sendto_operwall();
 extern	int	writecalls, writeb[];
 extern	int	deliver_it PROTO((aClient *, char *, int));
 
+int flood_check(aClient *sptr, time_t thetime);
+
 extern	int	check_registered PROTO((aClient *));
 extern	int	check_registered_user PROTO((aClient *));
 extern	char	*get_client_name PROTO((aClient *, int));

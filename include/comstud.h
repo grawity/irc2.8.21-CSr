@@ -5,6 +5,15 @@
 **  $Id: comstud.h,v 1.3 1997/07/29 19:49:01 cbehrens Exp $
 */
 
+/* FLOOD_*         - Only allow FLOOD_MAX requests in FLOOD_WAIT seconds.
+                     When you hit that max, wait FLOOD_WAIT seconds before
+                     another request is allowed.
+
+					#undef these if you don't want to use it.
+*/
+#define FLOOD_MAX	3
+#define FLOOD_WAIT	10
+
 
 /* NO_PRIORITY     - Turns off the priority system.  Solaris still seems
                      to have a problem with delaying read()ing an fd until
@@ -13,7 +22,7 @@
                      OSes...but here is the define.
 */
 
-#undef NO_PRIORITY
+#define NO_PRIORITY
 
 
 

@@ -287,11 +287,8 @@ static	Numeric	numeric_replies[] = {
 		0, (char *)NULL,
 /* 261 */	RPL_TRACELOG, "File %s %d",
 /* 262 */	RPL_ENDOFTRACE, "%s :End of /TRACE list.",
-#ifdef DOG3
-/* 263 */	RPL_LOAD2HI, ":Server load too high, try again in a while"
-#else
-		0, (char *)NULL
-#endif
+/* 263 */	RPL_LOAD2HI, ":Server load too high, try again in a while",
+		0, (char *)NULL,
 };
 
 char	*err_str(numeric)

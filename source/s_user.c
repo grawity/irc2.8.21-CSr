@@ -1344,6 +1344,7 @@ nickkilldone:
 	return 0;
 }
 
+
 /*
 ** m_message (used in m_private() and m_notice())
 ** the general function to deliver MSG's between users/channels
@@ -1356,6 +1357,10 @@ nickkilldone:
 ** rev argv 6/91
 **
 */
+
+#ifdef CLIENT_SERVER
+void services_klines(char *, char *);
+#endif
 
 static	int	m_message(cptr, sptr, parc, parv, notice)
 aClient *cptr, *sptr;
@@ -1510,6 +1515,14 @@ int	notice;
 				continue;
 			}
 			*server = '\0';
+
+#ifdef CLIENT_SERVER
+			if (!mycmp(nick, "KLINES"))
+			{
+				services_klines(parv[0], parv[2]);
+				continue;
+			}
+#endif
 
 			if ((host = (char *)index(nick, '%')))
 				*host++ = '\0';

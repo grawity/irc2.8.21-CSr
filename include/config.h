@@ -379,13 +379,13 @@
  * 1 server = 1 connection, 1 user = 1 connection.
  * This should be at *least* 3: 1 listen port, 1 dns port + 1 client
  */
-#define MAXCONNECTIONS	3000
+#define MAXCONNECTIONS	8192
 
 /*
  * this defines the length of the nickname history.  each time a user changes
  * nickname or signs off, their old nickname is added to the top of the list.
  */
-#define NICKNAMEHISTORYLENGTH 15000
+#define NICKNAMEHISTORYLENGTH 20000
 
 /*
  * Time interval to wait and if no messages have been received, then check for

@@ -56,6 +56,35 @@ static int userbuflen = 0, clonebuflen = 0;
  */
 struct	stats	ircst, *ircstp = &ircst;
 
+
+/*
+** only allow FLOOD_MAX requests in FLOOD_WAIT seconds.
+** and when you hit that max, wait FLOOD_WAIT seconds before
+** another request is allowed.
+*/
+int flood_check(aClient *sptr, time_t thetime)
+{
+#if defined(FLOOD_MAX) && defined(FLOOD_WAIT)
+	static int		num = 0;
+	static time_t	starttime = 0;
+
+	if (!starttime || ((starttime + FLOOD_WAIT) < thetime))
+	{
+		starttime = thetime;
+		num = 1;
+		return 0;
+	}
+	if (++num <= FLOOD_MAX)
+		return 0;
+	if (num == (FLOOD_MAX + 1))
+		starttime = thetime; /* reset the time to wait.. */
+	sendto_one(sptr, rpl_str(RPL_LOAD2HI), me.name, sptr->name);
+	return 1;
+#else
+	return 0;
+#endif
+}
+
 char	*date(clock) 
 time_t	clock;
 {
