@@ -1,14 +1,62 @@
 ---
 
-This is the README for irc2.8.21+CSr24.  Basically, this is just a list
+This is the README for irc2.8.21+CSr25.  Basically, this is just a list
 of changes...more information can be found in include/comstud.h.
 
-Any questions or comments can be directed to cbehrens@stealth.net
+Any questions or comments can be directed to cbehrens@concentric.net
+The newest versions of +CS ircds can be found at:
+     http://www.concentric.net/~Cbehrens/ircd
 
 ---
 
 NOTE: Please change values in comstud.h and dog3.h to your liking...
       The default values are probably less than ideal for you! 
+
+New in CSr25:
+
+1) Fixed a bug in a patch that DWildstar gave me in CSr21.
+   No more spewing of "Would have caused fake directions" for my
+   uplinks.  Yay!
+2) Fixed BETTER_MOTD where the motd would not be present until
+   you /rehash'd the server...and sometimes when /rehash'ing it
+   wouldn't reload.
+3) Fixed LIMIT_UH stuff.  Actually, it's changed a bit.  The limit #
+   is set via the connection frequency field of the class (Y: line)
+   For example, I:*.slavery.com::*.slavery.com::1
+   And          Y:1:180:1:15:1000000
+                       ^^^
+   That will allow only 1 unique u@h from *.slavery.com
+   This way you can put "2" or so for the class that you use for
+   open *@* I: lines if you want to allow them 2 connections...etc.
+4) You can now #define USE_POLL on SunOS to use SunOS's poll()
+
+5) Created a new usermode +d, and moved "Identd response differs"
+   messages there
+6) Created a new usermode +b, and moved the Bot/Invalid username
+   notices to it.
+7) Created a new usermode +l, and moved UH_LIMIT reject notices there
+8) Got rid of the +r usermode, which is in 2.9 servers.
+9) USERHOST and ISON do not "lag" users now, so NOTIFY, won't penalize you.
+10) A couple things dealing with K-lines.  K-lines now by default are
+    put in a separate file.  This file is set by KPATH in config.h
+    #define PUT_KLINES_IN_IRCD_CONF if you don't wish to use a separate
+    file for klines.  Purpose of keeping klines in a separate file is for
+    easier management of your klines.  Another #define for klines is
+    SEPARATE_QUOTE_KLINES_BY_DATE.  This #define will put your quote klines
+    in a file something like klines.conf-960915 if KPATH is defined to be
+    "klines.conf".  When you /rehash or start ircd, these dated files are
+    NOT loaded.  You will have to manually move them into klines.conf.
+    The purpose of this is to decide at the end of the day which quote klines
+    you would like to keep, etc.
+11) #define NO_REDUNDANT_KLINES if you want your /quote kline to reject
+    any klines that are already in your .conf.  This patch came from
+    teletype.  I didn't use his code to remove old redundant ones that
+    are already in your .conf, but will come up with something in the
+    future.
+12) Fixed dependancies in the Makefiles for comstud.h, etc.
+13) Fixed NO_NICK_FLOODS so that if a user is trying to switch to a nickname
+    that already exists, it won't penalize him/her.
+
 
 New in CSr24:
 

@@ -1,20 +1,57 @@
 #ifndef COMSTUD_H
 #define COMSTUD_H
 
-/* LIMIT_UH        - If you want to limit clients to 1 u@h on your server,
-                     define this to 1.  You can also define this to 0
-                     which disables the check...but it will compile the
-                     code into the server, and then you can /quote limituh #
-                     while opered.
-                     If you never want to use this, #undef it.
-Examples:
-
-     #define LIMIT_UH 1   - Starts out limiting 1 client per user@host
-     #define LIMIT_UH 0   - Starts out with no checking, but you can /quote
-     #undef LIMIT_UH      - Doesn't compile in the code.../quote won't work.
+/* NO_REDUNDANT_KLINES
+                   - This will check the kline that you try and put in
+                     via /quote kline and will not allow it if it matches
+                     a kline that's already in memory.
 */
 
-#define LIMIT_UH 0
+#define NO_REDUNDANT_KLINES
+
+/* PUT_KLINES_IN_IRCD_CONF
+                   - Starting in CSr25, klines can now be stored in a file
+                     separated from ircd.conf.  The file name is chosen
+                     via KPATH in config.h.  If QUOTE_KLINE is defined,
+                     by default, when you /quote kline, it'll put these
+                     new K: lines in the kline.conf file instead of ircd.conf
+                     This can be used as a way to separate the millions
+                     of K: lines that you may have.
+
+*** If you do not like the idea of separate files, define this ***
+#define PUT_KLINES_IN_IRCD_CONF
+*/
+
+/* SEPARATE_QUOTE_KLINES_BY_DATE
+		   - If PUT_KLINES_IN_IRCD_CONF is #undefined, you may
+                     #define this to put /quote klines into separate files
+                     by date.  Ie, if KPATH is "kline.conf", and today is
+                     09/09/96, it'll put today's quote klines in:
+                     kline.conf.960909
+             Note:   These files with dates will NOT be loaded when
+                     you start ircd...and if you /rehash all the quote klines
+                     for the day are lost, until you manually move the ones
+                     from kline.conf.960909 into kline.conf
+
+          Purpose:   Sometimes you may not want your quote klines to last
+                     more than a day, or you may want to look thru the
+                     kline.conf.960909 file before you move them into
+                     kline.conf.
+*/
+
+#define SEPARATE_QUOTE_KLINES_BY_DATE
+
+/* LIMIT_UH        - Use this if you want to use the connect frequency
+		     field in the Y: lines to limit that class to a
+                     certain # of same u@h's.
+                     For example, you can limit class 1 so that only 1
+                     connection per u@h is allowed (by setting the confreq
+                     field to 1)  This should cut down on clones and multiple
+		     clients.
+
+*/
+
+#define LIMIT_UH
 
 
 /* BUFFERED_LOGS   - define this to reduce disk IO when writing users.log
@@ -152,7 +189,7 @@ they are increased!
                      /mode * +o nick
 */
 
-#define NO_RED_MODES
+#undef NO_RED_MODES
 
 /* IP_BAN_ALL      - define this if you want a really cool ban
                      system
@@ -175,13 +212,13 @@ they are increased!
                      like: FuckYou which don't have all one case
 */
 
-#define NO_MIXED_CASE
+#undef NO_MIXED_CASE
 
 /* IGNORE_FIRST_CHAR - define this for NO_MIXED_CASE
                        if you wish to ignore the first character
 */
 
-#define IGNORE_FIRST_CHAR
+#undef IGNORE_FIRST_CHAR
 
 /* NO_SPECIAL      - define this if you want no "special" characters
                      in usernames.  A character is "special" if
@@ -194,7 +231,7 @@ they are increased!
 /* REJECT_IPHONE   - define if you want to reject I-phoners
 */
 
-#define REJECT_IPHONE
+#undef REJECT_IPHONE
 
 /* REJECT_BOTS     - Performs minimal checking to see if a client
                      which is trying to connect is a bot...
@@ -235,7 +272,7 @@ they are increased!
                        want them logged
 */
 
-#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr24/lib/logs/failed.log"
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr25/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -325,7 +362,7 @@ they are increased!
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr24/lib/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr25/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

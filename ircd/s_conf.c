@@ -642,7 +642,8 @@ int	sig;
 	clear_conf_list(&EList2, 1);
 	clear_conf_list(&EList3, 1);
 #endif /* E_LINES */
-	(void) initconf(0);
+	(void) initconf(0, configfile);
+	(void) initconf(0, klinefile);
 	close_listeners();
 
 	/*
@@ -676,7 +677,8 @@ int	sig;
  * configuration file from.  This may either be th4 file direct or one end
  * of a pipe from m4.
  */
-int	openconf()
+int	openconf(filename)
+char *filename;
 {
 #ifdef	M4_PREPROC
 	int	pi[2], i;
@@ -703,7 +705,7 @@ int	openconf()
 		 * goes out with report_error.  Could be dangerous,
 		 * two servers running with the same fd's >:-) -avalon
 		 */
-		(void)execlp("m4", "m4", "ircd.m4", configfile, 0);
+		(void)execlp("m4", "m4", "ircd.m4", filename, 0);
 		report_error("Error executing m4 %s:%s", &me);
 		exit(-1);
 	default :
@@ -711,7 +713,7 @@ int	openconf()
 		return pi[0];
 	}
 #else
-	return open(configfile, O_RDONLY);
+	return open(filename, O_RDONLY);
 #endif
 }
 extern char *getfield();
@@ -726,8 +728,9 @@ extern char *getfield();
 
 #define MAXCONFLINKS 150
 
-int 	initconf(opt)
+int 	initconf(opt, filename)
 int	opt;
+char *filename;
 {
 	static	char	quotes[9][2] = {{'b', '\b'}, {'f', '\f'}, {'n', '\n'},
 					{'r', '\r'}, {'t', '\t'}, {'v', '\v'},
@@ -738,8 +741,8 @@ int	opt;
 	int	ccount = 0, ncount = 0;
 	aConfItem *aconf = NULL;
 
-	Debug((DEBUG_DEBUG, "initconf(): ircd.conf = %s", configfile));
-	if ((fd = openconf()) == -1)
+	Debug((DEBUG_DEBUG, "initconf(): ircd.conf = %s", filename));
+	if ((fd = openconf(filename)) == -1)
 	    {
 #ifdef	M4_PREPROC
 		(void)wait(0);
@@ -1144,8 +1147,53 @@ char  *comment;
 	return (*comment == '');
 }
 
-int	find_kill(cptr)
+#ifdef NO_REDUNDANT_KLINES
+
+int test_kline_userhost(sptr, List, kuser, khost)
+aClient *sptr;
+aConfList       *List;
+char            *kuser, *khost;
+{
+	register aConfItem      *tmp;
+	register int            current;
+	char                    *host, *pass, *name;
+	static char             null[] = "<NULL>";
+	int                     port;
+
+	if (!List || !List->conf_list)
+		return 0;
+
+	for (current = 0; current < List->length; current++)
+	{
+		aConfEntry      *ptr = &List->conf_list[current];
+
+		for(; ptr; ptr = ptr->next)
+		{
+			if (ptr->sub)
+			if (test_kline_userhost(sptr, ptr->sub, kuser, khost))
+				return 1;
+			if (!(tmp = ptr->conf))
+				continue;
+			host = BadPtr(tmp->host) ? null : tmp->host;
+			pass = BadPtr(tmp->passwd) ? null : tmp->passwd;
+			name = BadPtr(tmp->name) ? null : tmp->name;
+                        port = (int)tmp->port;
+                        if (tmp->status == CONF_KILL)
+                        if (!match(name,kuser) && !match(host,khost))
+			{
+				sendto_one(sptr, ":%s NOTICE %s :K: line not added. %s@%s already matched by %s@%s", me.name, sptr->name, kuser, khost, name, host );
+                        return 1;
+                        }
+                }
+        }
+        return 0;
+}
+
+#endif
+
+int	find_kill(cptr, checkuh)
 aClient	*cptr;
+int	checkuh;
 {
 	char	reply[256], *host, *name;
 	aConfItem *tmp;
@@ -1240,23 +1288,30 @@ matched:
 */
 
 #ifdef LIMIT_UH
-        if (!tmp && uhlimit)
+        if (!tmp && checkuh)
         {
 		register aClient *sptr;
 		register int i;
-		int num = 0;
-
+		int num = 0, tot;
+		int cc = get_client_class(cptr);
+		aClass *cs;
+		
+		cs = find_class(cc);
+		tot = get_con_freq(cs);
+		if (tot)
                 for (i = highest_fd; i >= 0; i--)
 		{
 			if (!(sptr=local[i]) || !IsPerson(sptr))
 				continue;
+			if (cc != get_client_class(sptr))
+				continue;
 			if (!strcmp(sptr->user->username, name) &&
 				!strcmp(sptr->sockhost, host))
-				if (++num >= uhlimit)
+				if (++num >= tot)
 				{
-					sendto_one(cptr, ":%s NOTICE %s :This server is currently limited to %i client%s per user",
-						me.name, cptr->name, uhlimit, uhlimit==1?"":"s"); 
-					sendto_flagops(5, "Rejecting for too many clients: %s [%s@%s]",
+					sendto_one(cptr, ":%s NOTICE %s :This server is currently limited to %i client%s per user in your class",
+						me.name, cptr->name, tot, tot==1?"":"s"); 
+					sendto_flagops(LMODE, "Rejecting for too many clients: %s [%s@%s]",
 						cptr->name, cptr->user->username, cptr->user->host);	
 					return 1;
 				}

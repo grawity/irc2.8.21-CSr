@@ -62,6 +62,18 @@ typedef struct	MotdItem aMotd;
 #include "dbuf.h"	/* THIS REALLY SHOULDN'T BE HERE!!! --msa */
 #endif
 
+/* These set of defines are for sendto_flagops */
+#define OPERS 1
+#define CMODE 2
+#define KMODE 3
+#define FMODE 4
+#define BMODE 5
+#define UMODE 6
+#define DMODE 7
+#define LMODE 8
+/* */
+
+
 #define	HOSTLEN		63	/* Length of hostname.  Updated to         */
 				/* comply with RFC1123                     */
 
@@ -175,10 +187,12 @@ typedef struct	MotdItem aMotd;
 #define FLAGS_CMODE	0x200000 /* +c usermode */
 #define FLAGS_KMODE	0x400000 /* +k usermode */
 #define FLAGS_UMODE	0x800000 /* +u usermode */
-#define FLAGS_RMODE	0x1000000 /* +r usermode */
+#define FLAGS_BMODE	0x1000000 /* +b usermode */
+#define FLAGS_DMODE	0x2000000 /* +d usermode */
+#define FLAGS_LMODE	0x4000000 /* +l usermode */
 
 #define	SEND_UMODES	(FLAGS_INVISIBLE|FLAGS_OPER|FLAGS_WALLOP)
-#define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_RMODE)
+#define	ALL_UMODES	(SEND_UMODES|FLAGS_SERVNOTICE|FLAGS_CMODE|FLAGS_KMODE|FLAGS_FMODE|FLAGS_UMODE|FLAGS_LMODE|FLAGS_DMODE|FLAGS_BMODE)
 #define	FLAGS_ID	(FLAGS_DOID|FLAGS_GOTID)
 
 /*
@@ -192,7 +206,9 @@ typedef struct	MotdItem aMotd;
 #define IsCMode(x)		((x)->flags & FLAGS_CMODE)
 #define IsUMode(x)		((x)->flags & FLAGS_UMODE)
 #define IsKMode(x)		((x)->flags & FLAGS_KMODE)
-#define IsRMode(x)		((x)->flags & FLAGS_RMODE)
+#define IsLMode(x)		((x)->flags & FLAGS_LMODE)
+#define IsBMode(x)		((x)->flags & FLAGS_BMODE)
+#define IsDMode(x)		((x)->flags & FLAGS_DMODE)
 #define	IsPerson(x)		((x)->user && IsClient(x))
 #define	IsPrivileged(x)		(IsAnOper(x) || IsServer(x))
 #define	SendWallops(x)		((x)->flags & FLAGS_WALLOP)

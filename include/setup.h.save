@@ -10,18 +10,18 @@
 #define	NOINDEX
 #define	NEED_STRERROR
 #define	NEED_STRTOKEN
-#undef	NEED_STRTOK
+#define	NEED_STRTOK
 #undef	NEED_INET_ADDR
 #undef	NEED_INET_NTOA
 #undef	NEED_INET_NETOF
 #undef	GETTIMEOFDAY
 #undef	LRAND48
 #define	MALLOCH	<malloc.h>
-#undef	bzero(a,b)	memset(a,0,b)
-#undef	bcopy(a,b,c)	memcpy(b,a,c)
+#define	bzero(a,b)	memset(a,0,b)
+#define	bcopy(a,b,c)	memcpy(b,a,c)
 #define	bcmp	memcmp
-#define	NBLOCK_POSIX
-#define	POSIX_SIGNALS
+#define	NBLOCK_BSD
+#define	BSD_RELIABLE_SIGNALS
 #undef	TIMES_2
 #undef	GETRUSAGE_2
 #endif

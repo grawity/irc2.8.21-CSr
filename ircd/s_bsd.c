@@ -65,6 +65,11 @@ Computing Center and Jarkko Oikarinen";
 #ifdef USE_POLL
 #include <stropts.h>
 #include <poll.h>
+#ifndef SOL20
+typedef struct pollfd pollfd_t;
+#define POLLWRNORM      POLLOUT
+#define POLLRDNORM      0x0040
+#endif
 #endif /* USE_POLL_ */
 
 #ifdef	AIX
@@ -259,7 +264,7 @@ int	port;
 	    }
 	else if (cptr->fd >= MAXCLIENTS)
 	    {
-		sendto_flagops(6,"No more connections allowed (%s)", cptr->name);
+		sendto_flagops(UMODE,"No more connections allowed (%s)", cptr->name);
 		(void)close(cptr->fd);
 		return -1;
 	    }
@@ -377,7 +382,7 @@ int	port;
 	    }
 	else if (cptr->fd >= MAXCLIENTS)
 	    {
-		sendto_flagops(6,"No more connections allowed (%s)", cptr->name);
+		sendto_flagops(UMODE,"No more connections allowed (%s)", cptr->name);
 		(void)close(cptr->fd);
 		return -1;
 	    }
@@ -456,6 +461,7 @@ void	close_listeners()
 void	init_sys()
 {
 	Reg1	int	fd;
+#ifndef USE_POLL
 #ifdef RLIMIT_FD_MAX
 	struct rlimit limit;
 
@@ -499,6 +505,7 @@ void	init_sys()
 	    }
 # endif
 #endif
+#endif /* USE_POLL */
 #if defined(PCS) || defined(DYNIXPTX) || defined(SVR3)
 	char	logbuf[BUFSIZ];
 
@@ -1431,7 +1438,7 @@ int	msg_ready;
 		if (dbuf_put(&cptr->recvQ, readbuf, length) < 0)
 			return exit_client(cptr, cptr, cptr, "dbuf_put fail");
 
-		if (IsPerson(cptr) &&
+		if (IsPerson(cptr) && !IsAnOper(cptr) &&
 		    DBufLength(&cptr->recvQ) > CLIENT_FLOOD)
 			return exit_client(cptr, cptr, cptr, "Excess Flood");
 
@@ -1575,6 +1582,7 @@ time_t	delay; /* Don't ever use ZERO here, unless you mean to poll and then
 				continue;
 			if (IsMe(cptr) && IsListening(cptr))
 			    {
+#define CONNECTFAST
 #ifdef CONNECTFAST
 		/* next line was 2, changing to 1 */
 		/* if we dont have many clients just let em on */
@@ -1992,7 +2000,7 @@ time_t  delay;
                 res++;
                 if (res > 5)
                         restart("too many poll errors");
-                sleep(10);
+                usleep(10);
                 NOW = time(NULL);
             }
 

@@ -7,8 +7,8 @@
 #define	STDLIBH
 #define	STDDEFH
 #define	SYSSYSLOGH
-#define	NOINDEX
-#define	NEED_STRERROR
+#undef	NOINDEX
+#undef	NEED_STRERROR
 #define	NEED_STRTOKEN
 #undef	NEED_STRTOK
 #undef	NEED_INET_ADDR
@@ -17,11 +17,8 @@
 #undef	GETTIMEOFDAY
 #undef	LRAND48
 #define	MALLOCH	<malloc.h>
-#undef	bzero(a,b)	memset(a,0,b)
-#undef	bcopy(a,b,c)	memcpy(b,a,c)
-#define	bcmp	memcmp
 #define	NBLOCK_POSIX
-#define	POSIX_SIGNALS
+#define	SYSV_UNRELIABLE_SIGNALS
 #undef	TIMES_2
-#undef	GETRUSAGE_2
+#define	GETRUSAGE_2
 #endif

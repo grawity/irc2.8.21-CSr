@@ -90,9 +90,6 @@
 #ifdef IDLE_CHECK
 #define MSG_IDLE     "IDLE"     /* IDLE */
 #endif
-#ifdef LIMIT_UH
-#define MSG_LIMITUH  "LIMITUH"  /* LIMITUH */
-#endif
 #define MAXPARA    15 
 
 #ifdef DOG3
@@ -104,9 +101,6 @@ extern int m_kline();
 #endif
 #ifdef IDLE_CHECK
 extern int m_idle();
-#endif
-#ifdef LIMIT_UH
-extern int m_limituh();
 #endif
 extern int m_private(), m_topic(), m_join(), m_part(), m_mode();
 extern int m_ping(), m_pong(), m_wallops(), m_kick();
@@ -197,9 +191,6 @@ struct Message msgtab[] = {
 #endif
 #ifdef IDLE_CHECK
   { MSG_IDLE,    m_idle,     0, MAXPARA, 1 ,0L },
-#endif
-#ifdef LIMIT_UH
-  { MSG_LIMITUH, m_limituh,  0, MAXPARA, 1 ,0L },
 #endif
 #if defined(NPATH) && !defined(CLIENT_COMPILE)
   { MSG_NOTE,    m_note,     0, 1, 1 ,0L },

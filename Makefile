@@ -17,16 +17,25 @@
 #*   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #*/
 
-CC=cc
+CC=gcc
 RM=/bin/rm
-INCLUDEDIR=../include -I/usr/include
-#-I/usr/gnu/include
 
+#
 # Default flags:
-CFLAGS= -I$(INCLUDEDIR) -g
+INCLUDEDIR=../include
+CFLAGS= -I$(INCLUDEDIR) -O2 -fexpensive-optimizations -funroll-loops -fomit-frame-pointer
+IRCDLIBS=
+
+#
+# Solaris 2 flags:
+#IRCDLIBS=-L/usr/lib -lsocket -lnsl -lresolv
+
+# Others:
+
 #O2
 #IRCDLIBS=-L/usr/lib -L/usr/gnu/lib -lgnuc -O2
-IRCLIBS=-lcurses -ltermcap
+#IRCLIBS=-lcurses -ltermcap
+
 #
 # use the following on MIPS:
 #CFLAGS= -systype bsd43 -DSYSTYPE_BSD43 -I$(INCLUDEDIR)

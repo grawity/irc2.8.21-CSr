@@ -98,10 +98,6 @@ void send_high_sendq();
 	int idlelimit = DEFAULT_IDLELIMIT;
 #endif
 
-#ifdef LIMIT_UH
-	int uhlimit = LIMIT_UH;
-#endif
-
 time_t	NOW;
 aClient me;			/* That's me */
 aClient *client = &me;		/* Pointer to beginning of Client list */
@@ -114,6 +110,7 @@ static	void	open_debugfile(), setup_signals();
 char	**myargv;
 int	portnum = -1;		    /* Server port number, listening this */
 char	*configfile = CONFIGFILE;	/* Server configuration file */
+char	*klinefile = KLINEFILE;	        /* Config file for klines */
 int	debuglevel = -1;		/* Server debug level */
 int	bootopt = 0;			/* Server boot option flags */
 char	*debugmode = "";		/*  -"-    -"-   -"-  */
@@ -401,8 +398,12 @@ time_t	currenttime;
 		    }
 #ifdef IDLE_CHECK
 		idleflag = (checkit2 && IsPerson(cptr)) ? (idlelimit && !IsAnOper(cptr) &&
+#ifdef E_LINES
 			(currenttime-cptr->user->last > idlelimit) &&
 			!find_eline(cptr)) : 0;
+#else
+                        (currenttime-cptr->user->last > idlelimit)) : 0;
+#endif /* E_LINES */
 		if (idleflag)
 		{
 			if (!find_idle(cptr))
@@ -419,7 +420,7 @@ time_t	currenttime;
 		}
 #endif
 		killflag = (checkit && IsPerson(cptr)) ?
-			find_kill(cptr) : 0;
+			find_kill(cptr, 0) : 0;
 #ifdef R_LINES_OFTEN
 		rflag = (checkit && IsPerson(cptr)) ? find_restrict(cptr) : 0;
 #endif
@@ -598,11 +599,6 @@ char	*argv[];
 	time_t nextfdlistcheck=0; /*end of priority code */
 #endif
 	NOW = time(NULL);
-#ifdef BETTER_MOTD
-	motd = NULL;
-	motd_tm = NULL;
-	read_motd(MOTD);
-#endif
 #ifdef DBUF_INIT
         dbuf_init(); /* set up some dbuf stuff to control paging */
 #endif
@@ -728,7 +724,11 @@ char	*argv[];
 		exit(-1);
 	    }
 #endif
-
+#ifdef BETTER_MOTD
+        motd = NULL;
+        motd_tm = NULL;
+        read_motd(MOTD);
+#endif
 #ifndef IRC_UID
 	if ((uid != euid) && !euid)
 	    {
@@ -811,7 +811,7 @@ char	*argv[];
 #ifdef USE_SYSLOG
 	openlog(myargv[0], LOG_PID|LOG_NDELAY, LOG_FACILITY);
 #endif
-	if (initconf(bootopt) == -1)
+	if (initconf(bootopt,configfile) == -1)
 	    {
 		Debug((DEBUG_FATAL, "Failed in reading configuration file %s",
 			configfile));
@@ -819,6 +819,7 @@ char	*argv[];
 			configfile);
 		exit(-1);
 	    }
+	initconf(bootopt,klinefile);
 	if (!(bootopt & BOOT_INETD))
 	    {
 		static	char	star[] = "*";

@@ -973,14 +973,26 @@ va_dcl
 		return;
 	}
 #endif /* FK_USERMODES */
+/* 
+1 == Opers
+2 == Opers and +c
+3 == +k
+4 = +f
+5 = +b
+6 = +u
+7 = +d
+8 = +l
+*/
         for (i = 0; i <= highest_fd; i++)
                 if ((cptr = local[i]) && !IsServer(cptr) && !IsMe(cptr) &&
-			(((flag == 1) && IsAnOper(cptr)) ||
-			 ((flag == 2) && IsAnOper(cptr) && IsCMode(cptr)) ||
-			((flag == 3) && IsKMode(cptr)) ||
-			((flag == 4) && IsFMode(cptr)) ||
-			((flag == 5) && IsRMode(cptr)) ||
-			((flag == 6) && IsUMode(cptr))))
+			(((flag == OPERS) && IsAnOper(cptr)) ||
+			 ((flag == CMODE) && IsAnOper(cptr) && IsCMode(cptr)) ||
+			((flag == KMODE) && IsKMode(cptr)) ||
+			((flag == FMODE) && IsFMode(cptr)) ||
+			((flag == BMODE) && IsBMode(cptr)) ||
+			((flag == UMODE) && IsUMode(cptr)) ||
+			((flag == DMODE) && IsDMode(cptr)) ||
+			((flag == LMODE) && IsLMode(cptr))))
                     {
                         (void)irc_sprintf(nbuf, ":%s NOTICE %s :*** Notice -- ",
                                         me.name, cptr->name);

@@ -704,7 +704,7 @@ aClient *sptr;
 int	parc;
 char	*parv[];
 {
-	int	mcount = 0, chanop;
+	int	mcount = 0;
 	aChannel *chptr;
 
 	if (check_registered(sptr))
@@ -727,7 +727,6 @@ char	*parv[];
 	clean_channelname(parv[1]);
 	if (check_channelmask(sptr, cptr, parv[1]))
 		return 0;
-	chanop = is_chan_op(sptr, chptr) || IsServer(sptr);
 
 	if (parc < 3)
 	    {
@@ -740,7 +739,6 @@ char	*parv[];
 	    }
 	mcount = set_mode(cptr, sptr, chptr, parc - 2, parv + 2,
 			  modebuf, parabuf);
-
 	if (strlen(modebuf) > (size_t)1)
 		switch (mcount)
 		    {
@@ -755,7 +753,7 @@ char	*parv[];
 				{
 #ifndef DONT_SEND_FAKES
 #ifdef FK_USERMODES
-				    sendto_flagops(4,"Fake: %s MODE %s %s %s",
+				    sendto_flagops(FMODE,"Fake: %s MODE %s %s %s",
 					   parv[0], parv[1], modebuf, parabuf);
 #else
 				    sendto_ops("Fake: %s MODE %s %s %s",
@@ -879,7 +877,7 @@ char	*parv[], *mbuf, *pbuf;
 				break;
 			if (!ischop)
 				sendto_one(sptr, err_str(ERR_CHANOPRIVSNEEDED),
-					me.name, parv[0], chptr->chname);
+					me.name, sptr->name, chptr->chname);
 			if (whatt == MODE_ADD)
 			    {
 				lp = &chops[opcnt++];

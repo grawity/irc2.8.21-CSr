@@ -5,7 +5,7 @@
 #define	STRINGH
 #define	STRINGSH
 #define	STDLIBH
-#undef	STDDEFH
+#define	STDDEFH
 #define	SYSSYSLOGH
 #undef	NOINDEX
 #undef	NEED_STRERROR

@@ -63,7 +63,7 @@ check_max_count()
       {
               max_connection_count = m_clients + m_servers;
               if (max_connection_count % 10 == 0)
-                      sendto_flagops(1,
+                      sendto_flagops(OPERS,
                               "New highest connections: %d (%d clients)",
                               max_connection_count, max_client_count);
       }
@@ -285,55 +285,6 @@ char    *parv[];
       sendto_one(sptr, ":%s NOTICE %s :The idle limit is now set to %i minute(s)",
               me.name, parv[0], idlelimit/60);
       return 0;
-}
-
-#endif
-
-#ifdef LIMIT_UH
-
-int     m_limituh(cptr, sptr, parc, parv)
-aClient *cptr, *sptr;
-int     parc;
-char    *parv[];
-{
-        int temp;
-
-        if (!MyClient(sptr) || !IsAnOper(sptr))
-        {
-                sendto_one(sptr, err_str(ERR_NOPRIVILEGES), me.name, parv[0]);
-                return 0;
-        }
-        if (!parv[1] || !*parv[1])
-        {
-		if (uhlimit)
-                sendto_one(sptr, ":%s NOTICE %s :The current limit for the number of same u@h's is %i",
-                        me.name, parv[0], uhlimit);
-		else
-		sendto_one(sptr, ":%s NOTICE %s :There is currently no limit for the number of same u@h's",
-			me.name, parv[0]);
-                return 0;
-        }
-	temp = atoi(parv[1]);
-	if (temp < 0)
-	{
-		sendto_one(sptr, ":%s NOTICE %s :Hello???  Try a number >= 0.",
-			me.name, parv[0]);
-		return 0;
-	}
-	if (uhlimit = temp)
-	{
-		sendto_flagops(1,"%s has changed the u@h limit to %i.",
-			parv[0], uhlimit);
-		sendto_one(sptr, ":%s NOTICE %s :The u@h limit is now set to %i.",
-			me.name, parv[0], uhlimit);
-	}
-	else
-	{
-		sendto_flagops(1,"%s has disabled the u@h limit.", parv[0]);
-		sendto_one(sptr, ":%s NOTICE %s :The u@h limit is now disabled.", 
-			me.name, parv[0]);
-	}
-	return 0;
 }
 
 #endif
@@ -1369,6 +1320,7 @@ int	parc;
 char	*parv[];
     {
 	static	char	Lformat[]  = ":%s %d %s %s %u %u %u %u %u :%u";
+	static	char	CSformat[] = ":%s %d %s %s %u %u %u %u %u %u :%s";
 	struct	Message	*mptr;
 	aClient	*acptr;
 	char	stat = parc > 1 ? parv[1][0] : '\0';
@@ -1396,7 +1348,7 @@ char	*parv[];
 		name = me.name;
 #ifdef STATS_NOTICE
 	if (stat != (char) 0)
-		sendto_flagops(1,"STATS %c requested by %s (%s@%s)", stat,
+		sendto_flagops(OPERS,"STATS %c requested by %s (%s@%s)", stat,
 			sptr->name, sptr->user->username, sptr->user->host);
 #endif 
 	switch (stat)
@@ -1410,16 +1362,18 @@ char	*parv[];
 #else
                 for (i=serv_fdlist.entry[j=1];j<=serv_fdlist.last_entry;
                         i=serv_fdlist.entry[++j])
+		{
 			if (!(acptr=local[i]))
 				continue;
-		{
 #endif
-			sendto_one(sptr, ":%s NOTICE %s :%s %s %u :%u",
-				me.name, parv[0],
-				get_client_name(acptr, TRUE),
-				DoesTS(acptr) ? "TS" : "NoTS",
-				(int)DBufLength(&acptr->sendQ),
-                                NOW - acptr->firsttime);
+                        sendto_one(sptr, CSformat, me.name,
+                                   RPL_STATSLINKINFO, parv[0],
+                                   get_client_name(acptr, TRUE),
+                                   (int)DBufLength(&acptr->sendQ),
+                                   (int)acptr->sendM, (int)acptr->sendK,
+                                   (int)acptr->receiveM, (int)acptr->receiveK,
+                                   NOW - acptr->firsttime, DoesTS(acptr) ?
+						"TS" : "NoTS");
 		} 
 		break;
 	case 'L' : case 'l' :
@@ -2041,6 +1995,10 @@ char    *parv[];
         char tempuser[30];
         char temphost[512];
 	aConfItem *aconf;
+	char timebuffer[20];
+	char filenamebuf[1024];
+	char *filename;
+	struct tm *tmptr;
 
         if (!MyClient(sptr) ||
 #ifdef NO_LOCAL_KLINE
@@ -2096,6 +2054,12 @@ char    *parv[];
                 user = tempuser;
                 host = cluster(acptr->user->host);
         }
+#ifdef NO_REDUNDANT_KLINES
+	if (test_kline_userhost(sptr, &KList1, user, host) ||
+		test_kline_userhost(sptr, &KList2, user, host) ||
+		test_kline_userhost(sptr, &KList3, user, host))
+		return 0;
+#endif
         if (!matches(user, "akjhfkahfasfjd") &&
                 !matches(host, "ldksjfl.ksskdjfd.jfklsjf"))
         {
@@ -2131,14 +2095,26 @@ char    *parv[];
 		MyFree(host);
 	}
 	rehashed = 1; /* Forces looping thru clients to check k-lines */
-        sendto_flagops(1,"%s added K-Line for [%s@%s]: %s", parv[0], user, host,
+        sendto_flagops(OPERS,"%s added K-Line for [%s@%s]: %s", parv[0], user, host,
 		parv[2] && *parv[2] ? parv[2] : "No reason");
-        sendto_one(sptr, ":%s NOTICE %s :Added K-Line [%s@%s] to server configfile", me.name, parv[0], user, host);
-        if ((out = open(configfile, O_WRONLY|O_APPEND))==-1)
+#ifdef PUT_KLINES_IN_IRCD_CONF
+	filename = configfile;
+#elif defined(SEPARATE_QUOTE_KLINES_BY_DATE)
+	tmptr = localtime(&NOW);	
+	strftime(timebuffer, 20, "%y%m%d", tmptr);
+	sprintf(filenamebuf, "%s.%s", klinefile, timebuffer);
+	filename = filenamebuf;
+#else
+	filename = klinefile;
+#endif
+        if ((out = open(filename, O_RDWR|O_APPEND|O_CREAT))==-1)
         {
                 sendto_one(sptr, ":%s NOTICE %s :Problem opening server configfile", me.name, parv[0]);
                 return 0;
         }
+#ifdef SEPARATE_QUOTE_KLINES_BY_DATE
+	fchmod(out, 432);
+#endif
 	irc_sprintf(buffer, "#%s!%s@%s K'd: %s@%s: %s\n",
 		sptr->name, sptr->user->username,
 		sptr->user->host, user, host,
@@ -2155,6 +2131,8 @@ char    *parv[];
 	if (write(out, buffer, strlen(buffer)) <= 0)
 		sendto_one(sptr, ":%s NOTICE %s :Problem writing to the configfile", me.name, parv[0]);
         close(out);
+        sendto_one(sptr, ":%s NOTICE %s :Added K-Line [%s@%s] to configfile", me.name, parv[0], user, host);
+
 	return 0;
 }
 
@@ -2422,10 +2400,11 @@ char	*parv[];
 void read_motd(filename)
 char *filename;
 {
-	register aMotd *temp, *last;
-	struct stat sb;
-	char buffer[81], *blah;
-	FILE *st;
+	int fd;
+        register aMotd *temp, *last;
+        struct stat sb;
+        char    line[80];
+	register char *tmp;
 
 	while(motd)
 	{
@@ -2433,22 +2412,24 @@ char *filename;
 		MyFree(motd);
 		motd = temp;
 	}
-	st = fopen(filename, "rt");
-	if (!st)
+ 
+
+        if ((fd = open(MOTD, O_RDONLY)) == -1)
 		return;
-	fstat(fileno(st), &sb);
-	motd_tm = localtime(&sb.st_mtime);
+        (void)fstat(fd, &sb);
+        motd_tm = localtime(&sb.st_mtime);
+        (void)dgets(-1, NULL, 0); /* make sure buffer is at empty pos */
 	last = NULL;
-	while(fgets(buffer, 80, st))
+        while (dgets(fd, line, sizeof(line)-1) > 0)
 	{
-		if ((blah = strchr(buffer, '\n')) != NULL)
-			*blah = (char) 0;
-		if ((blah = strchr(buffer, '\r')) != NULL)
-			*blah = (char) 0;
+		if ((tmp = (char *)index(line,'\n')))
+			*tmp = '\0';
+		if ((tmp = (char *)index(line,'\r')))
+			*tmp = '\0';
 		temp = (aMotd *) MyMalloc(sizeof(aMotd));
 		if (!temp)
 			outofmemory();
-		strcpy(temp->line, buffer);
+		strcpy(temp->line, line);
 		temp->next = NULL;
 		if (!motd)
 			motd = temp;
@@ -2456,7 +2437,8 @@ char *filename;
 			last->next = temp;
 		last = temp;
 	}
-	fclose(st);
+        (void)dgets(-1, NULL, 0); /* make sure buffer is at empty pos */
+        (void)close(fd);
 }
 
 #endif

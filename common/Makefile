@@ -17,7 +17,7 @@
 #*   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #*/
 
-CC=cc
+CC=gcc
 RM=/bin/rm
 INCLUDE=../include
 
@@ -52,18 +52,18 @@ depend:
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
 
-bsd.o: bsd.c ../include/common.h ../include/sys.h ../include/config.h
+bsd.o: bsd.c ../include/common.h ../include/sys.h ../include/config.h ../include/comstud.h
 dbuf.o: ../include/config.h ../include/common.h ../include/dbuf.h
-dbuf.o: ../include/sys.h dbuf.c
-packet.o: ../include/struct.h ../include/config.h ../include/class.h
+dbuf.o: ../include/comstud.h ../include/sys.h dbuf.c
+packet.o: ../include/comstud.h ../include/struct.h ../include/config.h ../include/class.h
 packet.o: ../include/dbuf.h ../include/common.h ../include/msg.h packet.c
-parse.o: ../include/struct.h ../include/config.h
+parse.o: ../include/comstud.h ../include/struct.h ../include/config.h
 parse.o: ../include/class.h ../include/dbuf.h ../include/common.h
 parse.o: ../include/msg.h ../include/sys.h
 parse.o: ../include/numeric.h parse.c
 send.o: ../include/struct.h ../include/config.h ../include/class.h
-send.o: ../include/dbuf.h ../include/common.h send.c
-match.o: ../include/config.h ../include/common.h ../include/sys.h match.c
-manew.o: ../include/config.h ../include/common.h ../include/sys.h manew.c
-support.o: ../include/config.h ../include/common.h ../include/sys.h support.c
-inet_addr.o: ../include/sys.h inet_addr.c ../include/common.h
+send.o: ../include/comstud.h ../include/dbuf.h ../include/common.h send.c
+match.o: ../include/comstud.h ../include/config.h ../include/common.h ../include/sys.h match.c
+manew.o: ../include/comstud.h ../include/config.h ../include/common.h ../include/sys.h manew.c
+support.o: ../include/comstud.h ../include/config.h ../include/common.h ../include/sys.h support.c
+inet_addr.o: ../include/comstud.h ../include/sys.h inet_addr.c ../include/common.h

@@ -69,7 +69,9 @@ static int user_modes[]	     = { FLAGS_OPER, 'o',
 #ifdef FK_USERMODES
 				 FLAGS_KMODE, 'k',
 #endif
-				 FLAGS_RMODE, 'r',
+				 FLAGS_DMODE, 'd',
+				 FLAGS_BMODE, 'b',
+			         FLAGS_LMODE, 'l',
 				 0, 0 };
 
 /*
@@ -415,7 +417,7 @@ char	*nick, *username;
 		strncpyzt(user->username, temp, USERLEN+1);
 		if ((i = check_client(sptr, temp)))
 		    {
-			sendto_flagops(6,"%s from %s.", i == -3 ?
+			sendto_flagops(UMODE,"%s from %s.", i == -3 ?
 						  "Too many connections" :
 			 			  "Unauthorized connection",
 				   get_client_host(sptr));
@@ -445,9 +447,13 @@ char	*nick, *username;
 			strncpyzt(user->username, sptr->username, USERLEN+1);
 		else
 		{
+#ifdef IDENTD_ONLY
 			*user->username = '~';
 			(void)strncpy(&user->username[1], origuser, USERLEN);
 			user->username[USERLEN] = '\0';
+#else
+			strncpyzt(user->username, origuser, USERLEN+1);
+#endif
 		}
 		if (!BadPtr(aconf->passwd) &&
 		    !StrEq(sptr->passwd, aconf->passwd))
@@ -459,7 +465,7 @@ char	*nick, *username;
 		    }
 		bzero(sptr->passwd, sizeof(sptr->passwd));
 
-		if (find_kill(sptr))
+		if (find_kill(sptr, 1))
 		    {
 			ircstp->is_ref++;
 			return exit_client(cptr, sptr, &me, "K-lined");
@@ -500,7 +506,7 @@ char	*nick, *username;
 #ifdef NO_MIXED_CASE
                 if (lower && upper)
                   {
-                    sendto_flagops(5, "Invalid username: %s [%s@%s]",
+                    sendto_flagops(BMODE, "Invalid username: %s [%s@%s]",
                                nick, username, user->host);
                     ircstp->is_ref++;
                     return exit_client(cptr, sptr, &me, "Invalid username");
@@ -509,7 +515,7 @@ char	*nick, *username;
 #ifdef NO_SPECIAL
                 if (special)
                   {
-                    sendto_flagops(5,"Invalid username: %s [%s@%s]",
+                    sendto_flagops(BMODE,"Invalid username: %s [%s@%s]",
                                nick, user->username, user->host);
                     ircstp->is_ref++;
                     return exit_client(cptr, sptr, &me, "Invalid username");
@@ -531,7 +537,7 @@ char	*nick, *username;
 #if defined(BOTS_NOTICE) || defined(REJECT_BOTS)
 			if (reject == 1)
 			{
-                                sendto_flagops(5,"%s vlad/joh/com bot: %s [%s@%s]",
+                                sendto_flagops(BMODE,"%s vlad/joh/com bot: %s [%s@%s]",
 					bottype, nick, user->username,
                                         user->host);
 #ifdef REJECT_BOTS
@@ -541,7 +547,7 @@ char	*nick, *username;
 			} 
 			if ((reject == 2) || strstr(nick, "LameHelp"))
 			{
-                                sendto_flagops(5,"%s eggdrop bot: %s [%s@%s]",
+                                sendto_flagops(BMODE,"%s eggdrop bot: %s [%s@%s]",
 					bottype,
                                         nick, user->username, user->host);
 #ifdef REJECT_BOTS
@@ -551,7 +557,7 @@ char	*nick, *username;
 			}
 			if (reject == 3)
 			{
-				sendto_flagops(5,"%s ojnk/annoy bot: %s [%s@%s]",
+				sendto_flagops(BMODE,"%s ojnk/annoy bot: %s [%s@%s]",
 					bottype,
 					nick, user->username, user->host);
 #ifdef REJECT_BOTS
@@ -561,7 +567,7 @@ char	*nick, *username;
 			}
 			if (reject == 4)
 			{
-				sendto_flagops(5,"%s Guardian bot: %s [%s@%s]",
+				sendto_flagops(BMODE,"%s Guardian bot: %s [%s@%s]",
 				bottype,
 				nick, user->username, user->host);
 #ifdef REJECT_BOTS
@@ -572,7 +578,7 @@ char	*nick, *username;
                         if (!matches("*bot*", nick)||!matches("*Serv*", nick)||
                                 !matches("*help*", nick))
                         {
-                                sendto_flagops(5,"%s bot: %s [%s@%s]",
+                                sendto_flagops(BMODE,"%s bot: %s [%s@%s]",
 					bottype,
                                         nick, user->username, user->host);
 #ifdef REJECT_BOTS
@@ -588,7 +594,7 @@ char	*nick, *username;
 			if (NOW <= (blahidle->last+60))
 			{
 				blahidle->last += 60; /* Add 60 seconds */
-				sendto_flagops(1,"Rejecting idle exceeder %s [%s@%s]",
+				sendto_flagops(OPERS,"Rejecting idle exceeder %s [%s@%s]",
 					nick, user->username, user->host);
 				ircstp->is_ref++;
 				return exit_client(cptr, sptr, &me, "No bots allowed");
@@ -611,7 +617,7 @@ char	*nick, *username;
                         clone->num++;
                         clone->last = NOW;
                         if (clone->num == NUM_CLONES)
-                                sendto_flagops(1, "CloneBot protection activated against %s", user->host);
+                                sendto_flagops(OPERS, "CloneBot protection activated against %s", user->host);
                         if (clone->num >= NUM_CLONES)
                         {
 #ifdef FNAME_CLONELOG
@@ -632,7 +638,7 @@ char	*nick, *username;
 			}
 #endif /* BUFFERED_LOGS */
 #endif /* FNAME_CLONELOG */
-                                sendto_flagops(1, "Rejecting clonebot: %s [%s@%s]",
+                                sendto_flagops(OPERS, "Rejecting clonebot: %s [%s@%s]",
                                         nick, username, user->host);
 #ifdef KILL_CLONES
                                 strcpy(clonekillhost, user->host);
@@ -648,12 +654,12 @@ char	*nick, *username;
 #endif
 
 #ifdef CLIENT_NOTICES
-                sendto_flagops(2,"Client connecting: %s [%s@%s]",
+                sendto_flagops(CMODE,"Client connecting: %s (%s@%s)",
                                 nick, user->username, user->host);
 #endif /* CLIENT_NOTICES */
 		if (sptr->flags & FLAGS_GOTID)
 			if (strcmp(origuser, sptr->username))
-				sendto_flagops(1,"Identd response differs: %s [%s]", nick, origuser);
+				sendto_flagops(DMODE,"Identd response differs: %s [%s]", nick, origuser);
 	    }
 	else
 		strncpyzt(user->username, username, USERLEN+1);
@@ -769,32 +775,6 @@ char	*parv[];
 		*s = '\0';
 	strncpyzt(nick, parv[1], NICKLEN+1);
 
-#ifdef NO_NICK_FLOODS
-	if (MyClient(sptr) && IsRegistered(sptr))
-	{
-/* "lastnick" will actually be the first time a person did a /nick
-   if "lastnick" is 0 (has never /nick'd) or if "lastnick" is more
-   than 15 seconds ago, then "lastnick" will be reset to NOW
-   Basically, when someone hits 4 nick changes in 15 seconds, boom.
-*/
-
-		if (!sptr->lastnick || (NOW-sptr->lastnick > 15))
-		{
-			sptr->numnicks = 0;
-			sptr->lastnick = NOW;
-		}
-		sptr->numnicks++;
-		if (sptr->numnicks > 3)
-		{
-			sptr->lastnick = NOW+15; /* Hurt the person */
-			sendto_flagops(1,"Nick flooding detected by: %s [%s@%s]",
-				sptr->name, sptr->user->username, sptr->user->host);
-			sendto_one(sptr, err_str(ERR_TOOMANYNICKS),
-                                   me.name, sptr->name);
-			return 0;
-		}
-	}
-#endif
 	/*
 	 * if do_nick_name() returns a null name OR if the server sent a nick
 	 * name and do_nick_name() changed it in some way (due to rules of nick
@@ -848,6 +828,33 @@ char	*parv[];
 				   BadPtr(parv[0]) ? "*" : parv[0], nick);
 			return 0; /* NICK message ignored */
 		    }
+#ifdef NO_NICK_FLOODS
+        if (MyClient(sptr) && IsRegistered(sptr))
+        {
+/* "lastnick" will actually be the first time a person did a /nick
+   if "lastnick" is 0 (has never /nick'd) or if "lastnick" is more
+   than 15 seconds ago, then "lastnick" will be reset to NOW
+   Basically, when someone hits 4 nick changes in 15 seconds, boom.
+*/
+
+                if (!sptr->lastnick || (NOW-sptr->lastnick > 15))
+                {
+                        sptr->numnicks = 0;
+                        sptr->lastnick = NOW;
+                }
+                sptr->numnicks++;
+                if (sptr->numnicks > 3)
+                {
+                        sptr->lastnick = NOW+15; /* Hurt the person */
+                        sendto_flagops(OPERS,"Nick flooding detected by: %s (%s@%s)",
+                                sptr->name, sptr->user->username, sptr->user->host);
+                        sendto_one(sptr, err_str(ERR_TOOMANYNICKS),
+                                   me.name, sptr->name);
+                        return 0;
+                }
+        }
+#endif
+
 	/*
 	** acptr already has result from previous find_server()
 	*/
@@ -860,7 +867,7 @@ char	*parv[];
 		** there is no danger of the server being disconnected.
 		** Ultimate way to jupiter a nick ? >;-). -avalon
 		*/
-		sendto_flagops(4,"Nick collision on %s(%s <- %s)",
+		sendto_flagops(FMODE,"Nick collision on %s(%s <- %s)",
 			   sptr->name, acptr->from->name,
 			   get_client_name(cptr, FALSE));
 		ircstp->is_kill++;
@@ -959,7 +966,7 @@ char	*parv[];
 		if (!doests || !newts || !acptr->tsinfo
 		    || (newts == acptr->tsinfo))
 		    {
-		       sendto_flagops(4,"Nick collision on %s(%s <- %s)(both killed)",
+		       sendto_flagops(FMODE,"Nick collision on %s(%s <- %s)(both killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 			ircstp->is_kill++;
@@ -983,11 +990,11 @@ char	*parv[];
 		else
 		    {
 			if (sameuser)
-		      sendto_flagops(4,"Nick collision on %s(%s <- %s)(older killed)",
+		      sendto_flagops(FMODE,"Nick collision on %s(%s <- %s)(older killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 			else
-		      sendto_flagops(4,"Nick collision on %s(%s <- %s)(newer killed)",
+		      sendto_flagops(FMODE,"Nick collision on %s(%s <- %s)(newer killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 
@@ -1018,7 +1025,7 @@ char	*parv[];
 		newts = 0;
 	if (!doests || !newts || !acptr->tsinfo || (newts == acptr->tsinfo))
 	    {
-	sendto_flagops(4,"Nick change collision from %s to %s(%s <- %s)(both killed)",
+	sendto_flagops(FMODE,"Nick change collision from %s to %s(%s <- %s)(both killed)",
 			   sptr->name, acptr->name, acptr->from->name,
 			   get_client_name(cptr, FALSE));
 		ircstp->is_kill++;
@@ -1042,11 +1049,11 @@ char	*parv[];
 		 (!sameuser && newts > acptr->tsinfo))
 	    {
 		if (sameuser)
-    sendto_flagops(4,"Nick change collision from %s to %s(%s <- %s)(older killed)",
+    sendto_flagops(FMODE,"Nick change collision from %s to %s(%s <- %s)(older killed)",
 			   sptr->name, acptr->name, acptr->from->name,
 			   get_client_name(cptr, FALSE));
 		else
-    sendto_flagops(4,"Nick change collision from %s to %s(%s <- %s)(newer killed)",
+    sendto_flagops(FMODE,"Nick change collision from %s to %s(%s <- %s)(newer killed)",
 			   sptr->name, acptr->name, acptr->from->name,
 			   get_client_name(cptr, FALSE));
 		ircstp->is_kill++;
@@ -1063,11 +1070,11 @@ char	*parv[];
 	else
 	    {
 		if (sameuser)
-		    sendto_flagops(4,"Nick collision on %s(%s <- %s)(older killed)",
+		    sendto_flagops(FMODE,"Nick collision on %s(%s <- %s)(older killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 		else
-		    sendto_flagops(4,"Nick collision on %s(%s <- %s)(newer killed)",
+		    sendto_flagops(FMODE,"Nick collision on %s(%s <- %s)(newer killed)",
 				   acptr->name, acptr->from->name,
 				   get_client_name(cptr, FALSE));
 
@@ -2001,10 +2008,10 @@ char	*parv[];
 	    }
 
 	if (strchr(parv[0], '.'))
-		sendto_flagops(4,"Received KILL message for %s. From %s Path: %s!%s",
+		sendto_flagops(FMODE,"Received KILL message for %s. From %s Path: %s!%s",
 		   acptr->name, parv[0], inpath, path);
 	else
-	        sendto_flagops(3,"Received KILL message for %s. From %s Path: %s!%s",
+	        sendto_flagops(KMODE,"Received KILL message for %s. From %s Path: %s!%s",
                         acptr->name, parv[0], inpath, path);
 
 #if defined(USE_SYSLOG) && defined(SYSLOG_KILL)
@@ -2388,7 +2395,7 @@ char	*parv[];
                 }
 #endif
 #ifdef FAILED_OPER_NOTICE
-                sendto_flagops(1,"Failed OPER attempt: %s (%s@%s) [%s]",
+                sendto_flagops(OPERS,"Failed OPER attempt: %s (%s@%s) [%s]",
                      parv[0], sptr->user->username, sptr->sockhost, name);
 #endif
 	    }

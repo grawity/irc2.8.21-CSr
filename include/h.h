@@ -25,10 +25,7 @@
  */
 
 #include "comstud.h"
-
-#ifdef LIMIT_UH
-extern	int	uhlimit;
-#endif
+#include "dich_conf.h"
 
 #ifdef HIGHEST_CONNECTION
 extern        void    check_max_count();
@@ -38,6 +35,10 @@ extern        void    check_max_count();
 #ifdef BETTER_MOTD
 	extern aMotd *motd;
 	extern struct tm *motd_tm;
+#endif
+
+#ifdef NO_REDUNDANT_KLINES
+extern int test_kline_userhost PROTO((aClient *, aConfList *, char *, char *));
 #endif
 
 extern int idlelimit;
@@ -128,13 +129,13 @@ extern	aConfItem *find_conf_exact PROTO((char *, char *, char *, int));
 extern	aConfItem *find_conf_host PROTO((Link *, char *, int));
 extern	aConfItem *find_conf_ip PROTO((Link *, char *, char *, int));
 extern	aConfItem *find_conf_name PROTO((char *, int));
-extern	int	find_kill PROTO((aClient *));
+extern	int	find_kill PROTO((aClient *, int));
 extern	int	find_restrict PROTO((aClient *));
 extern	int	rehash PROTO((aClient *, aClient *, int));
-extern	int	initconf PROTO((int));
+extern	int	initconf PROTO((int, char *));
 
 extern	char	*MyMalloc PROTO((int)), *MyRealloc PROTO((char *, int));
-extern	char	*debugmode, *configfile, *sbrk0;
+extern	char	*debugmode, *configfile, *klinefile, *sbrk0;
 extern	char	*getfield PROTO((char *));
 extern	void	get_sockhost PROTO((aClient *, char *));
 extern	char	*rpl_str PROTO((int)), *err_str PROTO((int));

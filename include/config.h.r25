@@ -41,7 +41,7 @@
 /*	SGI			Nothing needed (IRIX 4.0.4) */
 #undef 	SVR3			/* SVR3 stuff - being worked on where poss. */
 #undef	DYNIXPTX		/* Sequents Brain-dead Posix implement. */
-#undef  SOL20			/* Solaris2 */
+#undef	SOL20			/* Solaris2 */
 #undef	ESIX			/* ESIX */
 #undef	NEXT			/* NeXTStep */
 #undef        SVR4
@@ -55,10 +55,7 @@
 
 #ifdef SOL20
 
-/* POLL seems to be broken/using 99% CPU, so this is disabled until
-   I can take a look at it */
-
-#undef USE_POLL                /* Define this if you want to use poll()
+#define USE_POLL                /* Define this if you want to use poll()
                                    on lame Solaris */
 
 #endif
@@ -88,7 +85,7 @@
  *       the maintainer.
  */
 
-#undef	DEBUGMODE		/* define DEBUGMODE to enable debugging mode.*/
+#define	DEBUGMODE		/* define DEBUGMODE to enable debugging mode.*/
 
 /*
  * If you have curses, and wish to use it, then define HAVECURSES. This is the
@@ -119,7 +116,7 @@
  * You must define these to something, even if you don't really want them.
  */
 #define	DPATH	"/home/irc/irc2.8.21+CSr25/lib"	/* dir where all ircd stuff is */
-#define	SPATH	"/home/irc/irc2.8.21+CSr25/lib/ircd"
+#define	SPATH	"/home/irc/irc.2.8.21+CSr25/lib/ircd"
 #define	CPATH	"ircd.conf"	/* server configuration file */
 #define KPATH	"klines/klines.conf"	/* config file containing K: lines */
 #define	MPATH	"ircd.motd"	/* server MOTD file */
@@ -134,8 +131,8 @@
  * successful use of /oper.  These are either full paths or files within DPATH.
  */
 
-#define FNAME_USERLOG "users.log"
-#define FNAME_OPERLOG "opers.log"
+#define FNAME_USERLOG "/home/irc/irc2.8.21+CSr25/logs/users.log" /* */
+#define FNAME_OPERLOG "/home/irc/irc2.8.21+CSr25/logs/opers.log" /* */
 
 /* CHROOTDIR
  *
@@ -192,7 +189,7 @@
 #define	OPER_KILL
 #define	OPER_REHASH
 #undef	OPER_RESTART
-#define OPER_DIE
+#undef	OPER_DIE
 #define	OPER_REMOTE
 #undef	LOCOP_REHASH
 #undef	LOCOP_RESTART
@@ -336,13 +333,13 @@
 /*
  * Max amount of internal send buffering when socket is stuck (bytes)
  */
-#define MAXSENDQLENGTH 4000000    /* Recommended value: 100000 for leaves */
+#define MAXSENDQLENGTH 3000000    /* Recommended value: 100000 for leaves */
                                  /*                    700000 for backbones */
 /*
  *  BUFFERPOOL is the maximum size of the total of all sendq's.
  *  Recommended value is 2 * MAXSENDQLENGTH, for hubs, 5 *.
  */
-#define	BUFFERPOOL     (10 * MAXSENDQLENGTH)
+#define	BUFFERPOOL     (5 * MAXSENDQLENGTH)
 
 /*
  * use these to setup a Unix domain socket to connect clients/servers to.
@@ -416,7 +413,7 @@
  * 1 server = 1 connection, 1 user = 1 connection.
  * This should be at *least* 3: 1 listen port, 1 dns port + 1 client
  */
-#define MAXCONNECTIONS	1024
+#define MAXCONNECTIONS	255
 
 /*
  * this defines the length of the nickname history.  each time a user changes

@@ -327,18 +327,26 @@ int len;
 	switch(which)
 	{
 	case 1:
+#ifdef FNAME_USERLOG
 		if (userbuflen+len >= ULOGBUFFERLEN-1) 
 			doit++;
 		filename = FNAME_USERLOG;
 		buffer = userbuf;
 		len2 = &userbuflen;
+#else
+		return;
+#endif
 		break;
 	case 2:
+#ifdef FNAME_CLONELOG
 		if (clonebuflen+len >= CLOGBUFFERLEN-1)
 			doit++;
 		filename = FNAME_CLONELOG;
 		buffer = clonebuf;
 		len2 = &clonebuflen;
+#else
+		return;
+#endif
 		break;
 	}
 	if (!len || doit)
@@ -410,7 +418,7 @@ char	*comment;	/* Reason for the exit */
 		sptr->flags |= FLAGS_CLOSING;
 #ifdef CLIENT_NOTICES
                 if (IsPerson(sptr))
-                	sendto_flagops(2, "Client exiting: %s [%s@%s]",
+                	sendto_flagops(CMODE, "Client exiting: %s (%s@%s)",
 				sptr->name, sptr->user->username,
 				sptr->user->host);
 #endif
@@ -491,6 +499,13 @@ char	*comment;	/* Reason for the exit */
 		** together into exit_one_client() to provide some useful
 		** information about where the net is broken.      Ian 
 		*/
+
+/* The above comment says that only server connections can have depending
+   remote clients.  This is true, and I don't see this changing...so I'm
+   adding in this if(), because looking thru all the clients is really
+   really lame -- Comstud */
+        if (IsServer(sptr))
+        {
 		(void)strcpy(comment1, me.name);
 		(void)strcat(comment1," ");
 		(void)strcat(comment1, sptr->name);
@@ -509,8 +524,8 @@ char	*comment;	/* Reason for the exit */
 			if (IsServer(acptr) && acptr->from == sptr)
 				exit_one_client(NULL, acptr, &me, me.name);
 		    }
-	    }
-
+	} /* IsServer */
+	} /* MyConnect */
 	exit_one_client(cptr, sptr, from, comment);
 	return cptr == sptr ? FLUSH_BUFFER : 0;
     }

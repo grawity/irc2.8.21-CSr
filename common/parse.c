@@ -385,6 +385,8 @@ struct	Message *mptr;
 		i = bufend - ((s) ? s : ch);
 		mptr->bytes += i;
 		if ((mptr->flags & 1) && !(IsServer(cptr) || IsService(cptr)))
+		{
+			if (mptr->func != m_ison && mptr->func != m_userhost)
 			cptr->since += (2 + i / 120);
 					/* Allow only 1 msg per 2 seconds
 					 * (on average) to prevent dumping.
@@ -392,6 +394,7 @@ struct	Message *mptr;
 					 * bursts of up to 5 msgs are allowed
 					 * -SRB
 					 */
+		}
 	    }
 	/*
 	** Must the following loop really be so devious? On
