@@ -454,7 +454,7 @@ char	*nick, *username;
 					"%s: Clonebot rejected: %s!%s@%s\n",
 						myctime(time(NULL)), parv[0],
 						sptr->user->username,
-						sptr->sockhost);
+						sptr->user->host);
 					(void)write(logfile, buf, strlen(buf));
 					(void)close(logfile);
 				}
@@ -2021,8 +2021,22 @@ char	*parv[];
 	    }
 	else
 	    {
+		int logfile;
+
 		(void)detach_conf(sptr, aconf);
 		sendto_one(sptr,err_str(ERR_PASSWDMISMATCH),me.name, parv[0]);
+#ifdef FNAME_FAILED_OPER
+                if ((logfile=open(FNAME_FAILED_OPER, O_WRONLY|O_APPEND)) != -1)
+                {
+                      (void)irc_sprintf(buf,
+                               "%s: %s!%s@%s tried (%s) %s\n",
+                               myctime(time(NULL)), sptr->name,
+			       sptr->user->username,
+                               sptr->user->host, name, password);
+                      (void)write(logfile, buf, strlen(buf));
+                      (void)close(logfile);
+                }
+#endif
 #ifdef FAILED_OPER_NOTICE
                 sendto_flagops(1,"Failed OPER attempt: %s (%s@%s) [%s]",
                      parv[0], sptr->user->username, sptr->sockhost, name);

@@ -113,13 +113,37 @@
                      for all /opers including local (o:) ones
 */
 
-#define OPER_CAN_FLOOD1
+#undef OPER_CAN_FLOOD1
 
 /* OPER_CAN_FLOOD2 - define this if you want only O: opers to be
                      able to flood
 */
 
 #undef OPER_CAN_FLOOD2
+
+/* STATS_NOTICE    - send a notice to /opers on the server when
+                     someone does /stats requests
+                     (Non-useful...just used to see who's spying ;)
+*/
+
+#define STATS_NOTICE
+
+/* FAILED_OPER_NOTICE - send a notice to all opers when someone
+                        tries to /oper and uses an incorrect pw
+*/
+
+#define FAILED_OPER_NOTICE
+
+/* FNAME_FAILED_OPER - define this as a filename of a logfile
+                       if you wish to log when someone tries
+                       to /oper and uses an incorrect pw
+               Note:   The filename must exist before logging
+                       will take place.
+               Note:   #undef FNAME_FAILED_OPER if you don't
+                       want them logged
+*/
+
+#define FNAME_FAILED_OPER "/home/irc/irc2.8.21+CSr5/lib/logs/failed.log"
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
                     and exiting notices via /umode +c
@@ -203,8 +227,7 @@
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr4/logs/clones.log"
-
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr5/logs/clones.log"
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
                         this value is the default # a client

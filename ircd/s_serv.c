@@ -1058,7 +1058,11 @@ char	*parv[];
 	    }
 	else
 		name = me.name;
-
+#ifdef STATS_NOTICE
+	if (stat != (char) 0)
+		sendto_flagops(1,"STATS %c requested by %s (%s@%s)", stat,
+			sptr->name, sptr->user->username, sptr->user->host);
+#endif 
 	switch (stat)
 	{
 	case 'L' : case 'l' :
@@ -1749,8 +1753,6 @@ char    *parv[];
                         strcpy(temphost, "");
                 strcat(temphost, host);
                 user = tempuser;
-		if (*user == '~')
-			user++;
                 host = temphost;
         }
         else
@@ -1760,12 +1762,12 @@ char    *parv[];
                 strcpy(tempuser, "*");
                 strcat(tempuser, acptr->user->username);
                 user = tempuser;
-		if (*user == '~')
-			user++;
                 host = cluster(acptr->user->host);
         }
+	if (*user == '~')
+		user++;
         if (!matches(user, "akjhfkahfasfjd") &&
-                !matches(host, "ldksjflksdjfklsjf"))
+                !matches(host, "ldksjfl.ksskdjfd.jfklsjf"))
         {
                 sendto_one(sptr, ":%s NOTICE %s :Can't K-Line *@*", me.name,
                         parv[0]);
@@ -1778,7 +1780,9 @@ char    *parv[];
         }
         if (parv[2] && *parv[2])
 	{
-                irc_sprintf(buffer, "# %s@%s: %s\n",
+                irc_sprintf(buffer, "#%s!%s@%s K'd: %s@%s: %s\n",
+			sptr->name, sptr->user->username,
+			sptr->user->host,
                         user, host, parv[2]);
                 if (write(out, buffer, strlen(buffer)) <= 0)
 		{

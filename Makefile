@@ -83,7 +83,7 @@ IRCDMODE = 711
 
 # IRCDDIR must be the same as DPATH in include/config.h
 #
-IRCDDIR=/home/irc/irc2.8.21+CSr4/lib
+# IRCDDIR=/home/irc/irc2.8.21+CSr4/lib
 
 SHELL=/bin/sh
 SUBDIRS=common ircd 

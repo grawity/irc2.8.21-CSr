@@ -415,7 +415,7 @@ ping_timeout:
         {
                 if (cptr->user && cptr->user->host &&
                         !mycmp(cptr->user->host, clonekillhost) &&
-                        ((now - cptr->firsttime) < CLONE_TIME))
+                        ((currenttime - cptr->firsttime) < CLONE_TIME))
                 {
                         ircstp->is_kill++;
                         sendto_ops("Clonebot killed: %s [%s@%s]",
