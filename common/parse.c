@@ -491,8 +491,8 @@ char	*cmd;
 		sptr->from->name, get_client_name(cptr, TRUE));
 	if (IsServer(sptr) || IsMe(sptr))
 	{ 
-		sendto_ops("Not dropping link: %s", cptr->name);
-		return -1;
+		sendto_ops("Dropping link for fake direction: %s", cptr->name);
+		return exit_client(cptr, cptr, &me, "Fake Direction");
 	}
 	if (IsServer(cptr))
 	{

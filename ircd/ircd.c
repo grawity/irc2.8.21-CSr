@@ -488,7 +488,9 @@ char	*argv[];
 	int	portarg = 0;
 	uid_t	uid, euid;
 	time_t	delay = 0, now;
+#ifndef AIX
         struct rlimit r;
+#endif
 #ifdef DOG3
 	int mainloops=0; /* counter of how many times we have gone through
                            the main loop */
@@ -497,9 +499,11 @@ char	*argv[];
 #ifdef DBUF_INIT
         dbuf_init(); /* set up some dbuf stuff to control paging */
 #endif
+#ifndef AIX
         r.rlim_cur = MAXCONNECTIONS;
         r.rlim_max = MAXCONNECTIONS;
         setrlimit(RLIMIT_NOFILE, &r);
+#endif
 #ifdef IDLE_CHECK
         idlelimit = DEFAULT_IDLELIMIT*60;
 #endif

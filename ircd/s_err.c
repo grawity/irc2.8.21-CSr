@@ -130,7 +130,7 @@ static	Numeric	numeric_errors[] = {
 		0, (char *)NULL, 0, (char *)NULL,
 /* 501 */	ERR_UMODEUNKNOWNFLAG, ":Unknown MODE flag",
 /* 502 */	ERR_USERSDONTMATCH, ":Cant change mode for other users",
-/* 503 */	ERR_GHOSTEDCLIENT, "%s :Message could not be delivered to %s",
+/* 503 */	ERR_GHOSTEDCLIENT, ":Message could not be delivered to %s",
 		0, (char *)NULL
 };
 
@@ -294,7 +294,7 @@ int	numeric;
 	Reg2	int	num = numeric;
 
 	num -= numeric_errors[0].num_val;
-	if (num < 0 || num > ERR_USERSDONTMATCH)
+	if (num < 0 || num > 599)
 		(void)irc_sprintf(numbuff,
 			":%%s %d %%s :INTERNAL ERROR: BAD NUMERIC! %d",
 			numeric, num);

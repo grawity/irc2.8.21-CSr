@@ -1004,7 +1004,7 @@ va_dcl
 		(void)exit_client(NULL, to, &me, "Ghost");
 		if (IsPerson(from))
 			sendto_one(from, err_str(ERR_GHOSTEDCLIENT),
-				me.name, to->name);
+				me.name, from->name, to->name);
                 return;
 	} 
 	if (to && from && MyClient(to) && IsPerson(from) &&
