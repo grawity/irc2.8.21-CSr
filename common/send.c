@@ -340,7 +340,7 @@ va_dcl
 # ifdef	USE_VARARGS
 	va_start(vl);
 # endif
-        bzero((char *)&sentalong,sizeof(sentalong));
+        bzero((char *)sentalong,sizeof(sentalong));
 	for (lp = chptr->members; lp; lp = lp->next)
 	    {
 		acptr = lp->value.cptr;
@@ -455,14 +455,14 @@ va_dcl
 # ifdef	USE_VARARGS
 	va_start(vl);
 # endif
-	bzero((char *)&sentalong,sizeof(sentalong));
+	bzero((char *)sentalong,sizeof(sentalong));
+	sentalong[user->fd] = 1;
 	if (user->user)
 	for (channels=user->user->channel;channels;channels=channels->next)
 		for(users=channels->value.chptr->members;users;users=users->next)
 		{
 			cptr = users->value.cptr;
-			if (!MyConnect(cptr) || (cptr == user) ||
-					sentalong[cptr->fd])
+			if (!MyConnect(cptr) || sentalong[cptr->fd])
 				continue;
 			sentalong[cptr->fd]++;
 # ifdef	USE_VARARGS
@@ -865,7 +865,7 @@ va_dcl
 #ifdef	USE_VARARGS
 	va_start(vl);
 #endif
-        bzero((char *)&sentalong,sizeof(sentalong));
+        bzero((char *)sentalong,sizeof(sentalong));
 	for (cptr = client; cptr; cptr = cptr->next)
 	    {
 		if (!SendWallops(cptr))

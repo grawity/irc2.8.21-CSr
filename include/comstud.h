@@ -203,7 +203,7 @@
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr3/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr4/logs/clones.log"
 
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,
