@@ -67,10 +67,11 @@ typedef struct dbuf
 ** as long as a pointer is 4 bytes, we get 2032 bytes for buffer
 ** data after we take away a bit for malloc to play with. -avalon
 */
+/* changed to 4080 from 2032 */
 typedef struct dbufbuf
     {
 	struct	dbufbuf	*next;	/* Next data buffer, NULL if this is last */
-	char	data[2032];	/* Actual data stored here */
+	char	data[4080];	/* Actual data stored here */
     } dbufbuf;
 
 /*

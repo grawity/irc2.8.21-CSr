@@ -1276,7 +1276,11 @@ Reg1	aChannel *chptr;
 		    {
 			obtmp = tmp;
 			tmp = tmp->next;
+#ifdef BAN_INFO
+			MyFree(obtmp->value.ban.banstr);
+#else
 			MyFree(obtmp->value.cp);
+#endif
 			free_link(obtmp);
 		    }
 		if (chptr->prevch)

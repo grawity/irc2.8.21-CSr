@@ -135,6 +135,9 @@ char	serveropts[] = {
 'C',
 # endif
 #endif
+#ifdef IDENTD_ONLY
+'d',
+#endif
 #ifdef OPER_CAN_FLOOD2
 'f',
 #endif

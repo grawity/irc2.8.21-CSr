@@ -360,27 +360,26 @@ char	*nick, *username;
 		aconf = sptr->confs->value.aconf;
 		if (sptr->flags & FLAGS_DOID && !(sptr->flags & FLAGS_GOTID))
 		    {
-			/* because username may point to user->username */
+#ifdef IDENTD_ONLY
                         ircstp->is_ref++;
 			sendto_one(sptr, ":%s NOTICE %s :This server will not allow connections from sites that don't run RFC1413 (pidentd). You may obtain a version for UNIX/VAX/VMX from \"ftp.eskimo.com:/security/pidentd-2.5.1.tar.gz\" via anonymous FTP.", me.name, parv[0]);
                         sendto_one(sptr, ":%s NOTICE %s : ", me.name, parv[0]);
 			sendto_one(sptr, ":%s NOTICE %s :For Windows, you have two choices. You can obtain WS_IRC+identd from 'ftp.eskimo.com:/security/Windows/wsirc14g.zip' or MIRC from 'ftp.eskimo.com:/security/Windows/mirc30b.zip'. For the Mac, try 'ftp.eskimo.com:/security/Mac/daemon100.sea.hqx'.", me.name, parv[0]);
                         sendto_one(sptr, ":%s NOTICE %s : ", me.name, parv[0]);
 			sendto_one(sptr, ":%s NOTICE %s :Users may wish to subscribe to a new mailing list 'identd-l'. This list is intended to help users install identd on their Unix, PC, Mac, and other machines.. Send email to majordomo@eskimo.com with the body of the message containing 'subscribe identd-l your@email.address'. Do NOT put anything in the subject line! It will be ignored.", me.name, parv[0]);
-			return exit_client(cptr, sptr, &me, "Install ident");
-
-/*
+			return exit_client(cptr, sptr, &me, "Install identd");
+#else
 			char	temp[USERLEN+1];
 
 			strncpyzt(temp, username, USERLEN+1);
 			*user->username = '~';
 			(void)strncpy(&user->username[1], temp, USERLEN);
 			user->username[USERLEN] = '\0';
-*/			
+#endif
 		    }
 		else if (sptr->flags & FLAGS_GOTID)
 			strncpyzt(user->username, sptr->username, USERLEN+1);
-		else /* if (!(sptr->flags & FLAGS_GOTID)) */
+		else
 		{
 			char temp[USERLEN+1];
 
@@ -389,10 +388,6 @@ char	*nick, *username;
 			(void)strncpy(&user->username[1], temp, USERLEN);
 			user->username[USERLEN] = '\0';
 		}
-/*
-		else
-                        strncpyzt(user->username, username, USERLEN+1);
-*/
 		if (!BadPtr(aconf->passwd) &&
 		    !StrEq(sptr->passwd, aconf->passwd))
 		    {

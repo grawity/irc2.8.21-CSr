@@ -1,5 +1,17 @@
 #ifndef COMSTUD_H
+#define COMSTUD_H
 
+/* IDENTD_ONLY      - define this if you only want people running
+                      identd to connect
+              Note:   Non-identd people are allowed on by
+                      not putting a '@' in an I: line...
+                      For example:
+                        I:204.122.*::*eskimo.com::10
+                      let's people on from eskimo.com even
+                      if they aren't running identd
+*/
+
+#define IDENTD_ONLY
 
 /* QUOTE_KLINE      - define this if you want /QUOTE KLINE
 */
@@ -110,7 +122,7 @@
 #undef OPER_CAN_FLOOD2
 
 /* CLIENT_NOTICES - define this if you wish to see client connecting
-                    and exiting notices via /umode +u
+                    and exiting notices via /umode +c
 */
 
 #define CLIENT_NOTICES
@@ -191,7 +203,7 @@
                     and you wish to log clones
 */
 
-#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr2/logs/clones.log"
+#define FNAME_CLONELOG "/home/irc/irc2.8.21+CSr3/logs/clones.log"
 
 
 /* DEFAULT_IDLELIMIT  - if you have CHECK_IDLE defined above,

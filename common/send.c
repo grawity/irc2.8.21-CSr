@@ -340,8 +340,7 @@ va_dcl
 # ifdef	USE_VARARGS
 	va_start(vl);
 # endif
-	for (i = 0; i < MAXCONNECTIONS; i++)
-		sentalong[i] = 0;
+        bzero((char *)&sentalong,sizeof(sentalong));
 	for (lp = chptr->members; lp; lp = lp->next)
 	    {
 		acptr = lp->value.cptr;
@@ -449,31 +448,34 @@ va_dcl
 {
 	va_list	vl;
 # endif
-	Reg1	int	i;
-	Reg2	aClient *cptr;
-	Reg3	Link	*lp;
+	register Link *channels;
+	register Link *users;
+	register aClient *cptr;
 
 # ifdef	USE_VARARGS
 	va_start(vl);
 # endif
-	for (i = 0; i <= highest_fd; i++)
-	    {
-		if (!(cptr = local[i]) || IsServer(cptr) ||
-		    user == cptr || !user->user)
-			continue;
-		for (lp = user->user->channel; lp; lp = lp->next)
-			if (IsMember(cptr, lp->value.chptr))
-			    {
+	bzero((char *)&sentalong,sizeof(sentalong));
+	if (user->user)
+	for (channels=user->user->channel;channels;channels=channels->next)
+		for(users=channels->value.chptr->members;users;users=users->next)
+		{
+			cptr = users->value.cptr;
+			if (!MyConnect(cptr) || (cptr == user) ||
+					sentalong[cptr->fd])
+				continue;
+			sentalong[cptr->fd]++;
 # ifdef	USE_VARARGS
-				sendto_prefix_one(cptr, user, pattern, vl);
+			sendto_prefix_one(cptr, user, pattern, vl);
 # else
-				sendto_prefix_one(cptr, user, pattern,
-						  p1, p2, p3, p4,
-						  p5, p6, p7, p8);
+			sendto_prefix_one(cptr, user, pattern,
+				  p1, p2, p3, p4, p5, p6, p7, p8);
 # endif
-				break;
-			    }
-	    }
+		}
+
+/* maybe (cptr == user) could be taken out above and this
+   part of code removed?  -- CS */
+
 	if (MyConnect(user))
 # ifdef	USE_VARARGS
 		sendto_prefix_one(user, user, pattern, vl);
@@ -863,8 +865,7 @@ va_dcl
 #ifdef	USE_VARARGS
 	va_start(vl);
 #endif
-	for (i=0; i <= highest_fd; i++)
-		sentalong[i] = 0;
+        bzero((char *)&sentalong,sizeof(sentalong));
 	for (cptr = client; cptr; cptr = cptr->next)
 	    {
 		if (!SendWallops(cptr))
